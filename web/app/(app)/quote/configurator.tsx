@@ -19,6 +19,16 @@ import {
   selectClass,
 } from "@/components/ui";
 import { Icon } from "@/components/icons";
+import { ToastViewport, type ToastKind, type ToastState } from "@/components/toast";
+
+type Status = "idle" | "updating" | "valid" | "invalid";
+
+const STATUS_META: Record<Status, { label: string; tone: "slate" | "amber" | "green" | "red" }> = {
+  idle: { label: "Waiting", tone: "slate" },
+  updating: { label: "Updating…", tone: "amber" },
+  valid: { label: "Valid configuration", tone: "green" },
+  invalid: { label: "Invalid configuration", tone: "red" },
+};
 
 export interface ConfiguratorProps {
   designId?: string;
@@ -47,6 +57,18 @@ export default function Configurator(props: ConfiguratorProps) {
   const [result, setResult] = useState<QuoteResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Transient feedback toast + suppression of the initial-load solve (so visiting
+  // the page doesn't greet the user with "Updating → success" noise).
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastSeq = useRef(0);
+  const settledOnceRef = useRef(false);
+  const showToast = useCallback((kind: ToastKind) => {
+    setToast({ id: ++toastSeq.current, kind });
+  }, []);
+  const expireToast = useCallback((id: number) => {
+    setToast((cur) => (cur && cur.id === id ? null : cur));
+  }, []);
 
   const [customer, setCustomer] = useState("");
   const [qty, setQty] = useState(1);
@@ -86,6 +108,7 @@ export default function Configurator(props: ConfiguratorProps) {
     if (!props.designId || !systemId || width <= 0 || height <= 0) return;
     setLoading(true);
     setError(null);
+    if (settledOnceRef.current) showToast("updating");
     quote({
       systemId,
       designId: props.designId,
@@ -95,10 +118,17 @@ export default function Configurator(props: ConfiguratorProps) {
       colourKey: colourKey || undefined,
       splitRatios: Object.keys(splitRatios).length ? splitRatios : undefined,
     })
-      .then((r) => setResult(r))
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Quote failed"))
+      .then((r) => {
+        setResult(r);
+        if (settledOnceRef.current) showToast("valid");
+        settledOnceRef.current = true;
+      })
+      .catch((e) => {
+        setError(e instanceof ApiError ? e.message : "Quote failed");
+        showToast("invalid");
+      })
       .finally(() => setLoading(false));
-  }, [props.designId, systemId, width, height, glassKey, colourKey, splitRatios]);
+  }, [props.designId, systemId, width, height, glassKey, colourKey, splitRatios, showToast]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -171,8 +201,14 @@ export default function Configurator(props: ConfiguratorProps) {
   const normalizedPreviewSvg = previewSvg ? normalizeSvgForPreview(previewSvg) : null;
   const canUseDesigner = Boolean(result?.geometry.outer && result.geometry.cells?.length);
 
+  // Single source of truth for status, shared by every surface (header meta,
+  // preview-card badge, canvas chip). `loading` wins so a re-solve always reads
+  // "Updating" even while a stale result is still held; `error` beats `result`.
+  const status: Status = loading ? "updating" : error ? "invalid" : result ? "valid" : "idle";
+
   return (
     <div className="space-y-4">
+      <ToastViewport toast={toast} onExpire={expireToast} />
       <PageHeader
         eyebrow="Quote workstation"
         title={props.designName ?? result?.designName ?? "Configure quote"}
@@ -186,7 +222,7 @@ export default function Configurator(props: ConfiguratorProps) {
           <>
             <Badge tone="purple">{props.designId}</Badge>
             {selectedSystem && <Badge tone="slate">{selectedSystem.name}</Badge>}
-            {loading ? <Badge tone="amber">Updating</Badge> : result ? <Badge tone="green">Valid configuration</Badge> : null}
+            {status !== "idle" && <Badge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</Badge>}
           </>
         }
       />
@@ -295,7 +331,7 @@ export default function Configurator(props: ConfiguratorProps) {
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone="blue">Preview</Badge>
-                <Badge tone={error ? "red" : result ? "green" : "slate"}>{error ? "Issue" : result ? "Solved" : "Waiting"}</Badge>
+                <Badge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</Badge>
               </div>
             </div>
             <div className="industrial-grid flex min-h-[460px] min-w-0 items-center justify-center overflow-hidden p-3 sm:min-h-[620px] sm:p-5">
@@ -325,9 +361,26 @@ export default function Configurator(props: ConfiguratorProps) {
                     <p className="mt-4 text-sm font-semibold text-slate-500">{loading ? "Solving configuration..." : "Enter dimensions to generate preview"}</p>
                   </div>
                 )}
-                {result && (
-                  <div className="absolute right-4 top-4 rounded-md bg-emerald-600 px-3 py-2 text-xs font-bold uppercase text-white shadow-[0_10px_25px_rgba(16,185,129,0.25)]">
-                    Valid configuration
+                {status !== "idle" && (
+                  <div
+                    className={
+                      "absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold  tracking-wide text-white shadow-[0_8px_20px_rgba(15,23,42,0.2)] " +
+                      (status === "updating"
+                        ? "bg-amber-500"
+                        : status === "invalid"
+                          ? "bg-red-600"
+                          : "bg-emerald-600")
+                    }
+                  >
+                    {status === "updating" ? (
+                      <span
+                        aria-hidden="true"
+                        className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+                      />
+                    ) : (
+                      <Icon name={status === "invalid" ? "alert" : "check"} className="h-4 w-4" />
+                    )}
+                    {STATUS_META[status].label}
                   </div>
                 )}
               </div>

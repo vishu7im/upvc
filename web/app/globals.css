@@ -157,3 +157,33 @@ textarea {
     transform: translateX(100%);
   }
 }
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+}
+
+.toast-enter {
+  animation: toast-in 0.22s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.toast-leave {
+  animation: toast-out 0.2s ease-in both;
+}
