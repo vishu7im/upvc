@@ -185,7 +185,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <PageHeader
             eyebrow="Generated assets"
             title="Documents"
-            description="Preview generated documents in place or download PDFs through the authenticated proxy."
+            description="Welded cut-length documents are selected by default. Switch to Normal when you need finished dimensions."
           />
           {docTypes.length === 0 ? (
             <EmptyState icon="document" title="No documents generated" description="The engine did not return any generated documents for this order." />
@@ -202,7 +202,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <h3 className="mt-6 text-xl font-bold text-slate-950">{docLabel(document.type)}</h3>
                   <p className="mt-2 flex-1 text-sm leading-6 text-slate-500">
                     {document.variants.includes("welded")
-                      ? "Choose Normal (finished sizes) or Welded (lengths include weld-shrinkage allowance)."
+                      ? "Welded includes the weld-shrinkage allowance for saw cutting. Normal shows finished sizes."
                       : "Production-ready fabrication document generated from confirmed order data."}
                   </p>
                   <DocumentViewer
