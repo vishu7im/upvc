@@ -122,13 +122,30 @@ textarea {
   content: "";
 }
 
+.quote-preview-frame {
+  height: clamp(420px, calc(100vh - 220px), 760px);
+}
+
+@media (max-width: 640px) {
+  .quote-preview-frame {
+    height: clamp(340px, calc(100vh - 260px), 520px);
+  }
+}
+
+.design-preview-svg {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  contain: paint;
+}
+
 .design-preview-svg > svg {
   display: block;
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .design-preview-svg > svg * {

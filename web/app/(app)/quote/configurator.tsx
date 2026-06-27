@@ -157,7 +157,7 @@ export default function Configurator(props: ConfiguratorProps) {
   const normalizedPreviewSvg = previewSvg ? normalizeSvgForPreview(previewSvg) : null;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         eyebrow="Quote workstation"
         title={props.designName ?? result?.designName ?? "Configure quote"}
@@ -176,13 +176,13 @@ export default function Configurator(props: ConfiguratorProps) {
         }
       />
 
-      <div className="grid gap-5 xl:grid-cols-[360px_minmax(420px,1fr)_380px]">
-        <Card className="h-fit overflow-hidden xl:sticky xl:top-20">
-          <div className="border-b border-slate-200 px-5 py-4">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <Card className="h-fit min-w-0 overflow-hidden xl:sticky xl:top-20">
+          <div className="border-b border-slate-200 px-4 py-3">
             <h2 className="text-base font-semibold text-slate-950">Configuration</h2>
             <p className="mt-1 text-sm text-slate-500">Live quote inputs in millimeters.</p>
           </div>
-          <div className="space-y-5 p-5">
+          <div className="space-y-4 p-4">
             <label className="block">
               <FieldLabel>Profile system</FieldLabel>
               <select value={systemId} onChange={(e) => setSystemId(e.target.value)} className={selectClass}>
@@ -247,7 +247,7 @@ export default function Configurator(props: ConfiguratorProps) {
               </select>
             </label>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-600">Glass</span>
                 <span className="text-right font-semibold text-slate-950">{selectedGlass?.name ?? "Design default"}</span>
@@ -256,11 +256,11 @@ export default function Configurator(props: ConfiguratorProps) {
                 <span className="font-semibold text-slate-600">Finish</span>
                 <span className="text-right font-semibold text-slate-950">{selectedColour?.name ?? "Default"}</span>
               </div>
-              <div className="mt-4 grid grid-cols-4 gap-2">
+              <div className="mt-3 grid grid-cols-4 gap-2">
                 {["#ffffff", "#353b3f", "#9a672f", "#4d2b22"].map((color, index) => (
                   <span
                     key={color}
-                    className={index === 0 ? "h-10 rounded-md border-2 border-[#4442e3]" : "h-10 rounded-md border border-slate-300"}
+                    className={index === 0 ? "h-8 rounded-md border-2 border-[#4442e3]" : "h-8 rounded-md border border-slate-300"}
                     style={{ background: color }}
                   />
                 ))}
@@ -269,142 +269,144 @@ export default function Configurator(props: ConfiguratorProps) {
           </div>
         </Card>
 
-        <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-            <div>
-              <h2 className="text-base font-semibold text-slate-950">Live design preview</h2>
-              <p className="mt-1 font-mono text-xs text-slate-500">
-                {width} x {height} mm / {systemId || "No system"}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge tone="blue">Preview</Badge>
-              <Badge tone={error ? "red" : result ? "green" : "slate"}>{error ? "Issue" : result ? "Solved" : "Waiting"}</Badge>
-            </div>
-          </div>
-          <div className="industrial-grid flex min-h-[560px] items-center justify-center p-6">
-            <div className="relative flex min-h-[460px] w-full max-w-3xl items-center justify-center rounded-lg border border-slate-200 bg-white/[0.84] p-8 shadow-[0_28px_70px_rgba(15,23,42,0.12)]">
-              {error ? (
-                <Alert tone="red" title="Quote failed">{error}</Alert>
-              ) : normalizedPreviewSvg ? (
-                <div
-                  className="design-preview-svg flex h-full max-h-[620px] min-h-[360px] w-full items-center justify-center"
-                  dangerouslySetInnerHTML={{ __html: normalizedPreviewSvg }}
-                />
-              ) : (
-                <div className="flex w-full max-w-md flex-col items-center">
-                  <div className="skeleton h-64 w-full rounded-lg" />
-                  <p className="mt-4 text-sm font-semibold text-slate-500">{loading ? "Solving configuration..." : "Enter dimensions to generate preview"}</p>
-                </div>
-              )}
-              {result && (
-                <div className="absolute right-4 top-4 rounded-md bg-emerald-600 px-3 py-2 text-xs font-bold uppercase text-white shadow-[0_10px_25px_rgba(16,185,129,0.25)]">
-                  Valid configuration
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        <div className="space-y-5 xl:sticky xl:top-20 xl:h-fit">
-          <Card className="overflow-hidden">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <p className="text-xs font-semibold uppercase text-[#4442e3]">Quote summary</p>
-              <div className="mt-2 flex items-baseline justify-between gap-3">
-                <h2 className="text-4xl font-bold text-slate-950">
-                  {result ? money(result.pricing.totals.grandTotal) : "--"}
-                </h2>
-                {loading && <span className="text-xs font-semibold uppercase text-amber-600">Updating</span>}
-              </div>
-            </div>
-            <dl className="space-y-3 p-5 text-sm">
-              {result ? (
-                <>
-                  <SummaryRow label="Material" value={money(result.pricing.totals.materialPrice)} />
-                  <SummaryRow label="Labour" value={money(result.pricing.totals.labour)} />
-                  <SummaryRow label="Markup" value={money(result.pricing.totals.markup)} />
-                  <SummaryRow label="Tax" value={money(result.pricing.totals.tax)} />
-                </>
-              ) : (
-                <p className="text-sm text-slate-500">Pricing appears after the first successful quote.</p>
-              )}
-            </dl>
-          </Card>
-
-          <Card className="overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div className="min-w-0 space-y-5">
+          <Card className="min-w-0 overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
               <div>
-                <h2 className="text-base font-semibold text-slate-950">BOM preview</h2>
-                <p className="mt-1 text-sm text-slate-500">{lines.length} priced lines</p>
-              </div>
-              <Badge tone="slate">{result?.pricing.currency ?? "GBP"}</Badge>
-            </div>
-            <div className="max-h-80 overflow-y-auto">
-              {lines.length === 0 ? (
-                <p className="p-5 text-sm text-slate-500">Material lines will appear after pricing completes.</p>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {lines.slice(0, 10).map((line) => (
-                    <li key={`${line.category}-${line.code}-${line.description}`} className="px-5 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-900">{line.description}</p>
-                          <p className="mt-1 font-mono text-xs text-slate-500">{line.code} / {line.qty} {line.unit}</p>
-                        </div>
-                        <span className="font-semibold text-slate-950">{money(line.totalPrice)}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">
-                  {props.orderId ? "Add to this order" : "Create order from quote"}
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Saved items use default glass and colour in the current order API.
+                <h2 className="text-base font-semibold text-slate-950">Live design preview</h2>
+                <p className="mt-1 font-mono text-xs text-slate-500">
+                  {width} x {height} mm / {systemId || "No system"}
                 </p>
               </div>
-              <Icon name="orders" className="mt-1 h-5 w-5 text-slate-400" />
+              <div className="flex items-center gap-2">
+                <Badge tone="blue">Preview</Badge>
+                <Badge tone={error ? "red" : result ? "green" : "slate"}>{error ? "Issue" : result ? "Solved" : "Waiting"}</Badge>
+              </div>
             </div>
-            <div className="mt-4 grid grid-cols-[96px_1fr] gap-3">
-              <label>
-                <FieldLabel>Qty</FieldLabel>
-                <input
-                  type="number"
-                  min={1}
-                  value={qty}
-                  onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className={fieldClass}
-                />
-              </label>
-              {!props.orderId && (
+            <div className="industrial-grid flex min-h-[460px] min-w-0 items-center justify-center overflow-hidden p-3 sm:min-h-[620px] sm:p-5">
+              <div className="quote-preview-frame relative flex min-h-0 w-full min-w-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white/[0.84] p-4 shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-6">
+                {error ? (
+                  <Alert tone="red" title="Quote failed">{error}</Alert>
+                ) : normalizedPreviewSvg ? (
+                  <div
+                    className="design-preview-svg flex h-full min-h-0 w-full min-w-0 items-center justify-center"
+                    dangerouslySetInnerHTML={{ __html: normalizedPreviewSvg }}
+                  />
+                ) : (
+                  <div className="flex w-full max-w-md flex-col items-center">
+                    <div className="skeleton h-64 w-full rounded-lg" />
+                    <p className="mt-4 text-sm font-semibold text-slate-500">{loading ? "Solving configuration..." : "Enter dimensions to generate preview"}</p>
+                  </div>
+                )}
+                {result && (
+                  <div className="absolute right-4 top-4 rounded-md bg-emerald-600 px-3 py-2 text-xs font-bold uppercase text-white shadow-[0_10px_25px_rgba(16,185,129,0.25)]">
+                    Valid configuration
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(240px,300px)_minmax(0,1fr)_minmax(280px,340px)]">
+            <Card className="min-w-0 overflow-hidden">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <p className="text-xs font-semibold uppercase text-[#4442e3]">Quote summary</p>
+                <div className="mt-2 flex items-baseline justify-between gap-3">
+                  <h2 className="text-3xl font-bold text-slate-950">
+                    {result ? money(result.pricing.totals.grandTotal) : "--"}
+                  </h2>
+                  {loading && <span className="text-xs font-semibold uppercase text-amber-600">Updating</span>}
+                </div>
+              </div>
+              <dl className="space-y-3 p-5 text-sm">
+                {result ? (
+                  <>
+                    <SummaryRow label="Material" value={money(result.pricing.totals.materialPrice)} />
+                    <SummaryRow label="Labour" value={money(result.pricing.totals.labour)} />
+                    <SummaryRow label="Markup" value={money(result.pricing.totals.markup)} />
+                    <SummaryRow label="Tax" value={money(result.pricing.totals.tax)} />
+                  </>
+                ) : (
+                  <p className="text-sm text-slate-500">Pricing appears after the first successful quote.</p>
+                )}
+              </dl>
+            </Card>
+
+            <Card className="min-w-0 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-950">BOM preview</h2>
+                  <p className="mt-1 text-sm text-slate-500">{lines.length} priced lines</p>
+                </div>
+                <Badge tone="slate">{result?.pricing.currency ?? "GBP"}</Badge>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {lines.length === 0 ? (
+                  <p className="p-5 text-sm text-slate-500">Material lines will appear after pricing completes.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {lines.slice(0, 10).map((line) => (
+                      <li key={`${line.category}-${line.code}-${line.description}`} className="px-5 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-900">{line.description}</p>
+                            <p className="mt-1 font-mono text-xs text-slate-500">{line.code} / {line.qty} {line.unit}</p>
+                          </div>
+                          <span className="font-semibold text-slate-950">{money(line.totalPrice)}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </Card>
+
+            <Card className="min-w-0 p-5 lg:col-span-2 2xl:col-span-1">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-950">
+                    {props.orderId ? "Add to this order" : "Create order from quote"}
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Saved items use default glass and colour in the current order API.
+                  </p>
+                </div>
+                <Icon name="orders" className="mt-1 h-5 w-5 text-slate-400" />
+              </div>
+              <div className="mt-4 grid grid-cols-[96px_1fr] gap-3">
                 <label>
-                  <FieldLabel>Customer</FieldLabel>
+                  <FieldLabel>Qty</FieldLabel>
                   <input
-                    value={customer}
-                    onChange={(e) => setCustomer(e.target.value)}
-                    placeholder="Customer name"
+                    type="number"
+                    min={1}
+                    value={qty}
+                    onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
                     className={fieldClass}
                   />
                 </label>
+                {!props.orderId && (
+                  <label>
+                    <FieldLabel>Customer</FieldLabel>
+                    <input
+                      value={customer}
+                      onChange={(e) => setCustomer(e.target.value)}
+                      placeholder="Customer name"
+                      className={fieldClass}
+                    />
+                  </label>
+                )}
+              </div>
+              {!canAdd && (
+                <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                  Open the configurator from a product design gallery to enable ordering.
+                </p>
               )}
-            </div>
-            {!canAdd && (
-              <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                Open the configurator from a product design gallery to enable ordering.
-              </p>
-            )}
-            {addError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{addError}</p>}
-            <Button onClick={onAddToOrder} disabled={!canAdd || adding} className="mt-4 w-full" icon="plus">
-              {adding ? "Adding..." : props.orderId ? "Add item" : "Create order"}
-            </Button>
-          </Card>
+              {addError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{addError}</p>}
+              <Button onClick={onAddToOrder} disabled={!canAdd || adding} className="mt-4 w-full" icon="plus">
+                {adding ? "Adding..." : props.orderId ? "Add item" : "Create order"}
+              </Button>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
