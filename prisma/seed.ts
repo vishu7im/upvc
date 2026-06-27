@@ -2,12 +2,13 @@
 // prisma/seed.ts — load the calibrated catalog into PostgreSQL.
 //
 // The hardcoded TypeScript catalog (system-sunnyplast.ts, designs.ts,
-// settings.ts) is the SOURCE OF TRUTH: every deduction in it is
-// calibrated against real Quotila jobs 85/88/90. This script copies it
-// faithfully into the DB so the engine can load from Postgres instead.
+// settings.ts) is the SOURCE OF TRUTH for structural catalog data: every
+// deduction in it is calibrated against real Quotila jobs 85/88/90. Admin-owned
+// commercial/runtime fields are created from these defaults once, then preserved
+// on later deploy reseeds.
 //
-// Idempotent: re-running upserts on the unique keys, so it's safe to run
-// repeatedly. Wrapped in a single interactive transaction.
+// Idempotent: re-running upserts on the unique keys is safe, and admin-owned
+// fields are not rewritten.
 //
 //   npm run db:seed
 // =====================================================================
@@ -93,14 +94,25 @@ async function seedSystem(
       jointType?: string;
       endClearance?: number;
     } = {},
-  ) =>
-    tx.profilePart.upsert({
+  ) => {
+    // These values are edited in Admin > Catalog. Do not reset them on every
+    // deploy, because docker-compose runs this seed during backend startup.
+    const {
+      cost: _cost,
+      price: _price,
+      weight: _weight,
+      weldAllowanceMm: _weldAllowanceMm,
+      ...catalogFields
+    } = base;
+
+    return tx.profilePart.upsert({
       where: {
         systemId_kind_partKey: { systemId: sys.systemId, kind, partKey },
       },
-      update: { ...base, ...extra },
+      update: { ...catalogFields, ...extra },
       create: { systemId: sys.systemId, partKey, kind, ...base, ...extra },
     });
+  };
 
   for (const [key, f] of Object.entries(sys.frames)) {
     await upsertPart(key, PartKind.FRAME, f, { glassRebate: f.glassRebate });
@@ -125,42 +137,59 @@ async function seedSystem(
 
   // 3. Glass
   for (const [partKey, g] of Object.entries(sys.glass)) {
+    const {
+      cost: _cost,
+      price: _price,
+      weight: _weight,
+      ...catalogFields
+    } = g;
     await tx.glass.upsert({
       where: { systemId_partKey: { systemId: sys.systemId, partKey } },
-      update: { ...g },
+      update: { ...catalogFields },
       create: { systemId: sys.systemId, partKey, ...g },
     });
   }
 
   // 4. Gaskets
   for (const [partKey, g] of Object.entries(sys.gaskets)) {
+    const {
+      cost: _cost,
+      price: _price,
+      weight: _weight,
+      ...catalogFields
+    } = g;
     await tx.gasket.upsert({
       where: { systemId_partKey: { systemId: sys.systemId, partKey } },
-      update: { ...g },
+      update: { ...catalogFields },
       create: { systemId: sys.systemId, partKey, ...g },
     });
   }
 
   // 5. Hardware
   for (const [partKey, h] of Object.entries(sys.hardware)) {
+    const {
+      cost: _cost,
+      price: _price,
+      weight: _weight,
+      ...catalogFields
+    } = h;
     await tx.hardware.upsert({
       where: { systemId_partKey: { systemId: sys.systemId, partKey } },
-      update: { ...h, lengthMm: h.lengthMm ?? null },
+      update: { ...catalogFields, lengthMm: h.lengthMm ?? null },
       create: { systemId: sys.systemId, partKey, ...h, lengthMm: h.lengthMm ?? null },
     });
   }
 
   // 6. Colours / finishes (M5) — base white ships at 0% uplift.
   for (const [key, c] of Object.entries(sys.colours)) {
+    const {
+      costUpliftPct: _costUpliftPct,
+      priceUpliftPct: _priceUpliftPct,
+      ...catalogFields
+    } = c;
     await tx.colourOption.upsert({
       where: { systemId_key: { systemId: sys.systemId, key } },
-      update: {
-        code: c.code,
-        name: c.name,
-        costUpliftPct: c.costUpliftPct,
-        priceUpliftPct: c.priceUpliftPct,
-        isBase: c.isBase,
-      },
+      update: catalogFields,
       create: {
         systemId: sys.systemId,
         key,
@@ -230,34 +259,29 @@ async function main() {
     });
   }
 
-  // Default settings (single row, id = 1)
+  // Default settings (single row, id = 1). Admin can edit every setting field,
+  // so seed only creates the row when it is missing.
   const s = DEFAULT_SETTINGS;
-  await prisma.setting.upsert({
+  const settingsExist = await prisma.setting.findUnique({
     where: { id: 1 },
-    update: {
-      currency: s.currency,
-      taxApply: s.taxApply,
-      taxPct: s.taxPct,
-      markupPct: s.markupPct,
-      wastagePct: s.wastagePct,
-      labourPerSash: s.labour.perSash,
-      labourPerDoor: s.labour.perDoor,
-      labourBase: s.labour.base,
-      weldAllowanceMm: s.weldAllowanceMm ?? 2.5,
-    },
-    create: {
-      id: 1,
-      currency: s.currency,
-      taxApply: s.taxApply,
-      taxPct: s.taxPct,
-      markupPct: s.markupPct,
-      wastagePct: s.wastagePct,
-      labourPerSash: s.labour.perSash,
-      labourPerDoor: s.labour.perDoor,
-      labourBase: s.labour.base,
-      weldAllowanceMm: s.weldAllowanceMm ?? 2.5,
-    },
+    select: { id: true },
   });
+  if (!settingsExist) {
+    await prisma.setting.create({
+      data: {
+        id: 1,
+        currency: s.currency,
+        taxApply: s.taxApply,
+        taxPct: s.taxPct,
+        markupPct: s.markupPct,
+        wastagePct: s.wastagePct,
+        labourPerSash: s.labour.perSash,
+        labourPerDoor: s.labour.perDoor,
+        labourBase: s.labour.base,
+        weldAllowanceMm: s.weldAllowanceMm ?? 2.5,
+      },
+    });
+  }
 
   // Flow data (products, imported designs, admin) — also auto-committing upserts.
   await seedProducts();
@@ -413,7 +437,7 @@ async function applyDerivedTopologies() {
         prisma.design.update({
           where: { externalId },
           data: {
-            topology: { ...(e.topology as object), _meta: e.meta } as Prisma.InputJsonValue,
+            topology: { ...(e.topology as object), _meta: e.meta } as unknown as Prisma.InputJsonValue,
             frameKey: e.frameKey,
             quotable: e.quotable,
           },
