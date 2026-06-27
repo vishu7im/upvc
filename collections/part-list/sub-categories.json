@@ -1,0 +1,308 @@
+[
+    {
+        "partCategoryId": 128,
+        "description": "Casement Handles",
+        "listIndex": 0,
+        "id": 2341,
+        "accountId": 1045,
+        "firstRevision": 2426,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Frame – (Standard)",
+        "listIndex": 0,
+        "id": 2739,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Friction Stays",
+        "listIndex": 1,
+        "id": 2342,
+        "accountId": 1045,
+        "firstRevision": 2427,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Sash – (Standard)",
+        "listIndex": 1,
+        "id": 2740,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Casement Locking",
+        "listIndex": 2,
+        "id": 2343,
+        "accountId": 1045,
+        "firstRevision": 2428,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Structural T/Z – (Standard)",
+        "listIndex": 2,
+        "id": 2741,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Add-on – (Standard)",
+        "listIndex": 3,
+        "id": 2742,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Casement Extras",
+        "listIndex": 3,
+        "id": 2344,
+        "accountId": 1045,
+        "firstRevision": 31570,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Cill – (Standard)",
+        "listIndex": 4,
+        "id": 2743,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Door Handle",
+        "listIndex": 4,
+        "id": 2345,
+        "accountId": 1045,
+        "firstRevision": 2430,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Cylinders",
+        "listIndex": 5,
+        "id": 2346,
+        "accountId": 1045,
+        "firstRevision": 2431,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Threshold – (Standard)",
+        "listIndex": 5,
+        "id": 2744,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Accessories – (Standard)",
+        "listIndex": 6,
+        "id": 2745,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Door Hinge",
+        "listIndex": 6,
+        "id": 2347,
+        "accountId": 1045,
+        "firstRevision": 2432,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Beads",
+        "listIndex": 7,
+        "id": 2746,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Door Lock",
+        "listIndex": 7,
+        "id": 2348,
+        "accountId": 1045,
+        "firstRevision": 2433,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Reinf - (steel)",
+        "listIndex": 8,
+        "id": 2747,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Door Extras",
+        "listIndex": 8,
+        "id": 2350,
+        "accountId": 1045,
+        "firstRevision": 9807,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Reinf - (Alum)",
+        "listIndex": 9,
+        "id": 2748,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Tilt & Turn Handles",
+        "listIndex": 9,
+        "id": 2352,
+        "accountId": 1045,
+        "firstRevision": 9807,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Reinf - (Thermal)",
+        "listIndex": 10,
+        "id": 2749,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Tilt & Turn Gearing",
+        "listIndex": 10,
+        "id": 2353,
+        "accountId": 1045,
+        "firstRevision": 9807,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Trickle Vents",
+        "listIndex": 11,
+        "id": 2351,
+        "accountId": 1045,
+        "firstRevision": 9807,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Gasket/Woolpile",
+        "listIndex": 11,
+        "id": 2750,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Letter Plate",
+        "listIndex": 12,
+        "id": 2349,
+        "accountId": 1045,
+        "firstRevision": 9807,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Door Knocker/Spy",
+        "listIndex": 13,
+        "id": 2355,
+        "accountId": 1045,
+        "firstRevision": 9805,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Post/Poles/Couplers",
+        "listIndex": 13,
+        "id": 2752,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Spyholes",
+        "listIndex": 14,
+        "id": 2358,
+        "accountId": 1045,
+        "firstRevision": 9804,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Patio - Profiles",
+        "listIndex": 14,
+        "id": 2753,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Numerals/Letters",
+        "listIndex": 15,
+        "id": 2359,
+        "accountId": 1045,
+        "firstRevision": 9804,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 305,
+        "description": "Patio - Accessories",
+        "listIndex": 15,
+        "id": 2754,
+        "accountId": 1045,
+        "firstRevision": 34297,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Patio Handles",
+        "listIndex": 16,
+        "id": 2360,
+        "accountId": 1045,
+        "firstRevision": 9804,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Patio Hardware",
+        "listIndex": 17,
+        "id": 2361,
+        "accountId": 1045,
+        "firstRevision": 9804,
+        "lastRevision": 0
+    },
+    {
+        "partCategoryId": 128,
+        "description": "Glazing Accessories",
+        "listIndex": 18,
+        "id": 2784,
+        "accountId": 1045,
+        "firstRevision": 39657,
+        "lastRevision": 0
+    }
+]

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>uPVC Engine — Test Driver</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; color: #28323c; background: #f6f8fa; }
+    header { background: #28323c; color: #fff; padding: 14px 20px; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.04em; }
+    .row { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px; min-height: calc(100vh - 50px); }
+    .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); padding: 16px; }
+    label { display: block; font-size: 12px; color: #666; margin: 10px 0 4px; font-weight: 500; }
+    input, select { width: 100%; padding: 8px 10px; border: 1px solid #d0d4d8; border-radius: 4px; font-size: 14px; font-family: inherit; }
+    button { background: #28323c; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; width: 100%; margin-top: 12px; }
+    button:hover { background: #3a4754; }
+    .preview { display: flex; align-items: center; justify-content: center; min-height: 400px; background: #fafafa; border-radius: 4px; padding: 20px; }
+    .preview svg { max-width: 100%; max-height: 600px; height: auto; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid #d0d4d8; margin-top: 16px; }
+    .tab { padding: 8px 16px; cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; }
+    .tab.active { border-bottom-color: #28323c; font-weight: 600; }
+    .panel { display: none; padding: 16px 0; }
+    .panel.active { display: block; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #eee; }
+    thead th { background: #f6f8fa; font-weight: 600; }
+    .right { text-align: right; }
+    .doc-iframe { width: 100%; height: 700px; border: 1px solid #d0d4d8; border-radius: 4px; }
+    .totals { font-size: 14px; }
+    .totals tr td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    .totals tr.grand td { font-weight: 700; font-size: 16px; border-top: 2px solid #28323c; padding-top: 8px; }
+    .small { font-size: 11px; color: #888; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>uPVC Fabrication Engine — Test Driver</h1>
+  </header>
+
+  <div class="row">
+    <aside class="card">
+      <label>System</label>
+      <select id="system"></select>
+
+      <label>Design</label>
+      <select id="design"></select>
+
+      <label>Width (mm)</label>
+      <input id="width" type="number" value="1200" min="200" max="5000">
+
+      <label>Height (mm)</label>
+      <input id="height" type="number" value="1200" min="200" max="3000">
+
+      <label>Customer</label>
+      <input id="customer" type="text" value="Test Customer">
+
+      <label>Order / Ref</label>
+      <input id="orderNo" type="text" value="TEST-001">
+
+      <button onclick="run()">Generate Quote</button>
+
+      <div class="small" id="status">Ready.</div>
+    </aside>
+
+    <main class="card">
+      <div class="tabs">
+        <div class="tab active" data-tab="preview">Preview</div>
+        <div class="tab" data-tab="parts">Parts</div>
+        <div class="tab" data-tab="cutting">Cutting Plan</div>
+        <div class="tab" data-tab="pricing">Pricing</div>
+        <div class="tab" data-tab="docs">Documents</div>
+      </div>
+
+      <div class="panel active" data-panel="preview">
+        <div class="preview" id="preview">Click "Generate Quote" to render a window.</div>
+      </div>
+
+      <div class="panel" data-panel="parts">
+        <h3>Bars (cuttable pieces)</h3>
+        <div id="bars-table"></div>
+        <h3>Glass</h3>
+        <div id="glass-table"></div>
+        <h3>Gaskets</h3>
+        <div id="gaskets-table"></div>
+        <h3>Hardware</h3>
+        <div id="hardware-table"></div>
+      </div>
+
+      <div class="panel" data-panel="cutting">
+        <div id="cutting-plan"></div>
+      </div>
+
+      <div class="panel" data-panel="pricing">
+        <h3>Line Items</h3>
+        <div id="pricing-lines"></div>
+        <h3>Totals</h3>
+        <div id="pricing-totals"></div>
+      </div>
+
+      <div class="panel" data-panel="docs">
+        <div class="tabs" style="margin-top: 0;">
+          <div class="tab active" data-doc="workOrder">Work Order</div>
+          <div class="tab" data-doc="cuttingList">Cutting List</div>
+          <div class="tab" data-doc="bom">BOM</div>
+          <div class="tab" data-doc="priceSummary">Price Summary</div>
+        </div>
+        <iframe id="doc-frame" class="doc-iframe" style="margin-top: 12px;"></iframe>
+      </div>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

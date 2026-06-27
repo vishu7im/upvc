@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Fab ERP - uPVC Fabrication System</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;family=Hanken+Grotesk:wght@600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "secondary": "#4442e3",
+                        "status-milling": "#3B82F6",
+                        "inverse-surface": "#2d3133",
+                        "on-secondary-container": "#fffbff",
+                        "surface-container-highest": "#e0e3e5",
+                        "tertiary": "#000000",
+                        "tertiary-container": "#271901",
+                        "on-primary": "#ffffff",
+                        "surface-dim": "#d8dadc",
+                        "on-surface-variant": "#45464d",
+                        "surface": "#f7f9fb",
+                        "secondary-fixed": "#e1dfff",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "primary-fixed-dim": "#bec6e0",
+                        "primary-fixed": "#dae2fd",
+                        "primary": "#000000",
+                        "inverse-primary": "#bec6e0",
+                        "tertiary-fixed": "#fcdeb5",
+                        "on-surface": "#191c1e",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f7f9fb",
+                        "surface-container-high": "#e6e8ea",
+                        "error": "#ba1a1a",
+                        "glass-border": "rgba(255, 255, 255, 0.4)",
+                        "secondary-container": "#5f5ffd",
+                        "surface-container": "#eceef0",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#565e74",
+                        "outline-variant": "#c6c6cd",
+                        "on-tertiary-container": "#98805d",
+                        "status-welding": "#F59E0B",
+                        "secondary-fixed-dim": "#c1c1ff",
+                        "on-secondary-fixed": "#09006b",
+                        "surface-bright": "#f7f9fb",
+                        "surface-variant": "#e0e3e5",
+                        "status-assembly": "#10B981",
+                        "outline": "#76777d",
+                        "glass-bg": "rgba(255, 255, 255, 0.7)",
+                        "danger": "#EF4444",
+                        "on-tertiary-fixed": "#271901",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-fixed-variant": "#2c24ce",
+                        "primary-container": "#131b2e",
+                        "surface-container-low": "#f2f4f6",
+                        "on-background": "#191c1e",
+                        "on-tertiary-fixed-variant": "#574425",
+                        "surface-container-lowest": "#ffffff",
+                        "status-shipped": "#6366F1",
+                        "on-primary-container": "#7c839b",
+                        "tertiary-fixed-dim": "#dec29a",
+                        "on-primary-fixed": "#131b2e",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#eff1f3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "margin-desktop": "40px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "container-max": "1440px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-sm": ["JetBrains Mono"],
+                        "display-xl": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "display-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .active-nav-glow {
+            box-shadow: 0 0 15px rgba(68, 66, 227, 0.2);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .chart-grid {
+            background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px), linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased">
+<!-- Sidebar Navigation -->
+<aside class="flex flex-col h-full py-base bg-surface dark:bg-inverse-surface text-secondary dark:text-secondary-fixed h-screen w-64 fixed left-0 top-0 border-r border-outline-variant dark:border-outline z-40">
+<div class="px-gutter py-8">
+<h1 class="text-headline-md font-headline-md font-bold text-primary dark:text-on-primary-fixed mb-1">Fab ERP</h1>
+<p class="text-label-sm font-label-sm text-on-surface-variant opacity-70">uPVC Fabrication System</p>
+</div>
+<nav class="flex-1 px-4 space-y-1 overflow-y-auto">
+<!-- Active: Dashboard -->
+<a class="flex items-center gap-3 px-4 py-3 text-secondary dark:text-secondary-fixed-dim font-bold bg-secondary-fixed dark:bg-primary-container rounded-lg transition-all active-nav-glow" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="text-body-md font-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">inventory_2</span>
+<span class="text-body-md font-body-md">Products</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">request_quote</span>
+<span class="text-body-md font-body-md">Quotes</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">shopping_cart</span>
+<span class="text-body-md font-body-md">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">factory</span>
+<span class="text-body-md font-body-md">Production</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">description</span>
+<span class="text-body-md font-body-md">Documents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">group</span>
+<span class="text-body-md font-body-md">Customers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">warehouse</span>
+<span class="text-body-md font-body-md">Inventory</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">analytics</span>
+<span class="text-body-md font-body-md">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">settings</span>
+<span class="text-body-md font-body-md">Administration</span>
+</a>
+</nav>
+<div class="px-4 py-6 border-t border-outline-variant">
+<button class="w-full flex items-center justify-center gap-2 bg-primary text-on-primary py-3 px-4 rounded-lg font-bold hover:opacity-90 transition-opacity mb-6">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+                New Quote
+            </button>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-secondary transition-colors text-body-md" href="#">
+<span class="material-symbols-outlined">help</span>
+                    Help
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-danger transition-colors text-body-md" href="#">
+<span class="material-symbols-outlined">logout</span>
+                    Logout
+                </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen">
+<!-- Top Navbar -->
+<header class="flex justify-between items-center h-16 px-gutter w-full sticky top-0 z-30 bg-glass-bg backdrop-blur-xl border-b border-glass-border shadow-sm">
+<div class="flex items-center gap-8">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-secondary text-body-md w-80 transition-all" placeholder="Search orders, quotes, inventory..." type="text"/>
+</div>
+<nav class="hidden md:flex gap-6">
+<a class="text-secondary font-bold border-b-2 border-secondary text-label-sm font-label-sm" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:text-secondary transition-colors text-label-sm font-label-sm" href="#">Orders</a>
+<a class="text-on-surface-variant hover:text-secondary transition-colors text-label-sm font-label-sm" href="#">Inventory</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<button class="bg-primary text-on-primary text-label-sm font-label-sm px-4 py-2 rounded-lg font-bold active:opacity-80 transition-opacity">Create Order</button>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<button class="material-symbols-outlined hover:text-secondary transition-colors">notifications</button>
+<button class="material-symbols-outlined hover:text-secondary transition-colors">history</button>
+<div class="h-8 w-8 rounded-full bg-primary overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A professional portrait of a modern industrial manager wearing a crisp white shirt, clean workshop background blurred in soft focus, high-quality corporate photography style with natural lighting and a confident expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtS1uGej_XvWkbLLyJ0Nkp79gG79jHr5WRKN41q551W42OkuGxSL7Dw5GRvPYGj7NHgqlXqbM3Cy9RmAn2nfNBsPpiQ4f1fW3abDVE5OdJrIukhn-ta33QSpZQ7w7MXzufOCcT5FyF5soRDicHmkK_V98KCtyd_FwMuhZTTDIXEqDuYaeOdwyg-W9nbvTbGgyHOt7Z7v3kCC6_BVgT1dWcThMh-Ejrh7c9Kzntqkp3PMXWVm1y2TT1lx1cjksHWtOyJLf7i5dltWA"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Dashboard Canvas -->
+<div class="p-gutter max-w-container-max mx-auto space-y-gutter">
+<!-- KPI Top Row -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<div class="glass-card p-6 rounded-xl relative overflow-hidden group">
+<div class="flex justify-between items-start mb-4">
+<div class="bg-secondary-fixed p-3 rounded-lg text-secondary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">request_quote</span>
+</div>
+<div class="flex items-center text-status-assembly text-label-sm font-label-sm font-bold">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+                            +12.5%
+                        </div>
+</div>
+<p class="text-on-surface-variant text-label-sm font-label-sm uppercase tracking-wider mb-1">Total Quotes</p>
+<h2 class="text-headline-md font-headline-md text-primary">1,284</h2>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-secondary opacity-20 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="glass-card p-6 rounded-xl relative overflow-hidden group">
+<div class="flex justify-between items-start mb-4">
+<div class="bg-primary-fixed p-3 rounded-lg text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">shopping_cart_checkout</span>
+</div>
+<div class="flex items-center text-status-assembly text-label-sm font-label-sm font-bold">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+                            +8.2%
+                        </div>
+</div>
+<p class="text-on-surface-variant text-label-sm font-label-sm uppercase tracking-wider mb-1">Orders Confirmed</p>
+<h2 class="text-headline-md font-headline-md text-primary">452</h2>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-primary opacity-20 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="glass-card p-6 rounded-xl relative overflow-hidden group">
+<div class="flex justify-between items-start mb-4">
+<div class="bg-tertiary-fixed p-3 rounded-lg text-on-tertiary-fixed">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">payments</span>
+</div>
+<div class="flex items-center text-status-assembly text-label-sm font-label-sm font-bold">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+                            +24%
+                        </div>
+</div>
+<p class="text-on-surface-variant text-label-sm font-label-sm uppercase tracking-wider mb-1">Revenue (MTD)</p>
+<h2 class="text-headline-md font-headline-md text-primary">£284,500</h2>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-tertiary-fixed-dim opacity-20 group-hover:opacity-100 transition-opacity"></div>
+</div>
+<div class="glass-card p-6 rounded-xl relative overflow-hidden group">
+<div class="flex justify-between items-start mb-4">
+<div class="bg-error-container p-3 rounded-lg text-on-error-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">pending_actions</span>
+</div>
+<div class="flex items-center text-danger text-label-sm font-label-sm font-bold">
+<span class="material-symbols-outlined text-[16px]">trending_down</span>
+                            -2.4%
+                        </div>
+</div>
+<p class="text-on-surface-variant text-label-sm font-label-sm uppercase tracking-wider mb-1">Pending Approvals</p>
+<h2 class="text-headline-md font-headline-md text-primary">18</h2>
+<div class="absolute bottom-0 left-0 w-full h-1 bg-error opacity-20 group-hover:opacity-100 transition-opacity"></div>
+</div>
+</section>
+<!-- Main Layout Grid -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Left Column: Chart & Table (Bento Style) -->
+<div class="col-span-12 lg:col-span-8 space-y-gutter">
+<!-- Chart Area -->
+<div class="glass-card rounded-xl p-6 h-[420px] flex flex-col">
+<div class="flex justify-between items-end mb-8">
+<div>
+<h3 class="text-headline-md font-headline-md text-primary">Revenue &amp; Production</h3>
+<p class="text-on-surface-variant text-body-md">Manufacturing throughput vs. Projected income</p>
+</div>
+<div class="flex gap-2">
+<span class="flex items-center gap-2 text-label-sm font-label-sm">
+<span class="w-3 h-3 rounded-full bg-secondary"></span> Revenue
+                                </span>
+<span class="flex items-center gap-2 text-label-sm font-label-sm">
+<span class="w-3 h-3 rounded-full bg-status-milling"></span> Production
+                                </span>
+</div>
+</div>
+<div class="flex-1 relative chart-grid border-l border-b border-outline-variant">
+<!-- Simulated Chart Content -->
+<svg class="absolute inset-0 w-full h-full overflow-visible" preserveaspectratio="none">
+<defs>
+<lineargradient id="gradient-rev" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#4442e3" stop-opacity="0.3"></stop>
+<stop offset="100%" stop-color="#4442e3" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<!-- Revenue Line Area -->
+<path d="M0 250 Q100 220 200 180 T400 140 T600 190 T800 100 L800 300 L0 300 Z" fill="url(#gradient-rev)"></path>
+<path d="M0 250 Q100 220 200 180 T400 140 T600 190 T800 100" fill="none" stroke="#4442e3" stroke-width="4"></path>
+<!-- Production Line -->
+<path d="M0 200 Q150 250 300 210 T600 150 T800 180" fill="none" stroke="#3B82F6" stroke-dasharray="8,4" stroke-width="3"></path>
+</svg>
+<div class="absolute bottom-[-24px] left-0 w-full flex justify-between text-label-sm font-label-sm text-outline">
+<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+</div>
+</div>
+</div>
+<!-- Recent Orders Table -->
+<div class="glass-card rounded-xl overflow-hidden">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center">
+<h3 class="text-headline-md font-headline-md text-primary">Recent Orders</h3>
+<button class="text-secondary font-bold text-label-sm font-label-sm hover:underline">View All</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-surface-container-low text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">
+<tr>
+<th class="px-6 py-4">Order ID</th>
+<th class="px-6 py-4">Customer</th>
+<th class="px-6 py-4">Material</th>
+<th class="px-6 py-4">Value</th>
+<th class="px-6 py-4">Status</th>
+<th class="px-6 py-4">Actions</th>
+</tr>
+</thead>
+<tbody class="text-body-md divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-4 font-label-sm">#ORD-9021</td>
+<td class="px-6 py-4 font-semibold">Prestige Builds Ltd</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-surface-container-high rounded text-label-sm font-label-sm">Anthracite Grey</span>
+</td>
+<td class="px-6 py-4 font-label-sm">£12,450.00</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1 px-3 py-1 bg-status-assembly/10 text-status-assembly rounded-full text-label-sm font-label-sm font-bold">
+                                                In Production
+                                            </span>
+</td>
+<td class="px-6 py-4">
+<button class="material-symbols-outlined text-outline hover:text-primary">more_vert</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-4 font-label-sm">#ORD-9022</td>
+<td class="px-6 py-4 font-semibold">Apex Windows</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-surface-container-high rounded text-label-sm font-label-sm">White uPVC</span>
+</td>
+<td class="px-6 py-4 font-label-sm">£4,200.00</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1 px-3 py-1 bg-secondary/10 text-secondary rounded-full text-label-sm font-label-sm font-bold">
+                                                Approved
+                                            </span>
+</td>
+<td class="px-6 py-4">
+<button class="material-symbols-outlined text-outline hover:text-primary">more_vert</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-4 font-label-sm">#ORD-9023</td>
+<td class="px-6 py-4 font-semibold">Modern Living</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-surface-container-high rounded text-label-sm font-label-sm">Rosewood</span>
+</td>
+<td class="px-6 py-4 font-label-sm">£8,910.00</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1 px-3 py-1 bg-outline-variant/30 text-on-surface-variant rounded-full text-label-sm font-label-sm font-bold">
+                                                Draft
+                                            </span>
+</td>
+<td class="px-6 py-4">
+<button class="material-symbols-outlined text-outline hover:text-primary">more_vert</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Right Column: Sidebar Widgets -->
+<div class="col-span-12 lg:col-span-4 space-y-gutter">
+<!-- Quick Actions -->
+<div class="glass-card rounded-xl p-6">
+<h4 class="text-label-sm font-label-sm font-bold uppercase tracking-widest text-on-surface-variant mb-6">Quick Actions</h4>
+<div class="grid grid-cols-2 gap-4">
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant hover:border-secondary hover:bg-secondary-fixed transition-all group">
+<span class="material-symbols-outlined text-primary mb-2 group-hover:scale-110 transition-transform">add_task</span>
+<span class="text-label-sm font-label-sm font-bold">New Quote</span>
+</button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant hover:border-secondary hover:bg-secondary-fixed transition-all group">
+<span class="material-symbols-outlined text-primary mb-2 group-hover:scale-110 transition-transform">inventory_2</span>
+<span class="text-label-sm font-label-sm font-bold">Add Stock</span>
+</button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant hover:border-secondary hover:bg-secondary-fixed transition-all group">
+<span class="material-symbols-outlined text-primary mb-2 group-hover:scale-110 transition-transform">handyman</span>
+<span class="text-label-sm font-label-sm font-bold">Schedule</span>
+</button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant hover:border-secondary hover:bg-secondary-fixed transition-all group">
+<span class="material-symbols-outlined text-primary mb-2 group-hover:scale-110 transition-transform">print</span>
+<span class="text-label-sm font-label-sm font-bold">Print Labels</span>
+</button>
+</div>
+</div>
+<!-- Calendar Widget -->
+<div class="glass-card rounded-xl p-6">
+<div class="flex justify-between items-center mb-6">
+<h4 class="text-label-sm font-label-sm font-bold uppercase tracking-widest text-on-surface-variant">Production Schedule</h4>
+<span class="text-body-md font-semibold">May 2024</span>
+</div>
+<div class="grid grid-cols-7 gap-2 text-center text-label-sm font-label-sm mb-4">
+<span class="text-outline">M</span><span class="text-outline">T</span><span class="text-outline">W</span><span class="text-outline">T</span><span class="text-outline">F</span><span class="text-outline">S</span><span class="text-outline">S</span>
+<!-- Mock Calendar Days -->
+<span class="py-2 text-outline">28</span><span class="py-2 text-outline">29</span><span class="py-2 text-outline">30</span><span class="py-2">1</span><span class="py-2">2</span><span class="py-2">3</span><span class="py-2">4</span>
+<span class="py-2">5</span><span class="py-2">6</span><span class="py-2">7</span><span class="py-2">8</span></div></div></div></div></div></main></body></html>

@@ -1,0 +1,27 @@
+[
+    {
+        "name": "Sunny Plast 70mm Casement",
+        "id": "1e503ae1-b978-4dc7-8747-935423503cc9",
+        "typeId": 101
+    },
+    {
+        "name": "Sunny Plast 70mm French Door",
+        "id": "3acbb38c-351b-44e5-8378-33c70ef07a8b",
+        "typeId": 153
+    },
+    {
+        "name": "Sunny Plast 70mm Single Door",
+        "id": "d1ab3175-2475-437c-a901-ae869299ab2b",
+        "typeId": 152
+    },
+    {
+        "name": "Sunny Plast 70mm Tilt & Turn",
+        "id": "1df8e44d-f76c-444b-8a76-1125239b7bf6",
+        "typeId": 102
+    },
+    {
+        "name": "Sunny Plast Sliding Patio",
+        "id": "73679b0a-2133-46fd-b8cd-b402544a600c",
+        "typeId": 155
+    }
+]

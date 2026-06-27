@@ -1,0 +1,519 @@
+# CLAUDE.md — Hardware Fabrication ERP (uPVC SaaS Engine)
+
+> Working notes for AI/devs on this codebase. Edit freely.
+
+## What this is
+
+A B2B SaaS backend for fabricating aluminium/uPVC hardware (windows, doors, partitions).
+Core flow: pick a **design**, enter **width × height**, the engine computes geometry →
+cut pieces → BOM → cutting plan → pricing → printable documents (Work Order, Cutting List,
+BOM, Price Summary).
+
+The fabrication engine is **already calibrated** against three real Quotila jobs (85/88/90).
+`npm run validate` runs **147 assertions** that must always stay green.
+
+## Tech stack (confirmed with the owner)
+
+- **Language/Runtime:** TypeScript on Node.js (ESM, run via `tsx`).
+- **Web:** Express 4.
+- **DB:** PostgreSQL via **Prisma**.
+- Do **not** change the stack without asking the owner.
+
+## Architecture — the one rule that matters
+
+**The engine is pure; the catalog is the only data seam.**
+
+- Engine modules in `src/engine/*` (`topology`, `bars`, `hardware`, `cutting`, `pricing`,
+  `svg`, `documents`) are pure functions: they receive a `ProfileSystem` + `Design` object and
+  return results. They never read files, env, or the DB. **Don't add I/O to them.**
+- The catalog (profile systems, deduction face-widths, sash overlaps, glass rebates,
+  reinforcement map, hardware, designs, settings) is loaded from **PostgreSQL** once at startup
+  by `src/catalog/loader.ts#loadCatalog()` into an in-memory cache, then served through the
+  synchronous accessors re-exported by `src/catalog/index.ts`
+  (`getSystem`, `getDesign`, `listSystems`, `listDesigns`, `DEFAULT_SETTINGS`).
+- `solve()` (`src/engine/solve.ts`) stays synchronous. Any new entrypoint must
+  `await loadCatalog()` during bootstrap **before** calling `solve()`
+  (see `src/api/server.ts` and `src/validation/jobs.ts`).
+
+### Data model (Prisma → in-memory)
+
+`prisma/schema.prisma` mirrors `src/types.ts`. Nested `Record<string, …>` maps are stored as
+relational tables keyed by their record key (`partKey`):
+
+- `profile_system` → frames/sashes/transoms/beads/reinforcement live in one `profile_part`
+  table discriminated by `kind` (specialised columns are nullable).
+- `glass`, `gasket`, `hardware`, `reinforcement_map`, `design` (topology as JSONB), `setting`.
+- Money/measurements are `Decimal` in the DB; the loader converts them to plain `number` so
+  engine math is byte-identical to the old hardcoded catalog.
+
+### Source of truth for the catalog
+
+The hardcoded TypeScript catalog is **retained as the seed source**:
+`src/catalog/system-sunnyplast.ts`, `src/catalog/designs.ts`, `src/catalog/settings.ts`.
+`prisma/seed.ts` copies it into Postgres (idempotent upserts in one transaction).
+When you add/correct catalog data, update the seed (and/or the DB) — never hardcode values in
+the engine.
+
+## Golden rule (fabrication accuracy is non-negotiable)
+
+**Never guess a formula, cutting rule, or bend/weld allowance.** Derive them from the master
+reference `collections/docs/HAWDWARE_PLANER(MAIN DOCUMENT).pdf`, or from a validated Quotila
+job. Every deduction in the catalog has a calibration comment citing its source. If a value is
+uncertain, say so and reference the master document.
+
+## Running it
+
+Prereqs: a PostgreSQL reachable via `DATABASE_URL` (copy `.env.example` → `.env`).
+
+```bash
+# 1. Start Postgres + MinIO (Docker path, for your machine):
+npm run db:up            # docker compose up -d  (postgres:16 on :5432, MinIO on :9000/:9001)
+
+# 2. Apply schema + generate client:
+npm run prisma:migrate   # prisma migrate dev
+npm run prisma:generate  # (migrate already does this)
+
+# 3. Seed catalog + products + 503 designs + admin user:
+npm run db:seed          # prints the seeded admin email/password
+
+# 4. Prove the engine is intact (MUST be 147 passed, 0 failed):
+npm run validate         # 132 default jobs + 3 custom-mode + 12 M3 extractor assertions
+
+# 5. Run the API:
+npm start                # http://localhost:3005  (or PORT from .env)
+```
+
+No Docker? Any local/remote Postgres works — point `DATABASE_URL` at it and run steps 2–5.
+The catalog seed avoids interactive transactions, so `npm run db:seed` works **through a pooler**
+(PgBouncer, often on :5433) too. PDF export needs S3-compatible object storage — set the `MINIO_*`
+vars in `.env` (local MinIO from `db:up`, or a managed S3/Spaces bucket). If `MINIO_*` is unset the
+API still runs; only the PDF routes are disabled.
+Default seeded admin (override via `ADMIN_EMAIL`/`ADMIN_PASSWORD`): `admin@local` / `admin123`.
+
+### API endpoints
+
+**Public (driver UI + live preview):**
+
+- `GET  /api/systems` — list profile systems
+- `GET  /api/designs` — list the quotable (engine) designs
+- `POST /api/quote` — `{ systemId, designId, widthMm, heightMm, mode?, overrides? }` → full `QuoteOutput`.
+  `mode:"custom"` + `overrides` (per-profile allowance tweaks) drives the Custom extraction mode.
+- `POST /api/quote/document` — `{ which: "workOrder"|"cuttingList"|"bom"|"priceSummary", …quote }` → HTML
+
+**Authenticated (JWT bearer — `Authorization: Bearer <token>`):**
+
+- `POST /api/auth/login` → `{ token, user }`; `GET /api/auth/me`; `POST /api/auth/register` (admin only)
+- `GET  /api/products?page&limit` · `GET /api/products/:id` · `GET /api/products/:id/designs?page&limit`
+  (paginated gallery; SVG-only designs flagged `quotable:false`)
+- `GET  /api/designs/:id` — single design incl. `imageSvg` + `quotable`
+- `POST /api/orders` (draft) · `GET /api/orders?page&limit` · `GET /api/orders/:id`
+- `POST /api/orders/:id/items` (rejects non-quotable designs) · `DELETE /api/orders/:id/items/:itemId`
+- `POST /api/orders/:id/confirm` → generates & persists 7 documents (aggregated across items)
+- `GET  /api/orders/:id/documents` · `GET /api/orders/:id/documents/:type` (HTML)
+- `GET  /api/orders/:id/documents/:type/pdf` — **PDF** (M4); rendered lazily on first hit, then
+  cached in object storage (`orders/{id}/{TYPE}.pdf`) and served from cache thereafter
+- `GET  /api/settings` · `PUT /api/settings` (admin) — financial settings + company branding
+  (companyName / companyAddress / accentColor)
+- `POST /api/settings/logo` (admin) — upload the logo as a **raw image body** (`Content-Type: image/*`)
+- **Catalog pricing (admin, M5)** — `GET /api/catalog/:systemId` (full priced dump);
+  `PUT /api/catalog/:systemId/parts/:kind/:partKey` and `…/glass|gaskets|hardware/:partKey`
+  (update `{cost,price,weight}`); `POST …/glass` (add a glass variant);
+  `POST …/colours` + `PUT …/colours/:key` (colour/finish + uplift %);
+  `POST …/import` (**CSV** `code,cost,price`, matched by part code → `{updated,unmatched}`).
+  Every write calls `loadCatalog()` so in-memory pricing refreshes immediately.
+- `GET  /api/branding/logo` — **public**; streams the current logo (for browser `<img>` previews)
+
+Documents: `work_order, cutting_list, bom, price_summary, work_planner, dmo, planner_list`.
+
+**Every document embeds a design preview drawn at the *modified* (chosen W×H) dimensions** — the
+solved-geometry SVG from `renderSvg()`, passed into the doc renderers as an optional `DocImage[]`
+(`{svg, caption}`) param and rendered as a preview band under the header. The engine stays pure (the
+SVG is plain data, like `DocBranding`). `solve()`'s 4 docs carry one image (this design at this size);
+order-confirm's 7 docs carry **one image per line item** at each item's size. **Omitting the param ⇒
+no band, byte-identical to before** (validation doesn't assert doc HTML, so the 147/157 stay green).
+
+## Key files
+
+- `src/types.ts` — the contracts. Keep stable; changing a shape ripples everywhere.
+- `src/catalog/loader.ts` — DB → in-memory catalog (the only data seam).
+- `src/catalog/index.ts` — public catalog accessors.
+- `src/engine/*` — pure fabrication logic (deductions in `bars.ts`/`topology.ts`; Custom mode in
+  `overrides.ts`; multi-window merge in `aggregate.ts`; HTML docs in `documents.ts`).
+- `src/api/*` — Express routers: `auth.ts`, `products.ts`, `designs.ts`, `orders.ts`, `settings.ts`
+  (admin settings + branding/logo), `catalog.ts` (M5 admin pricing CRUD + CSV import), shared
+  `http.ts`/`pagination.ts`, `middleware/auth.ts` (JWT). `server.ts` assembles them (+ public
+  `GET /api/branding/logo`, `ensureBucket()` at boot, `closeBrowser()` on shutdown).
+- `src/services/*` — **all I/O outside the engine** (M4): `storage.ts` (S3/MinIO seam — the only
+  object-storage code), `pdf.ts` (Puppeteer shared-browser singleton → `htmlToPdf`). The engine never
+  imports these; branding reaches `documents.ts` purely as a `DocBranding` param, and the loader
+  resolves the stored logo key → embedded data-URI.
+- `prisma/schema.prisma`, `prisma/seed.ts` — persistence + seed. **The catalog seed runs WITHOUT an
+  interactive `$transaction`** (plain idempotent upserts) so it survives transaction-mode poolers.
+- `src/validation/jobs.ts` — the 147-assertion geometry safety net (run after ANY engine/catalog
+  change); also calls `src/tools/extract-topology.test.ts#validateExtractor` and (M5)
+  `src/engine/pricing.test.ts#validatePricing` (+10 colour-uplift assertions → 157 total).
+- `src/tools/extract-topology.ts` — M3 SVG→topology extractor (build/seed-time; pure of the engine).
+- `src/catalog/derived-topologies.generated.ts` — generated extractor output (DO NOT hand-edit).
+
+## Roadmap (milestones)
+
+- [x] **M1 — Engine on DB.** Catalog persisted in Postgres; engine loads from DB; 132 assertions green.
+- [x] **M2 — End-to-end flow + Custom mode.** JWT auth, Orders (multi-item), Products + paginated
+      Design gallery (513 designs; 371 quotable after M3), live preview, confirm → 7 persisted documents, plus
+      the engine's Custom extraction mode (per-quote allowance overrides). 135 validation assertions
+      (132 default + 3 custom) + 24 end-to-end assertions green.
+- [x] **M3 — More quotable designs.** Automated SVG→topology extractor
+      (`src/tools/extract-topology.ts`) derives `CellNode` topologies **deterministically** from each
+      collection design's `imageSvg` (cell-rect transforms + HingePointer apex), validates each through
+      the real `solveTopology`/`computeHardware`, and emits `src/catalog/derived-topologies.generated.ts`.
+      `prisma/seed.ts#applyDerivedTopologies()` applies it (topology + tier-gated `quotable`) by
+      `externalId`. **Quotable designs 10 → 371** (345 casement + 16 single-door, all engine-validated).
+      Tilt&Turn (123) + French (12) are modelled but **gated `quotable:false`** (uncalibrated/structural);
+      Sliding (7) deferred. 147 validation assertions (135 + 12 extractor) + 12 M3 e2e assertions green.
+      See "M3 extractor & calibration tiers" below.
+- [x] **M4 — PDF export + branding.** The 7 HTML docs render to **PDF via Puppeteer** (headless
+      Chromium), generated **lazily on first request** and **cached in S3-compatible object storage
+      (MinIO)** under deterministic key `orders/{id}/{TYPE}.pdf` — confirm stays HTML-only/fast and the
+      cached PDF never goes stale (confirmed orders are immutable; key-existence IS the cache).
+      **Global company branding** (logo + name + address + accent colour) lives on the single `Setting`
+      row; the loader resolves the logo's object key into an embedded data-URI so docs/PDFs are
+      self-contained. All new I/O is in `src/services/*` — the engine stays pure (branding is a
+      `DocBranding` param). **Redis still deferred** (lazy + cache needs no queue). Also fixed: the
+      catalog seed's interactive-transaction P2028 against a pooler (now plain upserts). 147 validation
+      assertions stay green (no engine-math change). See "M4 — PDF + branding" below.
+- [x] **M5 — Pricing data + options.** The catalog still ships cost/price = 0 (no guessed supplier
+      numbers — golden rule); instead M5 adds the **mechanism** to fill them: an admin **catalog CRUD
+      + CSV price import** (`src/api/catalog.ts`, admin-only, `loadCatalog()` after every write).
+      Plus a **colour/finish** catalog entity (`ColourOption`) that applies a **% uplift to visible
+      profile lines** (frame/sash/transom/bead — NOT reinforcement/glass/gaskets/hardware) at pricing
+      time; base **White = 0%** so default quotes stay byte-identical and the 147 assertions stay green
+      (+10 new colour-uplift assertions in `src/engine/pricing.test.ts`). Glass **variants** are added
+      via the CRUD (the schema already allows unlimited glass rows). Colour/glass **selection** stays
+      design-baked (default colour = system `defaultColourKey`); per-quote selection is deferred to the
+      Phase 2 configurator UI. `Order.totalPrice` is now snapshotted at confirm. See "M5 — Pricing".
+- [ ] **M6 — More profile systems** (Veka, Rehau, …) and bay/bow products (needs the ED table below).
+
+*Phase 2 — UI frontend (Next.js; the Express API stays the single backend/engine host). Build one
+sub-milestone at a time. Full breakdown in "## Phase 2 — UI frontend" below.*
+
+- [x] **U0 — Scaffold + API seam.** New `web/` Next.js app (App Router, TS, Tailwind); typed API
+      client + BFF route handlers proxying to `EXPRESS_API_BASE`; JWT in an httpOnly cookie. `src/*`
+      untouched. See "Phase 2 — U0" below.
+- [x] **U1 — Auth + app shell.** Login page, protected `(app)` layout (server-side auth guard →
+      redirect to `/login`), top nav with current user + logout, admin-only nav gated by role
+      (route also server-guarded). Section stubs (Products/Quote/Orders/Admin) keep the nav navigable
+      until U2–U5. `src/*` untouched. See "Phase 2 — U1" below.
+- [x] **U2 — Product & design gallery.** Paginated product list (`/products`) + per-product design
+      gallery (`/products/[id]`) with **inline SVG previews** and **quotable/preview-only badges**,
+      link-based pagination. Server-Component fetches via the cookie-bearer seam; `src/*` untouched.
+      See "Phase 2 — U2" below.
+- [x] **U3 — Quote configurator + live preview.** `/quote` (deep-linked from quotable gallery cards):
+      system/W×H/glass/colour selectors, **debounced** `POST /api/quote`, live SVG + price breakdown.
+      Introduces per-quote **glass/colour selection** — adds optional `glassKey`/`colourKey` to
+      `QuoteInput`/`solve()` (clone-on-override, **byte-identical when omitted** so the 157 assertions
+      hold) + a read-only `GET /api/systems/:id/options`. See "Phase 2 — U3" below.
+- [x] **U4 — Orders.** `/orders` list (status/items/`totalPrice`) + `/orders/[id]` detail: add items
+      (via the configurator's "Add to order"), remove, confirm → the 7 documents with **View HTML +
+      PDF** links (streamed through the BFF). See "Phase 2 — U4" below.
+- [x] **U5 — Admin console.** `/admin` hub → `/admin/settings` (financial + branding + **logo upload**)
+      and `/admin/catalog` (per-row cost/price/weight edit across parts/glass/gaskets/hardware, colour
+      uplift add/edit, add glass variant, **CSV price import**). Admin-guarded routes. See "Phase 2 — U5".
+- [x] **U6 — Polish.** Loading skeleton (`loading.tsx`), error boundary (`error.tsx`), global
+      `not-found.tsx`, empty/unreachable states throughout. Deployment is owner-side (needs the engine +
+      Postgres). See "Phase 2 — U3/U4/U5" below.
+
+# Phase 2 UI frontend
+
+Stack confirmed: **Next.js**. UI sub-milestones **U0–U6** are tracked in the Roadmap above; full
+breakdown in "## Phase 2 — UI frontend (stack confirmed: Next.js)" below.
+
+## Master PDF findings (Sunnyplast Fabrication Manual No. 1, 87pp)
+
+The PDF is a **fabrication manual** (specs/formulas), not document templates. Cross-checked against
+the calibrated catalog (`src/catalog/system-sunnyplast.ts`). **No catalog values were changed** —
+the calibrated jobs (85/88/90) remain the source of truth and the manual's extra rules are
+length-dependent refinements that don't conflict for the validated jobs. Recorded for reconciliation:
+
+- **Authentic profile codes** (catalog currently uses placeholders): Frame 5ch `SPQ-5-10252`
+  (✓ matches), Frame 6ch `SPQ-6-10252` (catalog has `SPQ-6-11252` — verify), Transom/Mullion
+  `SPQ-05-20252` & `SPQ-005-30252`, **casement Sash `SPQ-05-30252`** (catalog placeholder `SPQ-T-SASH`),
+  **Bead `SPQ-1-51252` = 32mm** (catalog placeholder `BEAD-28`). Reconcile codes before going live.
+- **Reinforcement is length-dependent** in the manual (engine treats it as binary per profile):
+  Frame 5ch/6ch = none (✓ matches catalog); T-transom `SPQ-05-20252` reinforced only **>1.5 m**;
+  mullion `SPQ-5-30252` / Z `SPQ-005-30252` reinforced only **>1 m**. Calibrated jobs use long
+  members so the binary rule happens to match; short members may be over-reinforced. Future refinement.
+- **External Deduction (ED) table** by corner angle for bay/bow assemblies: 90°=63.2 mm down to
+  135°=53.2 mm. Needed when bay/bow products are added (engine is 90°-rectangular only today).
+- **Clear-opening (door) formula:** `Clear Opening = W − (X1 + 40) − (SW + 44.5)`.
+- **Per-product glass-deduction tables** (Casement, Tilt&Turn, French, Residential Door, …) give
+  authoritative glass sizes; they differ by frame chamber (5ch vs 6ch). Use these to extend glass
+  sizing beyond the 3 calibrated jobs.
+
+## M3 extractor & calibration tiers
+
+The collection SVGs **encode** structure (they are not just pictures), so topologies are _derived_,
+not guessed (golden rule). In each `<g layertype="Diagram">`: a `Sightline_component` per cell
+(`translate`+path-bbox = the cell daylight rect) and a `Sash_component` per _opening_ cell; in
+`<g layertype="HingePointers">` a triangle per opening cell whose **apex** points to the hinge edge.
+Drawing constants (SVG render units, NOT engine values): frame/divider face = 70, sash overlap = 28,
+so a cell's rebate footprint = fixed→daylight, sash→sash-outer inset 28; adjacent rebate rects abut
+across a ~70 gap whose centre is the divider line. Grid is rebuilt by recursive guillotine cuts;
+`splitAtRatio = cutCentre / canvasDim` (a full-window fraction, matching the engine). Non-guillotine
+layouts are **rejected**, never guessed.
+
+**Regenerate:** `npx tsx src/tools/extract-topology.ts` → rewrites
+`src/catalog/derived-topologies.generated.ts`; then `npm run db:seed` applies it. Deterministic.
+
+**Calibration tiers** (only families with a validated job become production-quotable):
+
+- **T1 quotable** — Casement (345) + Single Door (16): use existing calibrated profiles; each is
+  validated through the real engine + leaf-count == `quantityOfSquares` before `quotable=true`.
+- **T2 structural, gated false** — French Door (12): modelled via a zero-profile **`meeting-stile`**
+  vsplit (two `sash-door-z` leaves abut, no mullion; `SolvedGeometry.meetingStiles`); meeting-stile
+  shootbolt hardware is a **placeholder pending a real French job**.
+- **T3 geometry-OK, gated false** — Tilt&Turn (123): geometry == casement sash (reuses `sash-t`);
+  the `tilt-turn` content + T&T gear in `hardware.ts`/catalog are **uncalibrated** (no T&T job).
+- **T4 deferred** — Sliding Patio (7): no track/interlock/sliding-sash profiles or overlap
+  deductions exist → **not** quoted; left as SVG-only previews. The extractor hard-rejects the
+  family before parsing (`extract-topology.ts` `if (family === "sliding") return { ok:false, … }`).
+  **Promotion is golden-rule-blocked**, not a code gap: the master PDF lists sliding *codes*
+  (pp.15–16 `SPQ-GL-2025x` sashes / `SPQ-GL-1025x` frames+tracks / `SPQ-GL-20253` interlock; layouts
+  pp.29–32) but **no calibration** — reinforcement boxes blank (p.44), no sliding glass-deduction
+  table (p.43 TOC omits it; only casement tables pp.46–47), no sliding clear-opening formula (p.40 =
+  doors only); and there's no calibrated sliding job (cf. casement/door jobs 85/88/90). Also, patio
+  SVG `HingePointers` encode **slider-travel direction, not a hinge edge**, so `dirToContent()` would
+  mis-map them. **To promote (needs a real measured sliding job first):** add `sash-sliding` +
+  top/sill `track-*` + interlock profiles (calibrated, to `system-sunnyplast.ts`); add sliding
+  hardware (rollers/handle/lock-keeper/bumpers) to the catalog + a `hardware.ts` sliding branch; add
+  `sliding-left|sliding-right` cell content in `topology.ts`/`bars.ts` (track-engagement deduction,
+  not casement rebate overlap); in `extract-topology.ts` flip `FAMILY_RULES.sliding.eligible`, set
+  its profile keys, and special-case `dirToContent()` (apex = travel direction); add a calibrated
+  sliding assertion to `validation/jobs.ts`, then flip the gate.
+
+Casement/door **engine designs** (the 10 hand-authored `win-*`/`door-*` in `src/catalog/designs.ts`)
+have a topology but no source image; `prisma/seed.ts` now renders a deterministic gallery `imageSvg`
+for each from its topology via the pure quote path (`solveTopology` → `renderSvg`, preview-only
+dimensions) so they aren't imageless in the UI — no engine math changes, assertions unaffected.
+
+Caveats (flagged, not silently assumed): T-vs-Z transom is not encoded in the SVG → default
+`transom-t-67`; `transom-z-67` only for the root top-hung-over-fixed pattern (mirrors Job 85).
+To promote a gated tier: add a calibrated reference job + assertion, then flip the tier's gate —
+never relax the gate alone.
+
+## M4 — PDF + branding
+
+**Object storage (`src/services/storage.ts`)** is the only seam to S3-compatible storage (MinIO in
+dev; AWS S3 / DO Spaces in prod via the same `@aws-sdk/client-s3` code — just change `MINIO_*`).
+Deterministic keys mean *existence == cached*: `orders/{orderId}/{TYPE}.pdf`, `branding/logo`.
+
+**PDF (`src/services/pdf.ts`)** wraps Puppeteer with a lazily-launched, reused browser singleton
+(`--no-sandbox`); `htmlToPdf(html)` → A4 PDF buffer. The stored `Document.html` is already a full
+print-ready doc, so PDF is a direct conversion. `GET …/documents/:type/pdf` checks the cache key,
+renders + stores on miss, streams on hit. Confirmed orders are immutable, so cached PDFs never go
+stale. **Redis is intentionally not used** — lazy render + object cache needs no queue (revisit only
+if PDF latency forces background rendering).
+
+**Branding** is global, on the single `Setting` row (`companyName`, `companyAddress`, `accentColor`,
+`logoKey`). The **catalog loader** resolves `logoKey` → an embedded base64 data-URI in
+`DEFAULT_SETTINGS.branding` (storage being down is non-fatal — the logo is just omitted). The engine
+stays pure: `documents.ts` takes an optional `DocBranding` param (absent ⇒ the pre-M4 plain header,
+byte-for-byte). `solve()` passes `settings.branding`; order-confirm passes it too, so branding is
+baked into the snapshot HTML (and thus the PDF). Admin endpoints: `GET/PUT /api/settings`,
+`POST /api/settings/logo` (raw image body) — both call `loadCatalog()` to refresh in-memory branding;
+public `GET /api/branding/logo`.
+
+**Seed/pooler fix:** `prisma/seed.ts` no longer wraps the catalog in an interactive `$transaction`
+(plain idempotent upserts), which fixed P2028 against a transaction-mode pooler on :5433. Regenerate
+the Prisma client after the `add_branding_to_settings` migration.
+
+**Caveats:** branding is baked at confirm-time, so orders confirmed before a logo/branding was set
+show the plain header until re-confirmed (acceptable — confirmed orders are immutable snapshots).
+Puppeteer bundles Chromium (~300 MB) and needs a few shared libs under WSL/Docker.
+
+## M5 — Pricing data + options
+
+**The catalog still ships cost/price = 0** — I never commit guessed supplier numbers (golden rule).
+M5 instead builds the **editing surface** so the owner fills real prices, plus a colour-upcharge model.
+
+- **Admin catalog CRUD (`src/api/catalog.ts`, admin-only).** Mirrors the `settings.ts` admin pattern
+  (requireAuth+requireAdmin, zod-validated, `loadCatalog()` after every write so the engine sees new
+  prices at once). `GET /api/catalog/:systemId` serves the in-memory `getSystem()` dump (numbers, keyed
+  by partKey). `PUT …/parts/:kind/:partKey` + `…/{glass,gaskets,hardware}/:partKey` patch
+  `{cost,price,weight}`. `POST …/glass` adds a glass **variant**. **CSV import** `POST …/import`
+  (`Content-Type: text/csv`, header `code,cost,price`) matches each row by **part code** across
+  profile_part/glass/gasket/hardware in one `$transaction`, returns `{updated, unmatched[]}`.
+- **Colour / finish (`ColourOption`).** New catalog entity (`colour_option` table → `system.colours`
+  Record; `profile_system.defaultColourKey` picks the active one). `computePricing()` applies the active
+  colour's **% uplift** (`costUpliftPct`/`priceUpliftPct`) to **colour-bearing** lines only —
+  frame/sash/transom/bead via `isColourBearingCode()`; reinforcement (internal steel), glass, gaskets
+  and hardware are untouched. **Base White = 0% uplift**, so a default-colour quote is byte-identical to
+  pre-M5 → the 147 geometry assertions stay green. The engine stays **pure**: colour is plain data on
+  `ProfileSystem`, no I/O. `src/engine/pricing.test.ts#validatePricing(expect)` (wired into
+  `npm run validate`, DB-free, synthetic prices) proves the uplift math (10 assertions).
+- **Selection is still design-baked** in M5 (colour = system default; glass = the design's `glassKey`).
+  Per-quote glass/colour selection (extending `solve()`/`/api/quote`) is intentionally deferred to the
+  **Phase 2 configurator UI** (sub-milestone U3).
+- **`Order.totalPrice`** is snapshotted at confirm (`agg.pricing.totals.grandTotal`) so the orders list
+  shows a total without re-solving. Migration: `20260627010000_add_colour_options`
+  (`colour_option` table + `profile_system.defaultColourKey` + `order.totalPrice`).
+
+**Caveat:** quotes read **zero prices until the owner enters them** via the CRUD/CSV; only White (0%)
+ships seeded. Colour upcharge is a flat % on profiles — per-metre/per-component pricing is a future
+refinement.
+
+## Phase 2 — UI frontend (stack confirmed: Next.js)
+
+Stack confirmed with the owner: **Next.js (React, App Router, TypeScript)**. The **Express API stays the
+single backend/engine host** (do not replace it); Next.js is the **UI + a thin BFF proxy** (server-side
+route handlers forward to Express so the JWT lives in an httpOnly cookie, no browser CORS). New code in a
+new `web/` workspace; `src/*` untouched. Built as sequential sub-milestones, one at a time:
+**U0** scaffold + API seam · **U1** auth + app shell · **U2** product/design gallery (inline SVG) ·
+**U3** quote configurator + live preview (introduces per-quote glass/colour selection — the deferred M5
+selection) · **U4** orders + PDF download · **U5** admin console (settings + the M5 pricing editor) ·
+**U6** polish + deploy. Each adds backend endpoints only where missing (e.g. U3 adds the quote-time
+`glassKey`/`colourKey` override). Full breakdown in the approved plan.
+
+### Phase 2 — U0 (scaffold + API seam) — DONE
+
+The `web/` Next.js app (**Next 16, App Router, React 19, Tailwind v4, TS**) is scaffolded as its own
+npm project (own `package.json`/`node_modules`/lockfile — `src/*`, Prisma, engine all untouched; the
+**only** root edit is this CLAUDE.md). It builds and lints clean (`cd web && npm run build && npm run
+lint`).
+
+- **The seam (BFF proxy).** The browser only ever calls **same-origin** Next routes (`/api/...`).
+  `web/app/api/[...path]/route.ts` forwards each to `EXPRESS_API_BASE/api/...` (default
+  `http://localhost:3005`), injecting `Authorization: Bearer <jwt>` read from an **httpOnly `token`
+  cookie** — so the token never reaches client JS and there's no browser CORS. Status/body/content-type
+  pass through verbatim (JSON, HTML docs, PDF streams). Explicit routes beat the catch-all:
+  `…/api/auth/login` forwards creds to the engine, stores the returned JWT in the httpOnly cookie, and
+  returns only `{ user }`; `…/api/auth/logout` clears it.
+- **Two API helpers.** Client Components → `web/lib/api.ts` (calls the BFF; client-safe, no
+  server-only imports). Server Components / Route Handlers → `web/lib/server-api.ts` (calls the engine
+  directly, attaching the cookie's JWT; imports `next/headers`). Minimal response types in
+  `web/lib/types.ts` (not imported from root `src/types.ts` — its explicit-`.ts` ESM imports don't
+  suit Next's bundler). `web/app/page.tsx` is a throwaway **seam-check** (lists `/api/systems`,
+  gracefully reports if the engine is down); U1 replaces it.
+- **Next 16 specifics heeded** (per `node_modules/next/dist/docs`): `cookies()` and route `params` are
+  **async**; `GET` route handlers default to **dynamic**; `turbopack.root` pinned to `web/` so the
+  nested lockfile isn't mis-rooted. `server-only` resolves as a Next built-in alias (not in
+  node_modules). Run with `cd web && npm run dev` (UI :3000 → engine :3005).
+- **Verified** end-to-end against a mock engine: proxy GET, login sets `HttpOnly; Secure(prod);
+  SameSite=lax` cookie with body carrying **no token**, cookie-authed `/api/auth/me` (bearer injected
+  by the proxy), and 401 relay for bad/missing auth. Live run against the real engine needs Postgres
+  (owner-side: migrate + seed + `npm start`, then `cd web && npm run dev`).
+
+### Phase 2 — U1 (auth + app shell) — DONE
+
+Auth-gated app shell on top of the U0 seam. Still `web/`-only; `src/*` untouched.
+
+- **Auth guard is server-side.** `web/lib/server-api.ts#getCurrentUser()` resolves `GET /api/auth/me`
+  (bearer from the cookie) → `AuthUser | null` (null on 401/unreachable, never throws). The protected
+  **route group `web/app/(app)/`** has a `layout.tsx` that calls it and `redirect("/login")` when null;
+  every page under it (dashboard + section stubs) is thus gated by one check. `/login` does the inverse
+  (redirect to `/` if already authed). Both are `dynamic = "force-dynamic"` (they read the cookie).
+- **Login** (`web/app/login/`): a Server Component shell + a `"use client"` `login-form.tsx` that calls
+  the U0 `lib/api.ts#login()` (BFF → httpOnly cookie, returns `{user}` only), then
+  `router.replace("/") + refresh()` so the layout re-evaluates with the cookie set.
+- **Top nav** (`web/app/(app)/nav.tsx`, client): active-link highlight via `usePathname`, current user +
+  role badge, **logout** (`lib/api.ts#logout()` clears the cookie → back to `/login`). **Admin-only
+  links are gated by `user.role === "admin"`**, and the `/admin` route **also** guards server-side
+  (`redirect("/")` for non-admins) — the hidden nav link is defence-in-depth, not the gate.
+- **Section stubs** (`/products` U2, `/quote` U3, `/orders` U4, `/admin` U5) render a shared
+  `web/components/placeholder.tsx` so the shell is fully navigable now without 404s. The dashboard
+  (`web/app/(app)/page.tsx`) greets the user and shows the engine seam status (system count).
+- **Verified** against the mock engine on the built server: unauthed `/` → 307 `/login`; login → 200 +
+  `Set-Cookie token … HttpOnly` and `{user}`-only body; authed `/`, `/admin` → 200; `/login` while
+  authed → 307 `/`; `/api/auth/me` via proxy → user (401 without cookie); logout clears the cookie →
+  `/` 307 `/login`; bad creds → 401, no cookie. `npm run build` + `npm run lint` clean (11 routes).
+  Non-admin role-gating is code-verified (the mock only issues an admin). Live run still owner-side
+  (needs Postgres: migrate + seed + `npm start`, then `cd web && npm run dev`).
+
+### Phase 2 — U2 (product & design gallery) — DONE
+
+First content screens, on the existing **already-paginated** backend (no `src/*` change):
+`GET /api/products`, `…/:id`, `…/:id/designs`, `GET /api/designs/:id`.
+
+- **All Server Components**, `dynamic = "force-dynamic"`, fetching via `lib/server-api.ts`
+  (`serverApiGet`, cookie bearer attached server-side) — no client data fetching. `page` comes from
+  `await searchParams` (Next 16: `params`/`searchParams` are Promises). New shapes in `lib/types.ts`
+  (`Paginated<T>`, `ProductSummary`, `DesignListItem`, `DesignDetail`).
+- **Products list** `web/app/(app)/products/page.tsx` (replaced the U1 stub): card grid (name,
+  type/system, design-count pill) → each links to `/products/[id]`.
+- **Design gallery** `web/app/(app)/products/[id]/page.tsx`: the list endpoint **omits `imageSvg`**
+  (it's large), so the page fetches the page of designs then **`Promise.all`-fetches each design's full
+  record in parallel** for its SVG (a failed fetch degrades to a "no preview" tile, never fails the
+  page). 404 from the engine → `notFound()`. Page size capped at `limit=24`.
+- **`DesignCard`** (`web/components/design-card.tsx`): inline SVG via `dangerouslySetInnerHTML`
+  (**first-party catalog SVG**, not user input), responsively scaled
+  (`[&>svg]:h-auto [&>svg]:w-full`), plus a **green "Quotable" / zinc "Preview only" badge** and leaf
+  count. **`Pager`** (`web/components/pager.tsx`): link-based (`?page=`), no client JS, reused by both.
+- **Verified** against the extended mock engine (now serves products/designs + a tiny inline `<svg>`,
+  one quotable + one non-quotable, bearer-gated): BFF paginates `/api/products` and relays 401 without
+  the cookie; `/products` renders both products + gallery links; `/products/[id]` renders inline
+  `<svg>`, both badges, leaf counts; unknown id → 404. `npm run build` + `npm run lint` clean
+  (routes `/products`, `/products/[id]`). Live run owner-side (real engine + Postgres) shows the full
+  ~500-design gallery.
+
+### Phase 2 — U3 (quote configurator) — DONE
+
+The first feature that **changes the engine** — minimally and safely.
+
+- **Engine (the only `src/*` edit besides the options route):** `QuoteInput` gains optional
+  `glassKey`/`colourKey` (`src/types.ts`); `solve()` (`src/engine/solve.ts`) applies them by
+  **cloning** — colour clones the system with a new `defaultColourKey` (computePricing then applies
+  its uplift), glass clones the design's cell tree filling the chosen glass into any leaf that doesn't
+  pin its own (`fillDefaultGlass`, pure/recursive). **Both no-ops when omitted** (or colour==default),
+  so a quote without them is byte-identical to pre-U3 → the **147+10 assertions stay green** (owner
+  must run `npm run validate` to confirm against the DB; I can't here — no Postgres). Unknown
+  glass/colour keys throw a clear error. `npx tsc --noEmit` clean.
+- **`GET /api/systems/:id/options`** (public, `src/api/server.ts`): selectable glass (key+name) +
+  colours (key+name+`priceUpliftPct`) for a system — the configurator's selectors. Deliberately
+  **free of supplier costs** (unlike the admin `/api/catalog/:id` dump). `/api/quote` already spreads
+  the body into `solve()`, so glass/colour flow with no route change.
+- **UI:** `web/app/(app)/quote/` — a thin Server page + client `configurator.tsx`: system/W×H/glass/
+  colour controls, **350 ms-debounced** `POST /api/quote`, live inline SVG + price summary. Reached
+  via a **"Configure →"** link on each **quotable** `DesignCard` (carries `systemId/designId/productId
+  /name`, and `orderId` when adding to a draft). Includes an **"Add to order"** bridge into U4.
+- **Caveat (matches the roadmap):** glass/colour selection is **quote-time only** — saved order items
+  use the design-baked default (persisting per-item glass/colour would need an `OrderItem` migration;
+  deferred). The configurator notes this.
+
+### Phase 2 — U4 (orders) — DONE
+
+Pure frontend on the existing order API (no `src/*` change). `web/app/(app)/orders/`:
+
+- **List** (`page.tsx`): `GET /api/orders` table — orderNo, customer, status badge, item count,
+  snapshotted `totalPrice`, created; **"New order"** (client) creates a draft → detail.
+- **Detail** (`[id]/page.tsx`): header + line-item table. **Draft** → "Add item from gallery"
+  (`/products?orderId=…` deep-links the gallery→configurator→`POST items`), per-row **Remove**, and
+  **Confirm** (≥1 item) which generates the 7 docs. **Confirmed** → documents grid with **View** (HTML)
+  + **PDF** links hitting `/api/orders/:id/documents/:type[/pdf]` **through the BFF** (cookie→bearer,
+  streams verbatim). Client actions in `order-actions.tsx` (`router.refresh()` after each write).
+
+### Phase 2 — U5 (admin console) — DONE
+
+Pure frontend on the M5 admin API (no `src/*` change); all routes **server-guarded** by
+`role === "admin"` (like the U1 stub). `web/app/(app)/admin/`:
+
+- **`/admin`** hub → settings + catalog.
+- **`/admin/settings`** (`settings-form.tsx`): financial fields + branding (company name/address/accent
+  colour) → `PUT /api/settings`; **logo upload** as a raw `image/*` body (`apiSendRaw`) with a live
+  preview via `/api/branding/logo`.
+- **`/admin/catalog`** (`catalog-editor.tsx`): system selector; per-row **cost/price/weight** edit
+  (dirty-tracked Save) across frames/sashes/transoms/beads/reinforcement (`PUT …/parts/:KIND/:key`) and
+  glass/gaskets/hardware (`PUT …/:table/:key`); **add glass variant**; **colour** uplift add/edit; and
+  **CSV import** (`POST …/import`, raw `text/csv` via `apiSendRaw`) showing `{updated, unmatched}`.
+
+**Verified (U3–U5)** against an extended mock engine on the built server: options + quote
+glass/colour passthrough (anthracite → +15% material, glass/colour echoed in the SVG); orders
+create→add-item→confirm→documents (HTML via BFF); admin pages render; settings PUT, catalog part PUT,
+and **raw `text/csv` import all proxy correctly through the BFF**. `web/` `npm run build` + `npm run
+lint` clean (15 routes). Live run owner-side (engine + Postgres + MinIO for PDF/logo).
+
+## Conventions
+
+- Comment every fabrication formula with its source (jobnumber / PDF section).
+- Use transactions for DB writes (`prisma.$transaction`) — EXCEPT the catalog seed, which uses plain
+  idempotent upserts so it survives transaction-mode connection poolers (see M4 seed/pooler fix).
+- Validate dimension inputs before calling `solve()`.
+- After any change to the catalog or engine, run `npm run validate`.

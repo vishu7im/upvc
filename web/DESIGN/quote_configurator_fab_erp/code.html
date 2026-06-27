@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quotes Module - Fab ERP</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "secondary": "#4442e3",
+                    "status-milling": "#3B82F6",
+                    "inverse-surface": "#2d3133",
+                    "on-secondary-container": "#fffbff",
+                    "surface-container-highest": "#e0e3e5",
+                    "tertiary": "#000000",
+                    "tertiary-container": "#271901",
+                    "on-primary": "#ffffff",
+                    "surface-dim": "#d8dadc",
+                    "on-surface-variant": "#45464d",
+                    "surface": "#f7f9fb",
+                    "secondary-fixed": "#e1dfff",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "primary-fixed-dim": "#bec6e0",
+                    "primary-fixed": "#dae2fd",
+                    "primary": "#000000",
+                    "inverse-primary": "#bec6e0",
+                    "tertiary-fixed": "#fcdeb5",
+                    "on-surface": "#191c1e",
+                    "on-tertiary": "#ffffff",
+                    "background": "#f7f9fb",
+                    "surface-container-high": "#e6e8ea",
+                    "error": "#ba1a1a",
+                    "glass-border": "rgba(255, 255, 255, 0.4)",
+                    "secondary-container": "#5f5ffd",
+                    "surface-container": "#eceef0",
+                    "error-container": "#ffdad6",
+                    "surface-tint": "#565e74",
+                    "outline-variant": "#c6c6cd",
+                    "on-tertiary-container": "#98805d",
+                    "status-welding": "#F59E0B",
+                    "secondary-fixed-dim": "#c1c1ff",
+                    "on-secondary-fixed": "#09006b",
+                    "surface-bright": "#f7f9fb",
+                    "surface-variant": "#e0e3e5",
+                    "status-assembly": "#10B981",
+                    "outline": "#76777d",
+                    "glass-bg": "rgba(255, 255, 255, 0.7)",
+                    "danger": "#EF4444",
+                    "on-tertiary-fixed": "#271901",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#2c24ce",
+                    "primary-container": "#131b2e",
+                    "surface-container-low": "#f2f4f6",
+                    "on-background": "#191c1e",
+                    "on-tertiary-fixed-variant": "#574425",
+                    "surface-container-lowest": "#ffffff",
+                    "status-shipped": "#6366F1",
+                    "on-primary-container": "#7c839b",
+                    "tertiary-fixed-dim": "#dec29a",
+                    "on-primary-fixed": "#131b2e",
+                    "on-error": "#ffffff",
+                    "inverse-on-surface": "#eff1f3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "margin-desktop": "40px",
+                    "margin-mobile": "16px",
+                    "gutter": "24px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "label-sm": ["JetBrains Mono"],
+                    "display-xl": ["Hanken Grotesk"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "display-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .config-input-group:focus-within label {
+            color: #4442e3;
+        }
+        .canvas-bg {
+            background-image: radial-gradient(circle at 2px 2px, #e2e8f0 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-surface overflow-hidden">
+<!-- SIDE NAVIGATION BAR -->
+<aside class="h-screen w-64 fixed left-0 top-0 border-r border-outline-variant bg-surface flex flex-col py-base z-50">
+<div class="px-gutter mb-8">
+<h1 class="text-headline-md font-headline-md font-bold text-primary">Fab ERP</h1>
+<p class="text-label-sm font-label-sm text-on-surface-variant opacity-70">uPVC Fabrication System</p>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-body-md">Products</span>
+</a>
+<!-- Active State -->
+<a class="flex items-center gap-3 px-4 py-3 text-secondary font-bold bg-secondary-fixed rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="request_quote" style="font-variation-settings: 'FILL' 1;">request_quote</span>
+<span class="font-body-md">Quotes</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="font-body-md">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="factory">factory</span>
+<span class="font-body-md">Production</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="font-body-md">Documents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-body-md">Customers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined" data-icon="warehouse">warehouse</span>
+<span class="font-body-md">Inventory</span>
+</a>
+</nav>
+<div class="px-4 py-4 mt-auto border-t border-outline-variant space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-body-md">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-body-md">Logout</span>
+</a>
+</div>
+</aside>
+<!-- MAIN WRAPPER -->
+<main class="ml-64 flex flex-col h-screen">
+<!-- TOP NAV BAR -->
+<header class="flex justify-between items-center h-16 px-gutter w-full sticky top-0 z-40 bg-glass-bg backdrop-blur-xl border-b border-glass-border shadow-sm">
+<div class="flex items-center gap-6 flex-1">
+<div class="relative w-96">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg py-2 pl-10 pr-4 text-body-md focus:ring-2 focus:ring-secondary focus:border-secondary transition-all outline-none" placeholder="Search orders, profiles, materials..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-4 py-2 bg-secondary text-on-secondary rounded-lg font-bold text-label-sm hover:opacity-90 active:scale-95 transition-all">Quick Quote</button>
+<div class="h-8 w-px bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full"></span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant ml-2">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a fabrication manager in a modern factory setting, high quality studio lighting, sharp focus, wearing a corporate branded polo shirt with industrial machinery in the blurred background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQDTAuLcL3QONby-Ni0Zzj5MwEQGsyzdAgNPCjIMk78qcoSzSBXPTzglGyY-AKyrKaD82ZRmSU1-8x3s55Wjh8bhefyVaF7oL0be4vk6n0BfudGK7ll1-r9Rva2IRUOxxytvrnOHbJzOfrmGaNJRVxE1kVzNg45_cHGBQVzH2_-lNhqgZvGTd0NQyZoaGhTYKxp3QNctLnV0rywDqplw8Qhy3fnVCn5UidjJkphO-bcqqCpkmRdf29en-_WReUTXpglIy0T7Fs3no"/>
+</div>
+</div>
+</div>
+</header>
+<!-- CONFIGURATOR WORKSPACE -->
+<div class="flex flex-1 overflow-hidden">
+<!-- LEFT SIDEBAR: Configuration -->
+<aside class="w-80 h-full border-r border-outline-variant bg-surface flex flex-col overflow-y-auto">
+<div class="p-gutter space-y-6">
+<div>
+<h2 class="text-label-sm font-label-sm text-secondary uppercase tracking-widest mb-4">Dimensions (mm)</h2>
+<div class="grid grid-cols-2 gap-4">
+<div class="config-input-group space-y-1">
+<label class="text-label-sm font-label-sm block ml-1 transition-colors">Width</label>
+<div class="relative">
+<input class="w-full bg-white border border-outline-variant rounded-lg p-3 text-label-sm font-label-sm focus:ring-2 focus:ring-secondary focus:border-secondary outline-none" type="number" value="1200"/>
+<span class="absolute right-3 top-1/2 -translate-y-1/2 text-outline text-[10px] uppercase font-bold">mm</span>
+</div>
+</div>
+<div class="config-input-group space-y-1">
+<label class="text-label-sm font-label-sm block ml-1 transition-colors">Height</label>
+<div class="relative">
+<input class="w-full bg-white border border-outline-variant rounded-lg p-3 text-label-sm font-label-sm focus:ring-2 focus:ring-secondary focus:border-secondary outline-none" type="number" value="1500"/>
+<span class="absolute right-3 top-1/2 -translate-y-1/2 text-outline text-[10px] uppercase font-bold">mm</span>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<h2 class="text-label-sm font-label-sm text-secondary uppercase tracking-widest">Configuration</h2>
+<div class="config-input-group space-y-1">
+<label class="text-label-sm font-label-sm block ml-1 transition-colors">Profile System</label>
+<select class="w-full bg-white border border-outline-variant rounded-lg p-3 text-body-md font-body-md focus:ring-2 focus:ring-secondary focus:border-secondary outline-none appearance-none">
+<option>Euro Series 70mm</option>
+<option>Zenith Premium 82mm</option>
+<option>Heritage Sculptured</option>
+</select>
+</div>
+<div class="config-input-group space-y-1">
+<label class="text-label-sm font-label-sm block ml-1 transition-colors">Glass Type</label>
+<select class="w-full bg-white border border-outline-variant rounded-lg p-3 text-body-md font-body-md focus:ring-2 focus:ring-secondary focus:border-secondary outline-none">
+<option>24mm Double Glazed (Low-E)</option>
+<option>36mm Triple Glazed (Argon)</option>
+<option>6.4mm Laminated Safety</option>
+</select>
+</div>
+<div class="config-input-group space-y-1">
+<label class="text-label-sm font-label-sm block ml-1 transition-colors">Color / Finish</label>
+<div class="grid grid-cols-4 gap-2 mt-2">
+<button class="aspect-square rounded border-2 border-secondary p-0.5" title="Traffic White">
+<div class="w-full h-full bg-white rounded-sm shadow-inner"></div>
+</button>
+<button class="aspect-square rounded border border-outline-variant p-0.5 hover:border-secondary" title="Anthracite Gray">
+<div class="w-full h-full bg-[#383E42] rounded-sm shadow-inner"></div>
+</button>
+<button class="aspect-square rounded border border-outline-variant p-0.5 hover:border-secondary" title="Golden Oak">
+<div class="w-full h-full bg-[#8E5E32] rounded-sm shadow-inner"></div>
+</button>
+<button class="aspect-square rounded border border-outline-variant p-0.5 hover:border-secondary" title="Rosewood">
+<div class="w-full h-full bg-[#4A2D23] rounded-sm shadow-inner"></div>
+</button>
+</div>
+</div>
+<div class="config-input-group space-y-1">
+<label class="text-label-sm font-label-sm block ml-1 transition-colors">Hardware Set</label>
+<select class="w-full bg-white border border-outline-variant rounded-lg p-3 text-body-md font-body-md focus:ring-2 focus:ring-secondary focus:border-secondary outline-none">
+<option>Polished Chrome Standard</option>
+<option>Satin Black Security</option>
+<option>Brushed Stainless Premium</option>
+</select>
+</div>
+</div>
+<div class="pt-4 border-t border-outline-variant">
+<div class="flex items-center justify-between mb-4">
+<span class="text-body-md">Reinforcement</span>
+<div class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</div>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-body-md">Trickle Vent</span>
+<div class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- CENTRAL CANVAS: SVG Preview -->
+<section class="flex-1 canvas-bg relative flex items-center justify-center p-gutter">
+<div class="absolute top-6 left-6 flex gap-4">
+<div class="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded border border-glass-border shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="aspect_ratio">aspect_ratio</span>
+<span class="text-label-sm font-label-sm">1200 x 1500 mm</span>
+</div>
+<div class="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded border border-glass-border shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="palette">palette</span>
+<span class="text-label-sm font-label-sm">Traffic White (Smooth)</span>
+</div>
+</div>
+<!-- Window SVG Preview Container -->
+<div class="relative w-full max-w-lg aspect-[12/15] glass-panel rounded-lg shadow-2xl p-12 flex items-center justify-center group transition-all duration-500 hover:scale-[1.02]">
+<svg class="w-full h-full drop-shadow-xl overflow-visible" viewbox="0 0 1200 1500">
+<!-- Outer Frame -->
+<rect fill="#FFFFFF" height="1500" stroke="#E2E8F0" stroke-width="4" width="1200" x="0" y="0"></rect>
+<rect fill="#F8FAFC" height="1360" stroke="#94A3B8" stroke-width="2" width="1060" x="70" y="70"></rect>
+<!-- Mullion / Transom -->
+<line stroke="#E2E8F0" stroke-width="40" x1="0" x2="1200" y1="500" y2="500"></line>
+<!-- Panes -->
+<rect fill="#E0F2FE" fill-opacity="0.4" height="390" stroke="#60A5FA" stroke-width="1" width="1020" x="90" y="90"></rect>
+<rect fill="#E0F2FE" fill-opacity="0.4" height="890" stroke="#60A5FA" stroke-width="1" width="1020" x="90" y="520"></rect>
+<!-- Technical Annotations (only visible on hover or toggle) -->
+<g class="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+<text fill="#4442e3" font-family="JetBrains Mono" font-size="28" font-weight="700" text-anchor="middle" x="600" y="45">1200mm</text>
+<text fill="#4442e3" font-family="JetBrains Mono" font-size="28" font-weight="700" text-anchor="middle" transform="rotate(-90)" x="-750" y="45">1500mm</text>
+</g>
+<!-- Hardware Handle -->
+<rect fill="#94A3B8" height="120" rx="4" width="15" x="1050" y="900"></rect>
+</svg>
+<!-- Fabrication Status Badge Overlay -->
+<div class="absolute -top-4 -right-4 bg-status-assembly text-white px-4 py-2 rounded-full font-bold text-label-sm shadow-lg flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        VALID CONFIGURATION
+                    </div>
+</div>
+<div class="absolute bottom-6 right-6 flex gap-2">
+<button class="w-10 h-10 rounded-full bg-white border border-outline-variant flex items-center justify-center hover:bg-secondary-fixed transition-colors">
+<span class="material-symbols-outlined" data-icon="zoom_in">zoom_in</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-white border border-outline-variant flex items-center justify-center hover:bg-secondary-fixed transition-colors">
+<span class="material-symbols-outlined" data-icon="3d_rotation">3d_rotation</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-white border border-outline-variant flex items-center justify-center hover:bg-secondary-fixed transition-colors">
+<span class="material-symbols-outlined" data-icon="layers">layers</span>
+</button>
+</div>
+</section>
+<!-- RIGHT SIDEBAR: Live Summary -->
+<aside class="w-96 h-full border-l border-outline-variant bg-surface flex flex-col overflow-hidden">
+<div class="p-gutter flex flex-col h-full">
+<h2 class="text-label-sm font-label-sm text-secondary uppercase tracking-widest mb-6">Quote Summary</h2>
+<!-- Price Breakdown -->
+<div class="glass-panel p-4 rounded-xl mb-6 shadow-sm border border-secondary-fixed">
+<p class="text-label-sm font-label-sm text-on-surface-variant mb-1">Total Unit Price</p>
+<h3 class="text-display-xl font-display-xl text-primary mb-4">£482.50</h3>
+<div class="space-y-2 border-t border-secondary-fixed/30 pt-3">
+<div class="flex justify-between text-body-md">
+<span class="text-on-surface-variant">Materials</span>
+<span class="font-bold">£312.00</span>
+</div>
+<div class="flex justify-between text-body-md">
+<span class="text-on-surface-variant">Fabrication Labor</span>
+<span class="font-bold">£120.50</span>
+</div>
+<div class="flex justify-between text-body-md">
+<span class="text-on-surface-variant">Profit Margin (15%)</span>
+<span class="font-bold text-status-assembly">+£50.00</span>
+</div>
+</div>
+</div>
+<!-- Tabs for BOM/Materials -->
+<div class="flex gap-4 border-b border-outline-variant mb-4">
+<button class="pb-2 border-b-2 border-secondary text-secondary font-bold text-label-sm">BOM</button>
+<button class="pb-2 text-on-surface-variant text-label-sm">Materials</button>
+<button class="pb-2 text-on-surface-variant text-label-sm">Operations</button>
+</div>
+<!-- Scrollable BOM List -->
+<div class="flex-1 overflow-y-auto pr-2">
+<table class="w-full text-left">
+<thead class="sticky top-0 bg-surface z-10">
+<tr class="text-[10px] font-bold text-on-surface-variant uppercase tracking-tighter">
+<th class="py-2">Item</th>
+<th class="py-2 text-right">Qty/Len</th>
+<th class="py-2 text-right">Cost</th>
+</tr>
+</thead>
+<tbody class="text-label-sm divide-y divide-outline-variant">
+<tr>
+<td class="py-3">
+<div class="font-bold">Main Frame Profile</div>
+<div class="text-[10px] text-outline">White uPVC 70mm</div>
+</td>
+<td class="py-3 text-right font-label-sm">5400mm</td>
+<td class="py-3 text-right font-label-sm">£84.20</td>
+</tr>
+<tr>
+<td class="py-3">
+<div class="font-bold">Glazing Bead</div>
+<div class="text-[10px] text-outline">Sculptured Edge</div>
+</td>
+<td class="py-3 text-right font-label-sm">5200mm</td>
+<td class="py-3 text-right font-label-sm">£18.50</td>
+</tr>
+<tr>
+<td class="py-3">
+<div class="font-bold">IGU Unit</div>
+<div class="text-[10px] text-outline">Double Low-E Argon</div>
+</td>
+<td class="py-3 text-right font-label-sm">1.8 m²</td>
+<td class="py-3 text-right font-label-sm">£145.00</td>
+</tr>
+<tr>
+<td class="py-3">
+<div class="font-bold">Steel Reinforcement</div>
+<div class="text-[10px] text-outline">Galvanized U-Channel</div>
+</td>
+<td class="py-3 text-right font-label-sm">4800mm</td>
+<td class="py-3 text-right font-label-sm">£42.30</td>
+</tr>
+<tr>
+<td class="py-3">
+<div class="font-bold">Handle Set</div>
+<div class="text-[10px] text-outline">Chrome Locking</div>
+</td>
+<td class="py-3 text-right font-label-sm">1 unit</td>
+<td class="py-3 text-right font-label-sm">£22.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</aside>
+</div>
+<!-- STICKY BOTTOM ACTION BAR -->
+<footer class="h-20 bg-white border-t border-outline-variant flex items-center justify-between px-gutter z-50">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-status-assembly animate-pulse"></span>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Cloud Sync Active</span>
+</div>
+<div class="h-6 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-lg" data-icon="warning">warning</span>
+<span class="text-label-sm font-label-sm">1 Optimization available (Waste Reduction)</span>
+</div>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2.5 rounded-lg border border-outline-variant bg-white text-on-surface font-bold text-label-sm hover:bg-surface-container-high active:scale-95 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="drafts">drafts</span>
+                    Save Draft
+                </button>
+<button class="px-6 py-2.5 rounded-lg border border-secondary bg-secondary-fixed text-secondary font-bold text-label-sm hover:bg-secondary-fixed-dim active:scale-95 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="article">article</span>
+                    Generate Documents
+                </button>
+<button class="px-8 py-2.5 rounded-lg bg-primary text-on-primary font-bold text-label-sm hover:opacity-90 shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="send">send</span>
+                    Generate Quote
+                </button>
+</div>
+</footer>
+</main>
+<!-- Micro-interaction for SVG scaling and Input simulation -->
+<script>
+        document.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener('input', (e) => {
+                // In a real app, this would trigger re-calculation of BOM and SVG path updates
+                const feedback = document.querySelector('.bg-status-assembly');
+                feedback.classList.remove('bg-status-assembly');
+                feedback.classList.add('bg-status-welding');
+                feedback.innerHTML = '<span class="material-symbols-outlined text-sm" style="font-variation-settings: \'FILL\' 1;">sync</span> RECALCULATING...';
+                
+                setTimeout(() => {
+                    feedback.classList.remove('bg-status-welding');
+                    feedback.classList.add('bg-status-assembly');
+                    feedback.innerHTML = '<span class="material-symbols-outlined text-sm" style="font-variation-settings: \'FILL\' 1;">check_circle</span> VALID CONFIGURATION';
+                }, 800);
+            });
+        });
+    </script>
+</body></html>

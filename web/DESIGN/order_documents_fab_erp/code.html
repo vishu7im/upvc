@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Document Center - ORD-12345 | Fab ERP</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;family=Hanken+Grotesk:wght@600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "secondary": "#4442e3",
+                    "status-milling": "#3B82F6",
+                    "inverse-surface": "#2d3133",
+                    "on-secondary-container": "#fffbff",
+                    "surface-container-highest": "#e0e3e5",
+                    "tertiary": "#000000",
+                    "tertiary-container": "#271901",
+                    "on-primary": "#ffffff",
+                    "surface-dim": "#d8dadc",
+                    "on-surface-variant": "#45464d",
+                    "surface": "#f7f9fb",
+                    "secondary-fixed": "#e1dfff",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "primary-fixed-dim": "#bec6e0",
+                    "primary-fixed": "#dae2fd",
+                    "primary": "#000000",
+                    "inverse-primary": "#bec6e0",
+                    "tertiary-fixed": "#fcdeb5",
+                    "on-surface": "#191c1e",
+                    "on-tertiary": "#ffffff",
+                    "background": "#f7f9fb",
+                    "surface-container-high": "#e6e8ea",
+                    "error": "#ba1a1a",
+                    "glass-border": "rgba(255, 255, 255, 0.4)",
+                    "secondary-container": "#5f5ffd",
+                    "surface-container": "#eceef0",
+                    "error-container": "#ffdad6",
+                    "surface-tint": "#565e74",
+                    "outline-variant": "#c6c6cd",
+                    "on-tertiary-container": "#98805d",
+                    "status-welding": "#F59E0B",
+                    "secondary-fixed-dim": "#c1c1ff",
+                    "on-secondary-fixed": "#09006b",
+                    "surface-bright": "#f7f9fb",
+                    "surface-variant": "#e0e3e5",
+                    "status-assembly": "#10B981",
+                    "outline": "#76777d",
+                    "glass-bg": "rgba(255, 255, 255, 0.7)",
+                    "danger": "#EF4444",
+                    "on-tertiary-fixed": "#271901",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#2c24ce",
+                    "primary-container": "#131b2e",
+                    "surface-container-low": "#f2f4f6",
+                    "on-background": "#191c1e",
+                    "on-tertiary-fixed-variant": "#574425",
+                    "surface-container-lowest": "#ffffff",
+                    "status-shipped": "#6366F1",
+                    "on-primary-container": "#7c839b",
+                    "tertiary-fixed-dim": "#dec29a",
+                    "on-primary-fixed": "#131b2e",
+                    "on-error": "#ffffff",
+                    "inverse-on-surface": "#eff1f3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "margin-desktop": "40px",
+                    "margin-mobile": "16px",
+                    "gutter": "24px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "label-sm": ["JetBrains Mono"],
+                    "display-xl": ["Hanken Grotesk"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "display-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .sidebar-active {
+            box-shadow: inset 4px 0 0 0 #4442e3;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e0e3e5; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-screen">
+<!-- SideNavBar -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-surface border-r border-outline-variant flex flex-col py-base z-50">
+<div class="px-6 py-8">
+<h1 class="text-headline-md font-headline-md font-bold text-primary">Fab ERP</h1>
+<p class="text-label-sm font-label-sm text-on-surface-variant opacity-70">uPVC Fabrication System</p>
+</div>
+<nav class="flex-grow px-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="text-body-md">Products</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">request_quote</span>
+<span class="text-body-md">Quotes</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="text-body-md">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">factory</span>
+<span class="text-body-md">Production</span>
+</a>
+<!-- Active Tab -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-secondary font-bold bg-secondary-fixed transition-colors" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="text-body-md">Documents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-body-md">Customers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">warehouse</span>
+<span class="text-body-md">Inventory</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="text-body-md">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-body-md">Administration</span>
+</a>
+</nav>
+<div class="mt-auto px-4 border-t border-outline-variant pt-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-body-md">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-body-md">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-40 flex justify-between items-center h-16 px-gutter w-full bg-glass-bg backdrop-blur-xl border-b border-glass-border shadow-sm">
+<div class="flex items-center gap-6">
+<div class="relative">
+<span class="absolute inset-y-0 left-3 flex items-center text-outline">
+<span class="material-symbols-outlined text-sm">search</span>
+</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container border-none rounded-lg text-label-sm w-64 focus:ring-2 focus:ring-secondary/20" placeholder="Search orders, docs..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:text-secondary transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white"></span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-secondary transition-colors">
+<span class="material-symbols-outlined">history</span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-3">
+<div class="text-right">
+<p class="text-label-sm font-bold">M. Thompson</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Plant Manager</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center border border-outline-variant">
+<img class="w-full h-full rounded-full object-cover" data-alt="A professional headshot of a factory manager in their late 40s, wearing a clean industrial uniform. The lighting is soft and natural, coming from a nearby window. High-quality corporate photography style with a shallow depth of field, set in a clean manufacturing office environment with neutral tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJaoQcMRV4on0euHyKubpg2nmFqc_rHirNt7EwQvvrGWyHfkYAeHlr0hAaw3xpeEngSzYIt4_4wCflYgCJb11dGYebEJ2H20XRNerQfawXfjaTRpvlSg6ybnOLpHR0hYi5Obr2-IyVMPgbDuM5DnMsnlY2CCIW0p5_RN_sAR_meBumlbLwqgdnsSp_5SaHx0_YgKIQ8Mg7Fm6aMKqVp8fH33nCvcFjsOtxWFHYDVJ-fyxorfNxSKgAHu0hG3OFm8ONMGOZtktaRW4"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<div class="p-gutter max-w-container-max mx-auto">
+<!-- Breadcrumbs & Action Bar -->
+<div class="flex justify-between items-end mb-8">
+<div>
+<nav class="flex items-center gap-2 text-label-sm text-on-surface-variant mb-2">
+<a class="hover:text-primary transition-colors" href="#">Orders</a>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+<a class="hover:text-primary transition-colors" href="#">ORD-12345</a>
+<span class="material-symbols-outlined text-xs">chevron_right</span>
+<span class="text-primary font-bold">Document Center</span>
+</nav>
+<div class="flex items-center gap-4">
+<h2 class="text-display-xl font-display-xl text-primary">ORD-12345</h2>
+<span class="px-3 py-1 bg-status-welding/10 text-status-welding text-label-sm rounded-full border border-status-welding/20 flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-status-welding animate-pulse"></span>
+                            In Fabrication
+                        </span>
+</div>
+<p class="text-body-md text-on-surface-variant mt-2 max-w-2xl">
+                        Technical documentation and production assets for the <span class="font-bold text-on-surface">Luxury Residence uPVC System</span> project. Generated on Oct 24, 2023.
+                    </p>
+</div>
+<div class="flex gap-3">
+<button class="px-6 py-2 bg-white border border-outline-variant text-primary rounded-lg font-bold text-body-md hover:bg-surface-container-high transition-all flex items-center gap-2">
+<span class="material-symbols-outlined">archive</span>
+                        Bulk Export
+                    </button>
+<button class="px-6 py-2 bg-primary text-white rounded-lg font-bold text-body-md hover:opacity-90 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined">add</span>
+                        New Document
+                    </button>
+</div>
+</div>
+<!-- Documents Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- Work Order Card -->
+<div class="glass-card p-6 rounded-xl hover:shadow-lg transition-all group border border-outline-variant/30">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container">assignment</span>
+</div>
+<span class="text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">v2.4</span>
+</div>
+<h3 class="text-headline-md font-headline-md mb-2">Work Order</h3>
+<p class="text-body-md text-on-surface-variant mb-6">Primary fabrication instructions including dimensions, profile specs, and hardware requirements.</p>
+<div class="flex items-center gap-3">
+<button class="flex-grow py-2 bg-primary text-white rounded font-bold text-label-sm hover:opacity-90 transition-opacity">View Document</button>
+<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container transition-colors" title="Download PDF">
+<span class="material-symbols-outlined text-sm">download</span>
+</button>
+</div>
+</div>
+<!-- Cutting List Card -->
+<div class="glass-card p-6 rounded-xl hover:shadow-lg transition-all group border border-outline-variant/30">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-status-milling/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-status-milling">content_cut</span>
+</div>
+<span class="text-label-sm text-status-milling bg-status-milling/5 px-2 py-1 rounded">Optimized</span>
+</div>
+<h3 class="text-headline-md font-headline-md mb-2">Cutting List</h3>
+<p class="text-body-md text-on-surface-variant mb-6">Length-optimized profile breakdown for the CNC saw operator. Includes miter angles and waste reduction data.</p>
+<div class="flex items-center gap-3">
+<button class="flex-grow py-2 bg-primary text-white rounded font-bold text-label-sm hover:opacity-90 transition-opacity">View Document</button>
+<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container transition-colors" title="Download PDF">
+<span class="material-symbols-outlined text-sm">download</span>
+</button>
+</div>
+</div>
+<!-- Price Summary Card -->
+<div class="glass-card p-6 rounded-xl hover:shadow-lg transition-all group border border-outline-variant/30">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-secondary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">payments</span>
+</div>
+<span class="text-label-sm text-secondary bg-secondary-fixed px-2 py-1 rounded font-bold">$14,240.00</span>
+</div>
+<h3 class="text-headline-md font-headline-md mb-2">Price Summary</h3>
+<p class="text-body-md text-on-surface-variant mb-6">Comprehensive cost breakdown including labor, materials, and profit margins. Internal use only.</p>
+<div class="flex items-center gap-3">
+<button class="flex-grow py-2 bg-primary text-white rounded font-bold text-label-sm hover:opacity-90 transition-opacity">View Document</button>
+<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container transition-colors" title="Download PDF">
+<span class="material-symbols-outlined text-sm">download</span>
+</button>
+</div>
+</div>
+<!-- BOM Card -->
+<div class="glass-card p-6 rounded-xl hover:shadow-lg transition-all group border border-outline-variant/30">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-tertiary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-on-tertiary-fixed-variant">list_alt</span>
+</div>
+<span class="text-label-sm text-on-surface-variant bg-surface-container px-2 py-1 rounded">124 Items</span>
+</div>
+<h3 class="text-headline-md font-headline-md mb-2">BOM (Bill of Materials)</h3>
+<p class="text-body-md text-on-surface-variant mb-6">Complete list of profiles, hardware, gaskets, and glass units required for order completion.</p>
+<div class="flex items-center gap-3">
+<button class="flex-grow py-2 bg-primary text-white rounded font-bold text-label-sm hover:opacity-90 transition-opacity">View Document</button>
+<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container transition-colors" title="Download PDF">
+<span class="material-symbols-outlined text-sm">download</span>
+</button>
+</div>
+</div>
+<!-- DMO Card -->
+<div class="glass-card p-6 rounded-xl hover:shadow-lg transition-all group border border-outline-variant/30">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-error-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-error-container">engineering</span>
+</div>
+<span class="text-label-sm text-error bg-error-container/20 px-2 py-1 rounded">Urgent</span>
+</div>
+<h3 class="text-headline-md font-headline-md mb-2">DMO (Delivery Order)</h3>
+<p class="text-body-md text-on-surface-variant mb-6">Logistical documentation for site delivery, including glass safety certificates and load manifests.</p>
+<div class="flex items-center gap-3">
+<button class="flex-grow py-2 bg-primary text-white rounded font-bold text-label-sm hover:opacity-90 transition-opacity">View Document</button>
+<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container transition-colors" title="Download PDF">
+<span class="material-symbols-outlined text-sm">download</span>
+</button>
+</div>
+</div>
+<!-- Planner List Card -->
+<div class="glass-card p-6 rounded-xl hover:shadow-lg transition-all group border border-outline-variant/30">
+<div class="flex justify-between items-start mb-6">
+<div class="w-12 h-12 rounded-lg bg-status-assembly/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-status-assembly">calendar_today</span>
+</div>
+<span class="text-label-sm text-status-assembly bg-status-assembly/5 px-2 py-1 rounded">Phase 2</span>
+</div>
+<h3 class="text-headline-md font-headline-md mb-2">Planner List</h3>
+<p class="text-body-md text-on-surface-variant mb-6">Daily production schedule and station assignments for the fabrication floor team.</p>
+<div class="flex items-center gap-3">
+<button class="flex-grow py-2 bg-primary text-white rounded font-bold text-label-sm hover:opacity-90 transition-opacity">View Document</button>
+<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container transition-colors" title="Download PDF">
+<span class="material-symbols-outlined text-sm">download</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Visual Decorative Element (Industrial aesthetic) -->
+<div class="mt-12 grid grid-cols-4 gap-gutter opacity-40 grayscale pointer-events-none">
+<div class="h-32 rounded bg-surface-container-highest border border-outline-variant flex items-center justify-center">
+<img class="w-full h-full object-cover rounded opacity-50" data-alt="A close-up technical photograph of a high-precision uPVC window corner joint with a clean heat-welded seam. The lighting is cold and industrial, highlighting the texture of the Anthracite Gray profile. Sharp focus, macro photography style with minimal color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBe_A3XzfrfOMNv7usmzT6KrpLGTSSc_XS9KObmxNKrmbwnGbRrhLx8aZEQdUvKspEZjO7b-M8YUIridOXSABSwTf73nPfqbxltbVQA2v4fnfEFM41K1nGfS6daXunI9gNnr334NymavKAdoa3L4K5VE10iW-Q8wKsPqcCGdLTzrihnIkbuZ63tRsQhlt0eazjhvCuMmPVI_nvtvL5zmQ4YGri2hbBsG-qUWu0EG4C33CNlA9Gix0wxGRvb9tTaNjxqlXnDAvCUpHQ"/>
+</div>
+<div class="h-32 rounded bg-surface-container-highest border border-outline-variant">
+<img class="w-full h-full object-cover rounded opacity-50" data-alt="A detailed view of a CNC cutting saw blade inside a modern window fabrication factory. Sparks and water mist create a dynamic atmosphere. The style is industrial, clean, and futuristic, with cool blue and slate gray tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIdG_XLNThB41Kts-7yk_Hjc73M2Rs31DIQQfkSmSnDx7J5rbLBUmo_WzWBLQXBgivjgY271v1fdIqMxMb_rQsN-6jjiNx-IqfwVzIsefQDigg7rgtr7sXYo06nipb3bKJR3V9TmhxGEjpwGqhJuQ2h1cLuTReHMh4W8lO6FWB2wKKswT6veevFkvOin-vSVIsMkMrYrY5TCdTYE_i9afBWpGcjwexCKwN3DmECyJrJ8iRYpIKZEggaJp06yKvFscYTdjjc2BpP9U"/>
+</div>
+<div class="h-32 rounded bg-surface-container-highest border border-outline-variant">
+<img class="w-full h-full object-cover rounded opacity-50" data-alt="Racks of white and gray uPVC extrusion profiles stored in a high-density warehouse. Parallel lines create a strong geometric composition. Clean industrial aesthetic, bright diffuse lighting, and high-performance manufacturing mood." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAe8nSjhz9wMIuSw9HDmQqF3b0RPhqxWAfUVKH4I1J0X1AyUvnBaLxGJrjPo1apeElx2icqJcqRDDy9-U_Q2Y7x-LSXwCcweyzq1BFOrqhDs8FchjMJM2X9cg8X-GH6CczPDUi4aDO9TJ-T4CAcFV05ChRKyTROLvojxv4zaqaIFd4okk7qPuFuDOhSM56McK0dl8zz0SRuN9LS1rp8OHU5taJ9fci1Mtm9h8DaChan2PBO1GW2hSo3mHlqaVeJQE03BgwjzHwgDAE"/>
+</div>
+<div class="h-32 rounded bg-surface-container-highest border border-outline-variant">
+<img class="w-full h-full object-cover rounded opacity-50" data-alt="A workstation in a uPVC factory showing a digital display with a complex window frame schematic and technical dimensions. The background is a slightly blurred fabrication floor with modern machinery. Professional, tech-focused, and industrial." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrDHl6GaqnbgQ3yF2N5NDltIKD8oOzwO5qDWjCmUDoJlMhbvoXv1QgySot2TIkaN9R50_SrJGf5jyhvrV7sIQajWc1zSf2jD5OLa-YVtarmq1-htOo9_5-R9uaVbd-6JndJWd-Z1LOnK7ZiZJ9J-DyYC40ZEfHt00CAenELjXLpKKeVcRefLgzK-X28AnfLJOP8fPdHW9STv2n-fYG2V37XkutSMS-2Ra7CCG-4S4q-JotRxylwetg3BCCgfMuwxQ7tFV-tzDeMPw"/>
+</div>
+</div>
+<!-- Footer Meta -->
+<footer class="mt-12 pt-8 border-t border-outline-variant flex justify-between items-center text-label-sm text-on-surface-variant">
+<p>© 2023 Fab ERP System • Precision Manufacturing Suite</p>
+<div class="flex gap-6">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">cloud_done</span> All systems nominal</span>
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-xs">lock</span> Encrypted Document Access</span>
+</div>
+</footer>
+</div>
+</main>
+<!-- Contextual FAB - Only for relevant action screens -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-secondary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50">
+<span class="material-symbols-outlined">print</span>
+</button>
+<script>
+        // Micro-interaction for cards
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-4px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+    </script>
+</body></html>

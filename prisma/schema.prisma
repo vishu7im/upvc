@@ -1,0 +1,344 @@
+// =====================================================================
+// Prisma schema — persistence for the fabrication catalog.
+//
+// This mirrors the in-memory `ProfileSystem` / `Design` / `Settings`
+// shapes in src/types.ts. The nested `Record<string, ...>` maps are
+// modelled as relational tables keyed by their record key (`*Key`)
+// so src/catalog/loader.ts can rebuild the EXACT in-memory objects the
+// engine expects.
+//
+// Money/measurement columns are Decimal in the DB; the loader converts
+// them to JS numbers so engine math stays byte-identical to the
+// hardcoded catalog (132 validation assertions must still pass).
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Discriminator for the unified profile-part table ----------------
+enum PartKind {
+  FRAME
+  SASH
+  TRANSOM
+  BEAD
+  REINFORCEMENT
+}
+
+// ---- A profile system (e.g. "sunnyplast-70") -------------------------
+model ProfileSystem {
+  id               String  @id // = systemId, e.g. "sunnyplast-70"
+  name             String
+  currency         String
+  stockBarLengthMm Int
+  sawKerfMm        Int
+
+  // Colour/finish currently applied for pricing (M5). null ⇒ no uplift.
+  // Per-quote colour selection is deferred to the configurator UI (Phase 2);
+  // for now this is the system-wide default (e.g. base "white", 0% uplift).
+  defaultColourKey String?
+
+  parts             ProfilePart[]
+  glass             Glass[]
+  gaskets           Gasket[]
+  hardware          Hardware[]
+  colours           ColourOption[]
+  reinforcementMap  ReinforcementMapEntry[]
+
+  @@map("profile_system")
+}
+
+// ---- Frames, sashes, transoms, beads, reinforcement ------------------
+// They share the ProfileSection base; specialised fields are nullable
+// and only populated for the relevant kind.
+model ProfilePart {
+  id       String @id @default(uuid())
+  systemId String
+  system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  partKey String // the in-memory Record key, e.g. "frame-5ch"
+  kind    PartKind
+
+  // ProfileSection base
+  code              String
+  name              String
+  faceWidth         Decimal @db.Decimal(10, 4)
+  cost              Decimal @db.Decimal(12, 4)
+  price             Decimal @db.Decimal(12, 4)
+  per               String // "m" | "pc" | "m2" | "set"
+  weight            Decimal @db.Decimal(12, 4)
+  financialCategory String
+
+  // FrameSection / SashSection
+  glassRebate Decimal? @db.Decimal(10, 4)
+  // SashSection
+  overlap Decimal? @db.Decimal(10, 4)
+  // BeadSection
+  stickOut Decimal? @db.Decimal(10, 4)
+  // TransomSection: "T" | "Z"
+  jointType String?
+  // Reinforcement
+  endClearance Decimal? @db.Decimal(10, 4)
+
+  @@unique([systemId, kind, partKey])
+  @@map("profile_part")
+}
+
+// ---- Glass -----------------------------------------------------------
+model Glass {
+  id       String @id @default(uuid())
+  systemId String
+  system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  partKey           String
+  code              String
+  name              String
+  rebatePerSide     Decimal @db.Decimal(10, 4)
+  cost              Decimal @db.Decimal(12, 4)
+  price             Decimal @db.Decimal(12, 4)
+  per               String // "m2"
+  weight            Decimal @db.Decimal(12, 4)
+  financialCategory String
+
+  @@unique([systemId, partKey])
+  @@map("glass")
+}
+
+// ---- Gaskets ---------------------------------------------------------
+model Gasket {
+  id       String @id @default(uuid())
+  systemId String
+  system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  partKey           String
+  code              String
+  name              String
+  cost              Decimal @db.Decimal(12, 4)
+  price             Decimal @db.Decimal(12, 4)
+  per               String // "m"
+  weight            Decimal @db.Decimal(12, 4)
+  financialCategory String
+
+  @@unique([systemId, partKey])
+  @@map("gasket")
+}
+
+// ---- Hardware --------------------------------------------------------
+model Hardware {
+  id       String @id @default(uuid())
+  systemId String
+  system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  partKey           String
+  code              String
+  name              String
+  cost              Decimal @db.Decimal(12, 4)
+  price             Decimal @db.Decimal(12, 4)
+  per               String // "pc"
+  weight            Decimal @db.Decimal(12, 4)
+  financialCategory String
+  lengthMm          Decimal? @db.Decimal(10, 4) // espagnolettes / friction hinges
+
+  @@unique([systemId, partKey])
+  @@map("hardware")
+}
+
+// ---- Colour / finish options (M5) ------------------------------------
+// A selectable colour/finish that applies a percentage uplift to the
+// VISIBLE profile lines (frame/sash/transom/bead) at pricing time.
+// The base colour (e.g. white) carries 0% uplift, so a default catalog
+// quote is byte-identical to pre-M5. Real foiled-colour uplifts are
+// entered by the owner via the admin catalog API (never guessed).
+model ColourOption {
+  id       String @id @default(uuid())
+  systemId String
+  system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  key            String // in-memory Record key, e.g. "white"
+  code           String // doc code, e.g. "COL-WHITE"
+  name           String // e.g. "White" / "Golden Oak (Foiled)"
+  costUpliftPct  Decimal @default(0) @db.Decimal(6, 3)
+  priceUpliftPct Decimal @default(0) @db.Decimal(6, 3)
+  isBase         Boolean @default(false)
+
+  @@unique([systemId, key])
+  @@map("colour_option")
+}
+
+// ---- reinforcementMap: profile code -> reinforcement record key ------
+model ReinforcementMapEntry {
+  id       String @id @default(uuid())
+  systemId String
+  system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  profileCode      String // the .code of the profile being reinforced
+  reinforcementKey String // the reinforcement Record key
+
+  @@unique([systemId, profileCode])
+  @@map("reinforcement_map")
+}
+
+// ---- Designs (cell-tree topology stored as JSONB) --------------------
+// A design is "quotable" iff it has a CellNode topology the engine can solve.
+// SVG-only designs imported from collections/ have topology=null, quotable=false;
+// attaching a topology later (a data update) flips quotable=true with no code change.
+model Design {
+  designId    String  @id
+  name        String
+  productType String // "window" | "door"
+  frameKey    String
+  topology    Json? // recursive CellNode tree (null for SVG-only designs)
+  svgPreview  String?
+
+  // Catalogue / import metadata
+  externalId        String?  @unique // collections design UUID
+  imageSvg          String? // embedded SVG from collections (large)
+  quantityOfSquares Int?
+  listIndex         Int?
+  quotable          Boolean  @default(false)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@map("design")
+}
+
+// ---- Product (a product line, e.g. "Sunny Plast 70mm Casement") ------
+model Product {
+  id        String @id // collections product UUID
+  name      String
+  typeId    Int // NOT unique: e.g. Casement and Energy Plus Casement both share 101
+  systemId  String
+  listIndex Int    @default(0)
+
+  designs    Design[]
+  orderItems OrderItem[]
+
+  @@index([typeId])
+  @@map("product")
+}
+
+// ---- Users (JWT auth) ------------------------------------------------
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("user")
+  createdAt    DateTime @default(now())
+
+  orders Order[]
+
+  @@map("user")
+}
+
+// ---- Customers (minimal, B2B) ----------------------------------------
+model Customer {
+  id    String  @id @default(uuid())
+  name  String
+  email String?
+  phone String?
+
+  orders Order[]
+
+  @@map("customer")
+}
+
+// ---- Orders ----------------------------------------------------------
+model Order {
+  id           String   @id @default(uuid())
+  orderNo      String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName String
+  reference    String?
+  status       String   @default("draft") // "draft" | "confirmed"
+  // Grand total snapshot (M5) — set at confirm so the orders list can show a
+  // price without re-solving. null for draft/legacy orders.
+  totalPrice   Decimal? @db.Decimal(12, 4)
+  createdAt    DateTime @default(now())
+
+  items     OrderItem[]
+  documents Document[]
+
+  @@index([userId])
+  @@map("order")
+}
+
+// ---- Order items (one fabricated unit = product + design + W×H) ------
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  designId  String
+  design    Design  @relation(fields: [designId], references: [designId])
+  systemId  String
+  widthMm   Float
+  heightMm  Float
+  qty       Int    @default(1)
+  mode      String @default("default") // "default" | "custom"
+  overrides Json? // EngineOverrides when mode === "custom"
+  pricingSnapshot Json? // totals captured at confirm
+
+  @@index([orderId])
+  @@map("order_item")
+}
+
+// ---- Generated documents (persisted at confirm) ----------------------
+enum DocumentType {
+  WORK_ORDER
+  CUTTING_LIST
+  BOM
+  PRICE_SUMMARY
+  WORK_PLANNER
+  DMO
+  PLANNER_LIST
+}
+
+model Document {
+  id        String       @id @default(uuid())
+  orderId   String
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      DocumentType
+  html      String
+  createdAt DateTime     @default(now())
+
+  @@unique([orderId, type])
+  @@index([orderId])
+  @@map("document")
+}
+
+// ---- Default financial / display settings (single row) ---------------
+model Setting {
+  id            Int     @id @default(1)
+  currency      String
+  taxApply      Boolean
+  taxPct        Decimal @db.Decimal(6, 3)
+  markupPct     Decimal @db.Decimal(6, 3)
+  wastagePct    Decimal @db.Decimal(6, 3)
+  labourPerSash Decimal @db.Decimal(12, 4)
+  labourPerDoor Decimal @db.Decimal(12, 4)
+  labourBase    Decimal @db.Decimal(12, 4)
+
+  // Global company branding (M4) — printed on every document header.
+  // logoKey is the object-storage key of the uploaded logo (resolved to an
+  // embedded data-URI by the catalog loader); all nullable until configured.
+  companyName    String?
+  companyAddress String?
+  accentColor    String?
+  logoKey        String?
+
+  @@map("setting")
+}

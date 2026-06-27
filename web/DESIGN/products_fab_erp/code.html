@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;family=Hanken+Grotesk:wght@600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .industrial-shadow {
+            box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+        }
+        .industrial-shadow-hover:hover {
+            box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.15);
+            transition: all 0.3s ease;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "secondary": "#4442e3",
+                        "status-milling": "#3B82F6",
+                        "inverse-surface": "#2d3133",
+                        "on-secondary-container": "#fffbff",
+                        "surface-container-highest": "#e0e3e5",
+                        "tertiary": "#000000",
+                        "tertiary-container": "#271901",
+                        "on-primary": "#ffffff",
+                        "surface-dim": "#d8dadc",
+                        "on-surface-variant": "#45464d",
+                        "surface": "#f7f9fb",
+                        "secondary-fixed": "#e1dfff",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "primary-fixed-dim": "#bec6e0",
+                        "primary-fixed": "#dae2fd",
+                        "primary": "#000000",
+                        "inverse-primary": "#bec6e0",
+                        "tertiary-fixed": "#fcdeb5",
+                        "on-surface": "#191c1e",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f7f9fb",
+                        "surface-container-high": "#e6e8ea",
+                        "error": "#ba1a1a",
+                        "glass-border": "rgba(255, 255, 255, 0.4)",
+                        "secondary-container": "#5f5ffd",
+                        "surface-container": "#eceef0",
+                        "error-container": "#ffdad6",
+                        "surface-tint": "#565e74",
+                        "outline-variant": "#c6c6cd",
+                        "on-tertiary-container": "#98805d",
+                        "status-welding": "#F59E0B",
+                        "secondary-fixed-dim": "#c1c1ff",
+                        "on-secondary-fixed": "#09006b",
+                        "surface-bright": "#f7f9fb",
+                        "surface-variant": "#e0e3e5",
+                        "status-assembly": "#10B981",
+                        "outline": "#76777d",
+                        "glass-bg": "rgba(255, 255, 255, 0.7)",
+                        "danger": "#EF4444",
+                        "on-tertiary-fixed": "#271901",
+                        "on-secondary": "#ffffff",
+                        "on-secondary-fixed-variant": "#2c24ce",
+                        "primary-container": "#131b2e",
+                        "surface-container-low": "#f2f4f6",
+                        "on-background": "#191c1e",
+                        "on-tertiary-fixed-variant": "#574425",
+                        "surface-container-lowest": "#ffffff",
+                        "status-shipped": "#6366F1",
+                        "on-primary-container": "#7c839b",
+                        "tertiary-fixed-dim": "#dec29a",
+                        "on-primary-fixed": "#131b2e",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#eff1f3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "margin-desktop": "40px",
+                        "margin-mobile": "16px",
+                        "gutter": "24px",
+                        "container-max": "1440px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-sm": ["JetBrains Mono"],
+                        "display-xl": ["Hanken Grotesk"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "display-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-x-hidden">
+<!-- Side Navigation Bar -->
+<aside class="h-screen w-64 fixed left-0 top-0 flex flex-col py-base border-r border-outline-variant bg-surface z-50">
+<div class="px-6 py-8">
+<h1 class="text-headline-md font-headline-md font-bold text-primary">Fab ERP</h1>
+<p class="text-on-surface-variant text-label-sm font-label-sm opacity-70">uPVC Fabrication System</p>
+</div>
+<nav class="flex-1 px-4 space-y-1 overflow-y-auto hide-scrollbar">
+<!-- Nav Item Logic: Products is Active -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary font-bold bg-secondary-fixed rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md">Products</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">request_quote</span>
+<span class="font-body-md">Quotes</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="font-body-md">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">factory</span>
+<span class="font-body-md">Production</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-body-md">Documents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-body-md">Customers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">warehouse</span>
+<span class="font-body-md">Inventory</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-md">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md">Administration</span>
+</a>
+</nav>
+<div class="p-4 border-t border-outline-variant mt-auto">
+<button class="w-full bg-primary text-on-primary py-3 rounded-lg flex items-center justify-center gap-2 mb-4 hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined">add</span>
+<span class="font-body-md">New Quote</span>
+</button>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-label-sm font-label-sm">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-label-sm font-label-sm">Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 min-h-screen">
+<!-- Top Navigation Bar -->
+<header class="sticky top-0 z-40 bg-glass-bg backdrop-blur-xl border-b border-glass-border flex justify-between items-center h-16 px-gutter w-full shadow-sm">
+<div class="flex items-center gap-8 w-1/2">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container border-none focus:ring-2 focus:ring-secondary rounded-lg text-body-md" placeholder="Search product styles, profile IDs, or design names..." type="text"/>
+</div>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant hover:text-secondary font-label-sm transition-colors uppercase tracking-widest" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:text-secondary font-label-sm transition-colors uppercase tracking-widest" href="#">Orders</a>
+<a class="text-secondary border-b-2 border-secondary font-label-sm uppercase tracking-widest" href="#">Inventory</a>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3">
+<button class="p-2 hover:bg-surface-container-high rounded-full transition-colors relative">
+<span class="material-symbols-outlined text-on-surface-variant">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-secondary rounded-full"></span>
+</button>
+<button class="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">history</span>
+</button>
+<button class="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">help</span>
+</button>
+</div>
+<div class="h-8 w-[1px] bg-outline-variant"></div>
+<div class="flex items-center gap-3">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="Professional studio portrait of a manufacturing facility manager, clean lighting, wearing business casual attire with a subtle industrial background, photorealistic digital photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgjrRH5OIkIDrV0a9MHWCs_R5dDDI4N86SziTN1aL8zoSFauca-AzMSKi2XkWqwwjrQnSluDoriTWbd7-hPDuTqP5uV2iEfDVh2n_vzDNIEQM5_N2PNxIjrSTwQsPiJpaCzIVrdTWCF0y7OAbkocCTOx9MqxCa9XVLv30Vzw5zViV3WUu2iP8kxKko0mwEGcxiiEr7AQGRwLx0i5j-P0Ml0c6WC6UamKmZ5kSRWi3_aZ9kwHBYCKyEXkd79En-vIA5JChZBuDnPYs"/>
+<div class="hidden lg:block">
+<p class="text-label-sm font-label-sm font-bold leading-none">Alex Rivera</p>
+<p class="text-[10px] text-on-surface-variant leading-none mt-1">Plant Manager</p>
+</div>
+</div>
+</div>
+</header>
+<!-- Product Module Content -->
+<section class="p-gutter max-w-container-max mx-auto">
+<!-- Breadcrumbs & Actions -->
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+<div>
+<div class="flex items-center gap-2 text-on-surface-variant text-label-sm font-label-sm mb-2">
+<span>Inventory</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-secondary">Products Catalog</span>
+</div>
+<h2 class="text-display-xl font-display-xl text-primary">Products</h2>
+</div>
+<div class="flex gap-3">
+<button class="px-6 py-3 bg-surface-container-high border border-outline-variant text-primary rounded-lg font-body-md flex items-center gap-2 hover:bg-surface-variant transition-colors active:scale-95">
+<span class="material-symbols-outlined">file_download</span>
+                        Export PDF
+                    </button>
+<button class="px-6 py-3 bg-primary text-on-primary rounded-lg font-body-md flex items-center gap-2 industrial-shadow hover:opacity-90 transition-all active:scale-95">
+<span class="material-symbols-outlined">add_circle</span>
+                        Register New Profile
+                    </button>
+</div>
+</div>
+<!-- Categories & Filters -->
+<div class="glass-card p-4 rounded-xl mb-8 flex flex-wrap items-center justify-between gap-6 industrial-shadow">
+<div class="flex items-center gap-1 bg-surface-container-low p-1 rounded-lg">
+<button class="px-6 py-2 bg-secondary text-on-primary rounded-lg font-body-md shadow-sm transition-all">All Products</button>
+<button class="px-6 py-2 text-on-surface-variant hover:text-primary transition-colors font-body-md">Windows</button>
+<button class="px-6 py-2 text-on-surface-variant hover:text-primary transition-colors font-body-md">Doors</button>
+<button class="px-6 py-2 text-on-surface-variant hover:text-primary transition-colors font-body-md">Sliding Systems</button>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Profile:</span>
+<select class="bg-surface-container border-none text-label-sm font-label-sm rounded-lg focus:ring-secondary py-2 pl-3 pr-8">
+<option>All Systems</option>
+<option>EcoLine 70</option>
+<option>UltraTech 82</option>
+<option>Premium Slide</option>
+</select>
+</div>
+<div class="h-6 w-[1px] bg-outline-variant"></div>
+<div class="flex items-center gap-2">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Sort:</span>
+<button class="p-2 hover:bg-surface-container-high rounded-lg transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">sort</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Products Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter">
+<!-- Product Card 1: Casement Window -->
+<div class="group bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden industrial-shadow industrial-shadow-hover transition-all">
+<div class="relative h-56 bg-surface-container-high overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A modern white uPVC casement window installed in a minimalist residential setting, clean lines, bright daylight, architecture photography, high resolution, industrial design aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOk1IpcWsfJVv0nmmAeEgWmjr1dyGeTa0r1S80pR4xHpgiL4S1genvyjcAuhSckhI5XYdkHVIKYTD3rhaCahJKjrA4DjOZBttKdQ5kEERzajeHSak6H5SreSi14l8dQQubz_bZaL-ZL4BM6npTVpWXt4BH-fHiX9smj_FGEr0r5o5-x014PMMA37UkCY0Q_tzfhojqsrw7kKtT5IPscN5pG54M88fyjEhRVKnyQ_SNmAf-tQzkc8ufz92ltq4f1eeBqOT5Qr3tOlE"/>
+<div class="absolute top-3 left-3 bg-secondary/90 text-white text-[10px] font-label-sm px-2 py-1 rounded uppercase tracking-wider backdrop-blur-sm">Top Seller</div>
+<div class="absolute bottom-3 right-3 flex gap-2">
+<button class="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+</button>
+</div>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-headline-md font-headline-md text-primary">Standard Casement</h3>
+<span class="material-symbols-outlined text-outline">info</span>
+</div>
+<div class="flex gap-2 mb-4">
+<span class="px-2 py-0.5 bg-secondary/10 text-secondary text-label-sm font-label-sm rounded">White uPVC</span>
+<span class="px-2 py-0.5 bg-status-milling/10 text-status-milling text-label-sm font-label-sm rounded">A+ Grade</span>
+</div>
+<div class="space-y-3 border-t border-outline-variant pt-4">
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Profile System</span>
+<span class="text-primary font-bold">EcoLine 70mm</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Design Count</span>
+<span class="text-primary font-bold">14 Variants</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">U-Value</span>
+<span class="text-primary font-bold">1.2 W/m²K</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 2: Tilt & Turn -->
+<div class="group bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden industrial-shadow industrial-shadow-hover transition-all">
+<div class="relative h-56 bg-surface-container-high overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Anthracite grey uPVC tilt and turn window shown in tilt position, architectural details, high-end hardware visible, studio lighting, corporate modern style, sharp focus on mechanical joints." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGD6Va8Gjqt5HQ4ATROQPfrSE9O3BdVl47ctF3B5cPDvmUBntpLUztdUasU7RnmvLvdg337Iij-VDnVYeQHA_CdqhGFhZEnyNHRvi3j26yFF8oC9jrLC4VNNiQfPgfTIh3zAHjNFD-Hn8VAoPFtwXhPn-NC49iahcxTYd51OxrB51ZiYJWCxJwDiMgcVjtakSWxwLUgyJp_Em9zZGA3Zu3DYWOr5sJkpQcnkgesdxQgwJpbbdfepZhXiUaBqKKbGX50Y2emnW8fK0"/>
+<div class="absolute top-3 left-3 bg-primary/90 text-white text-[10px] font-label-sm px-2 py-1 rounded uppercase tracking-wider backdrop-blur-sm">Premium</div>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-headline-md font-headline-md text-primary">Tilt &amp; Turn Elite</h3>
+<span class="material-symbols-outlined text-outline">info</span>
+</div>
+<div class="flex gap-2 mb-4">
+<span class="px-2 py-0.5 bg-secondary/10 text-secondary text-label-sm font-label-sm rounded">Anthracite Grey</span>
+<span class="px-2 py-0.5 bg-status-welding/10 text-status-welding text-label-sm font-label-sm rounded">Triple Glaze</span>
+</div>
+<div class="space-y-3 border-t border-outline-variant pt-4">
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Profile System</span>
+<span class="text-primary font-bold">UltraTech 82mm</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Design Count</span>
+<span class="text-primary font-bold">8 Variants</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">U-Value</span>
+<span class="text-primary font-bold">0.9 W/m²K</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 3: French Door -->
+<div class="group bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden industrial-shadow industrial-shadow-hover transition-all">
+<div class="relative h-56 bg-surface-container-high overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Elegant uPVC French doors with large glass panes looking out onto a terrace, sunset lighting, high contrast, industrial-grade profile visible, luxury residential fabrication, realistic texture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMWimleBYgtQjq3XUtx7KT9A1BlRVAKQBwHSSM6i7GcOp7usPHEzKrdX7SVH4Th5zPY7c3hYzAG_qaGKUuqMTKhMdKjs4z_1sg1sz2bMWqVF4eWgXOJtM6dkxVbMW9hq14xY2ovGzS5nC0YKBdgyXI5RW1LIPRwHeIyKmEyMaY4XZpU8qN4EZfvuXwzEUOJzcv9rB0lkDXn_OtJUXbVybE36c6L4l9ox3BUV_kO_ZimI7fNvDRZC3ZAI60m29NKVLLw4Lc9WDstE8"/>
+<div class="absolute top-3 left-3 bg-status-shipped/90 text-white text-[10px] font-label-sm px-2 py-1 rounded uppercase tracking-wider backdrop-blur-sm">New Model</div>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-headline-md font-headline-md text-primary">Heritage French</h3>
+<span class="material-symbols-outlined text-outline">info</span>
+</div>
+<div class="flex gap-2 mb-4">
+<span class="px-2 py-0.5 bg-secondary/10 text-secondary text-label-sm font-label-sm rounded">Golden Oak</span>
+<span class="px-2 py-0.5 bg-status-assembly/10 text-status-assembly text-label-sm font-label-sm rounded">Multi-Point Lock</span>
+</div>
+<div class="space-y-3 border-t border-outline-variant pt-4">
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Profile System</span>
+<span class="text-primary font-bold">Heritage 70mm</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Design Count</span>
+<span class="text-primary font-bold">12 Variants</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Security</span>
+<span class="text-primary font-bold">PAS24 Rated</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 4: Patio Slider -->
+<div class="group bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden industrial-shadow industrial-shadow-hover transition-all">
+<div class="relative h-56 bg-surface-container-high overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Wide span uPVC sliding door system, minimal frame design, large glass surface, modern coastal architecture, bright airy feel, professional real estate photography style, grey finish." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGQMRkJ6m0USj9vnUPeuQxPEhYYZzVwmCDy6i4lNt1RFIS4mkTnRirF_KsGdrHnhUohNzgB7vAAgic0drmnKyiV81A8V3z18WAtalOLRIa9lSCxddAm9WROloX9ZyCLu5EaFN0i1ipcG7Dr_-_p3Y4NPv6ku28wWNCSanv5vxQKB33OQS3M8QPsakS5ZCVnMrvEE0SVCMi9Uf4j5ewx7Deiw3BntZQivYnydJk9aabhQiIOAeL76pLJon9PYoYuual6u0D-mAW6T4"/>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-headline-md font-headline-md text-primary">Panoramic Slide</h3>
+<span class="material-symbols-outlined text-outline">info</span>
+</div>
+<div class="flex gap-2 mb-4">
+<span class="px-2 py-0.5 bg-secondary/10 text-secondary text-label-sm font-label-sm rounded">Modern Grey</span>
+<span class="px-2 py-0.5 bg-status-shipped/10 text-status-shipped text-label-sm font-label-sm rounded">Slim Frame</span>
+</div>
+<div class="space-y-3 border-t border-outline-variant pt-4">
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Profile System</span>
+<span class="text-primary font-bold">SkyView 120mm</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Design Count</span>
+<span class="text-primary font-bold">5 Variants</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Max Span</span>
+<span class="text-primary font-bold">6.5 Meters</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 5: Bi-Fold Door -->
+<div class="group bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden industrial-shadow industrial-shadow-hover transition-all">
+<div class="relative h-56 bg-surface-container-high overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="uPVC bi-folding door system partially open, showing hardware and folding mechanism, outdoor garden view, daytime lighting, crisp clean aesthetic, industrial precision manufacturing." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqJlz28h0_KE2mdiX31oxibVuyDvgukzdgwfh0I3g4dKyXk_pLRyeITUWZF80bZgjnX_Ms6s85046m6flpLX-9z-NRENjYN0z5Xzvesn2V0vIsf3U2WKm8txS9VXY_a80Y6OTQDgs8jD9-jygournuTEo09sFY8IDh012du7zcIK9a4emxkLhq63JeXwz13KEOblsJVfT_xAhlZMCyOZhQUxhkPdgbMSNN4WD_TtrEZy7vSa1T6LNhocaLNy7K82BwQuhIVzSj8v0"/>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-headline-md font-headline-md text-primary">Flex-Fold S7</h3>
+<span class="material-symbols-outlined text-outline">info</span>
+</div>
+<div class="flex gap-2 mb-4">
+<span class="px-2 py-0.5 bg-secondary/10 text-secondary text-label-sm font-label-sm rounded">Signal White</span>
+<span class="px-2 py-0.5 bg-status-milling/10 text-status-milling text-label-sm font-label-sm rounded">7-Leaf Max</span>
+</div>
+<div class="space-y-3 border-t border-outline-variant pt-4">
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Profile System</span>
+<span class="text-primary font-bold">Structura 75mm</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Design Count</span>
+<span class="text-primary font-bold">18 Variants</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Thermal</span>
+<span class="text-primary font-bold">1.4 W/m²K</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Product Card 6: Vertical Slider -->
+<div class="group bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden industrial-shadow industrial-shadow-hover transition-all">
+<div class="relative h-56 bg-surface-container-high overflow-hidden">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="Traditional vertical sliding sash window with modern uPVC fabrication, white frame, georgian bars, high detailed woodgrain texture, studio clean lighting, professional industrial showcase." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_lbnzqJJN88CC13z9W2qwj68kkotSrmGvbqS5Q-3skkDDCswH-I5pi3KJnbbILGOFNhBlRzOLyhf5sGLrqJh11SMBs7WH2157pkQDm5LKQ04MtF0Jz568igUrK3r223OFcU7APTjpTsKAH7o7C-ZZ_UfU4au5ICWyKF9E2EYfKtNoi0K85KFVLq-0g7DVLCIqcMcpHMv0aXSMF67ATRMJe5h0gLtS7LfdLH_8BoA3uRsc0WOOF5oPQTzVaRhxtFsVYPlIQx22-6U"/>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-headline-md font-headline-md text-primary">Traditional Sash</h3>
+<span class="material-symbols-outlined text-outline">info</span>
+</div>
+<div class="flex gap-2 mb-4">
+<span class="px-2 py-0.5 bg-secondary/10 text-secondary text-label-sm font-label-sm rounded">Woodgrain</span>
+<span class="px-2 py-0.5 bg-status-welding/10 text-status-welding text-label-sm font-label-sm rounded">Georgian Bars</span>
+</div>
+<div class="space-y-3 border-t border-outline-variant pt-4">
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Profile System</span>
+<span class="text-primary font-bold">Legacy 128mm</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Design Count</span>
+<span class="text-primary font-bold">6 Variants</span>
+</div>
+<div class="flex justify-between text-label-sm font-label-sm">
+<span class="text-on-surface-variant">Mechanism</span>
+<span class="text-primary font-bold">Balanced Sash</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Empty "Add Product" Placeholder -->
+<div class="border-2 border-dashed border-outline-variant rounded-lg flex flex-col items-center justify-center p-8 text-center bg-surface-container-low/50 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-secondary">add</span>
+</div>
+<p class="text-body-md font-bold text-primary">Add New Product</p>
+<p class="text-label-sm text-on-surface-variant mt-1">Upload CAD or manual profile</p>
+</div>
+</div>
+<!-- Bottom Pagination/Status -->
+<div class="mt-12 flex flex-col md:flex-row justify-between items-center gap-4 py-6 border-t border-outline-variant">
+<p class="text-label-sm font-label-sm text-on-surface-variant">Showing 1-24 of 142 products in catalog</p>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-white transition-colors">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-on-primary font-bold">1</button>
+</div></div></section></main></body></html>

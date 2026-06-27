@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Orders Management | uPVC Fabrication ERP</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;900&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Design System Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "secondary": "#4442e3",
+                    "status-milling": "#3B82F6",
+                    "inverse-surface": "#2d3133",
+                    "on-secondary-container": "#fffbff",
+                    "surface-container-highest": "#e0e3e5",
+                    "tertiary": "#000000",
+                    "tertiary-container": "#271901",
+                    "on-primary": "#ffffff",
+                    "surface-dim": "#d8dadc",
+                    "on-surface-variant": "#45464d",
+                    "surface": "#f7f9fb",
+                    "secondary-fixed": "#e1dfff",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "primary-fixed-dim": "#bec6e0",
+                    "primary-fixed": "#dae2fd",
+                    "primary": "#000000",
+                    "inverse-primary": "#bec6e0",
+                    "tertiary-fixed": "#fcdeb5",
+                    "on-surface": "#191c1e",
+                    "on-tertiary": "#ffffff",
+                    "background": "#f7f9fb",
+                    "surface-container-high": "#e6e8ea",
+                    "error": "#ba1a1a",
+                    "glass-border": "rgba(255, 255, 255, 0.4)",
+                    "secondary-container": "#5f5ffd",
+                    "surface-container": "#eceef0",
+                    "error-container": "#ffdad6",
+                    "surface-tint": "#565e74",
+                    "outline-variant": "#c6c6cd",
+                    "on-tertiary-container": "#98805d",
+                    "status-welding": "#F59E0B",
+                    "secondary-fixed-dim": "#c1c1ff",
+                    "on-secondary-fixed": "#09006b",
+                    "surface-bright": "#f7f9fb",
+                    "surface-variant": "#e0e3e5",
+                    "status-assembly": "#10B981",
+                    "outline": "#76777d",
+                    "glass-bg": "rgba(255, 255, 255, 0.7)",
+                    "danger": "#EF4444",
+                    "on-tertiary-fixed": "#271901",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-fixed-variant": "#2c24ce",
+                    "primary-container": "#131b2e",
+                    "surface-container-low": "#f2f4f6",
+                    "on-background": "#191c1e",
+                    "on-tertiary-fixed-variant": "#574425",
+                    "surface-container-lowest": "#ffffff",
+                    "status-shipped": "#6366F1",
+                    "on-primary-container": "#7c839b",
+                    "tertiary-fixed-dim": "#dec29a",
+                    "on-primary-fixed": "#131b2e",
+                    "on-error": "#ffffff",
+                    "inverse-on-surface": "#eff1f3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "margin-desktop": "40px",
+                    "margin-mobile": "16px",
+                    "gutter": "24px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "label-sm": ["JetBrains Mono"],
+                    "display-xl": ["Hanken Grotesk"],
+                    "headline-lg": ["Hanken Grotesk"],
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Hanken Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .glass-panel {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased overflow-hidden">
+<!-- Side Navigation Bar -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-surface border-r border-outline-variant flex flex-col py-base z-50">
+<div class="px-6 py-8 flex flex-col gap-1">
+<h1 class="text-headline-md font-headline-md font-bold text-primary">Fab ERP</h1>
+<p class="text-label-sm font-label-sm text-on-surface-variant opacity-70">uPVC Fabrication System</p>
+</div>
+<nav class="flex-1 px-4 space-y-1 overflow-y-auto no-scrollbar">
+<!-- Navigation Items Mapping -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg group" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="text-body-md">Products</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">request_quote</span>
+<span class="text-body-md">Quotes</span>
+</a>
+<!-- ACTIVE STATE: Orders -->
+<a class="flex items-center gap-3 px-4 py-3 text-secondary font-bold bg-secondary-fixed rounded-lg" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="text-body-md">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">factory</span>
+<span class="text-body-md">Production</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="text-body-md">Documents</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="text-body-md">Customers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">warehouse</span>
+<span class="text-body-md">Inventory</span>
+</a>
+</nav>
+<div class="px-4 py-6 space-y-4 border-t border-outline-variant">
+<button class="w-full py-3 bg-primary text-on-primary font-bold rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined">add</span>
+                New Quote
+            </button>
+<div class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-body-md">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg text-danger" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-body-md">Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 flex flex-col h-screen overflow-hidden">
+<!-- Top Navigation Bar -->
+<header class="flex justify-between items-center h-16 px-gutter w-full bg-glass-bg backdrop-blur-xl border-b border-glass-border sticky top-0 z-40">
+<div class="flex items-center gap-8">
+<span class="text-headline-md font-black text-primary">Orders</span>
+<div class="hidden md:flex items-center gap-6">
+<a class="text-on-surface-variant hover:text-secondary text-label-sm font-label-sm" href="#">All Orders</a>
+<a class="text-secondary border-b-2 border-secondary text-label-sm font-label-sm py-5" href="#">Active Projects</a>
+<a class="text-on-surface-variant hover:text-secondary text-label-sm font-label-sm" href="#">History</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="bg-surface-container-low border border-outline-variant rounded-full pl-10 pr-4 py-2 text-body-md focus:outline-none focus:ring-2 focus:ring-secondary/50 w-64 transition-all" placeholder="Search orders..." type="text"/>
+</div>
+<div class="flex items-center border-l border-outline-variant pl-4 ml-4 gap-3">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-surface"></span>
+</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline">
+<img class="w-full h-full object-cover" data-alt="Professional headshot of a senior fabrication manager, mid-40s, looking confidently at the camera, neutral studio background with soft cinematic lighting, corporate uPVC ERP user profile photo style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFwIXBJAkyrBP-YA_uOr4wvZeYjhAIskx_5SFMfu1KoLMbh3lK5QY94mlcdPR7ZmOfCh3-CEWj_9HfRHPCXsO4r2mCr-H5SJd2MiNJFyTu8-ZTZSCJrmuPePm-8ol0ShPHH5hn-BiFEl-ZhFMtxecPPArydL9C11kKE6ltgtNdwPuGZ-s15MtiIf0JP7N2jP3b9vY7OSG9QV8qvaM4KKij3hk2ywH7-teewYP3Exv-u8gKdxrUkjcChw6ij3AmoK7gGK3aMinFErI"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Dynamic Content Canvas -->
+<div class="flex-1 overflow-y-auto p-gutter bg-surface-container-low">
+<!-- Toolbar & Tab Toggle -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+<div class="flex p-1 bg-surface-container-high rounded-lg">
+<button class="px-6 py-2 rounded-md font-bold text-body-md transition-all bg-surface text-secondary shadow-sm" id="kanban-tab" onclick="toggleView('kanban')">
+<span class="flex items-center gap-2">
+<span class="material-symbols-outlined">view_kanban</span> Kanban View
+                        </span>
+</button>
+<button class="px-6 py-2 rounded-md font-bold text-body-md transition-all text-on-surface-variant hover:text-on-surface" id="table-tab" onclick="toggleView('table')">
+<span class="flex items-center gap-2">
+<span class="material-symbols-outlined">table_chart</span> Table View
+                        </span>
+</button>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-2 bg-surface px-4 py-2 rounded-lg border border-outline-variant shadow-sm">
+<span class="material-symbols-outlined text-outline">calendar_today</span>
+<select class="bg-transparent text-label-sm border-none focus:ring-0 cursor-pointer">
+<option>Last 30 Days</option>
+<option>This Quarter</option>
+<option>Full Year</option>
+</select>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 bg-surface text-on-surface border border-outline-variant rounded-lg font-bold hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+                        Filters
+                    </button>
+<button class="flex items-center gap-2 px-5 py-2 bg-primary text-on-primary rounded-lg font-bold hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined">add_circle</span>
+                        Create Order
+                    </button>
+</div>
+</div>
+<!-- Kanban View -->
+<div class="grid grid-cols-1 md:grid-cols-5 gap-gutter h-full min-h-[600px]" id="view-kanban">
+<!-- Draft Column -->
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<h3 class="font-headline-md text-on-surface-variant flex items-center gap-2">
+                            Draft <span class="bg-surface-container-highest px-2 py-0.5 rounded text-label-sm">4</span>
+</h3>
+<span class="material-symbols-outlined text-outline">more_horiz</span>
+</div>
+<div class="flex flex-col gap-4">
+<!-- Kanban Card -->
+<div class="glass-panel p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow group cursor-pointer border-l-4 border-outline">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-sm font-label-sm text-secondary">#ORD-4021</span>
+<span class="material-symbols-outlined text-outline text-body-md opacity-0 group-hover:opacity-100">open_in_new</span>
+</div>
+<h4 class="font-bold text-on-surface mb-1">Modern Villa Windows</h4>
+<p class="text-label-sm text-on-surface-variant mb-4">Customer: Smith &amp; Co</p>
+<div class="flex justify-between items-center mb-3">
+<span class="font-bold text-on-surface">£12,450.00</span>
+<span class="bg-on-tertiary-container/10 text-on-tertiary-container text-label-sm px-2 py-0.5 rounded">White uPVC</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-outline h-full" style="width: 20%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Approved Column -->
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<h3 class="font-headline-md text-on-surface-variant flex items-center gap-2">
+                            Approved <span class="bg-surface-container-highest px-2 py-0.5 rounded text-label-sm">2</span>
+</h3>
+</div>
+<div class="flex flex-col gap-4">
+<div class="glass-panel p-4 rounded-lg shadow-sm border-l-4 border-status-milling">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-sm font-label-sm text-secondary">#ORD-3998</span>
+</div>
+<h4 class="font-bold text-on-surface mb-1">Commercial Office Block</h4>
+<p class="text-label-sm text-on-surface-variant mb-4">Customer: BuildTech UK</p>
+<div class="flex justify-between items-center mb-3">
+<span class="font-bold text-on-surface">£45,900.00</span>
+<span class="bg-on-tertiary-container/10 text-on-tertiary-container text-label-sm px-2 py-0.5 rounded">Anthracite Gray</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-status-milling h-full" style="width: 40%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- In Production Column -->
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<h3 class="font-headline-md text-on-surface-variant flex items-center gap-2">
+                            In Production <span class="bg-surface-container-highest px-2 py-0.5 rounded text-label-sm">8</span>
+</h3>
+</div>
+<div class="flex flex-col gap-4">
+<div class="glass-panel p-4 rounded-lg shadow-sm border-l-4 border-status-welding">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-sm font-label-sm text-secondary">#ORD-3950</span>
+<span class="material-symbols-outlined text-status-welding animate-pulse">settings</span>
+</div>
+<h4 class="font-bold text-on-surface mb-1">Residential Patio Doors</h4>
+<p class="text-label-sm text-on-surface-variant mb-4">Customer: Private Estate</p>
+<div class="flex justify-between items-center mb-3">
+<span class="font-bold text-on-surface">£8,220.00</span>
+<span class="bg-on-tertiary-container/10 text-on-tertiary-container text-label-sm px-2 py-0.5 rounded">Oak Foil</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-status-welding h-full" style="width: 65%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Fabricated Column -->
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<h3 class="font-headline-md text-on-surface-variant flex items-center gap-2">
+                            Fabricated <span class="bg-surface-container-highest px-2 py-0.5 rounded text-label-sm">3</span>
+</h3>
+</div>
+<div class="flex flex-col gap-4">
+<div class="glass-panel p-4 rounded-lg shadow-sm border-l-4 border-status-assembly">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-sm font-label-sm text-secondary">#ORD-3912</span>
+</div>
+<h4 class="font-bold text-on-surface mb-1">Bay Window Set</h4>
+<p class="text-label-sm text-on-surface-variant mb-4">Customer: Heritage Homes</p>
+<div class="flex justify-between items-center mb-3">
+<span class="font-bold text-on-surface">£3,100.00</span>
+<span class="bg-on-tertiary-container/10 text-on-tertiary-container text-label-sm px-2 py-0.5 rounded">White uPVC</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-status-assembly h-full" style="width: 90%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Delivered Column -->
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between px-2">
+<h3 class="font-headline-md text-on-surface-variant flex items-center gap-2">
+                            Delivered <span class="bg-surface-container-highest px-2 py-0.5 rounded text-label-sm">12</span>
+</h3>
+</div>
+<div class="flex flex-col gap-4 opacity-70 hover:opacity-100 transition-opacity">
+<div class="glass-panel p-4 rounded-lg shadow-sm border-l-4 border-status-shipped">
+<div class="flex justify-between items-start mb-2">
+<span class="text-label-sm font-label-sm text-secondary">#ORD-3881</span>
+<span class="material-symbols-outlined text-status-assembly">check_circle</span>
+</div>
+<h4 class="font-bold text-on-surface mb-1">Garage Door Trim</h4>
+<p class="text-label-sm text-on-surface-variant mb-4">Customer: Rapid Builders</p>
+<div class="flex justify-between items-center mb-3">
+<span class="font-bold text-on-surface">£540.00</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-status-shipped h-full" style="width: 100%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Table View (Hidden by Default) -->
+<div class="hidden animate-in fade-in slide-in-from-bottom-4 duration-500" id="view-table">
+<div class="bg-surface border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high border-b border-outline-variant">
+<th class="px-6 py-4 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Order ID</th>
+<th class="px-6 py-4 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Customer Name</th>
+<th class="px-6 py-4 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Date Created</th>
+<th class="px-6 py-4 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Priority</th>
+<th class="px-6 py-4 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Value</th>
+<th class="px-6 py-4 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Status</th>
+<th class="px-6 py-4 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 font-label-sm text-secondary">#ORD-4021</td>
+<td class="px-6 py-4 font-bold">Smith &amp; Co</td>
+<td class="px-6 py-4 text-on-surface-variant">24 Oct, 2023</td>
+<td class="px-6 py-4">
+<span class="bg-danger/10 text-danger px-2 py-0.5 rounded text-label-sm font-bold">CRITICAL</span>
+</td>
+<td class="px-6 py-4 font-bold">£12,450.00</td>
+<td class="px-6 py-4">
+<span class="bg-outline/10 text-outline px-3 py-1 rounded-full text-label-sm">DRAFT</span>
+</td>
+<td class="px-6 py-4">
+<button class="p-1 hover:bg-surface-container-highest rounded text-outline group-hover:text-primary transition-colors">
+<span class="material-symbols-outlined">edit</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 font-label-sm text-secondary">#ORD-3998</td>
+<td class="px-6 py-4 font-bold">BuildTech UK</td>
+<td class="px-6 py-4 text-on-surface-variant">22 Oct, 2023</td>
+<td class="px-6 py-4">
+<span class="bg-status-milling/10 text-status-milling px-2 py-0.5 rounded text-label-sm font-bold">NORMAL</span>
+</td>
+<td class="px-6 py-4 font-bold">£45,900.00</td>
+<td class="px-6 py-4">
+<span class="bg-status-milling/10 text-status-milling px-3 py-1 rounded-full text-label-sm">APPROVED</span>
+</td>
+<td class="px-6 py-4">
+<button class="p-1 hover:bg-surface-container-highest rounded text-outline group-hover:text-primary transition-colors">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4 font-label-sm text-secondary">#ORD-3950</td>
+<td class="px-6 py-4 font-bold">Private Estate</td>
+<td class="px-6 py-4 text-on-surface-variant">20 Oct, 2023</td>
+<td class="px-6 py-4">
+<span class="bg-status-welding/10 text-status-welding px-2 py-0.5 rounded text-label-sm font-bold">HIGH</span>
+</td>
+<td class="px-6 py-4 font-bold">£8,220.00</td>
+<td class="px-6 py-4">
+<span class="bg-status-welding/10 text-status-welding px-3 py-1 rounded-full text-label-sm">PRODUCTION</span>
+</td>
+<td class="px-6 py-4">
+<button class="p-1 hover:bg-surface-container-highest rounded text-outline group-hover:text-primary transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+<!-- Micro-interaction Scripts -->
+<script>
+        function toggleView(view) {
+            const kanbanView = document.getElementById('view-kanban');
+            const tableView = document.getElementById('view-table');
+            const kanbanTab = document.getElementById('kanban-tab');
+            const tableTab = document.getElementById('table-tab');
+
+            if (view === 'kanban') {
+                kanbanView.classList.remove('hidden');
+                tableView.classList.add('hidden');
+                
+                // Update styles for kanban tab
+                kanbanTab.classList.add('bg-surface', 'text-secondary', 'shadow-sm');
+                kanbanTab.classList.remove('text-on-surface-variant');
+                
+                // Update styles for table tab
+                tableTab.classList.remove('bg-surface', 'text-secondary', 'shadow-sm');
+                tableTab.classList.add('text-on-surface-variant');
+            } else {
+                kanbanView.classList.add('hidden');
+                tableView.classList.remove('hidden');
+                
+                // Update styles for table tab
+                tableTab.classList.add('bg-surface', 'text-secondary', 'shadow-sm');
+                tableTab.classList.remove('text-on-surface-variant');
+                
+                // Update styles for kanban tab
+                kanbanTab.classList.remove('bg-surface', 'text-secondary', 'shadow-sm');
+                kanbanTab.classList.add('text-on-surface-variant');
+            }
+        }
+    </script>
+</body></html>

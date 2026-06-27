@@ -1,0 +1,105 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: upvc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-upvc_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-65e954e9-a001-44fa-a7a9-0a7b7f5d36ee}
+      POSTGRES_DB: ${POSTGRES_DB:-upvc}
+    ports:
+      - "5433:5432"
+    volumes:
+      - upvc_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - upvc-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: upvc-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-7c735c27-35ba-4d78-bffd-e5cbf2a56070}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - upvc_miniodata:/data
+    networks:
+      - upvc-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: upvc-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      DATABASE_URL: postgresql://${POSTGRES_USER:-upvc_user}:${POSTGRES_PASSWORD:-65e954e9-a001-44fa-a7a9-0a7b7f5d36ee}@postgres:5432/${POSTGRES_DB:-upvc}?schema=public&connection_limit=5&pool_timeout=20
+      JWT_SECRET: ${JWT_SECRET:-change-this-before-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-7c735c27-35ba-4d78-bffd-e5cbf2a56070}
+      MINIO_BUCKET: ${MINIO_BUCKET:-upvc-files}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET:-upvc-files-bucket}
+      MINIO_REGION: us-east-1
+      MINIO_FORCE_PATH_STYLE: "true"
+      MINIO_USE_SSL: "false"
+    ports:
+      - "3005:3005"
+    command: >
+      sh -c "npx prisma migrate deploy &&
+             npm run db:seed &&
+             npm start"
+    networks:
+      - upvc-network
+      - shared_proxy_network
+
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: upvc-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      EXPRESS_API_BASE: http://backend:3005
+    ports:
+      - "3000:3000"
+    networks:
+      - upvc-network
+      - shared_proxy_network
+
+volumes:
+  upvc_pgdata:
+  upvc_miniodata:
+
+networks:
+  upvc-network:
+    driver: bridge
+
+  shared_proxy_network:
+    external: true
