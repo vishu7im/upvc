@@ -50,6 +50,13 @@ export function solve(input: QuoteInput): QuoteOutput {
     design = { ...baseDesign, topology: fillDefaultGlass(baseDesign.topology, input.glassKey) };
   }
 
+  // Per-quote internal split overrides (multi-span editing). Re-position each
+  // transom/mullion split by its node pathId. Omitted/empty ⇒ design's baked
+  // splits, so the quote stays byte-identical (and the 157 assertions hold).
+  if (input.splitRatios && Object.keys(input.splitRatios).length) {
+    design = { ...design, topology: applySplitRatios(design.topology, input.splitRatios) };
+  }
+
   // 1. Topology — solve geometry
   const geometry = solveTopology(design, input.widthMm, input.heightMm, system);
 
@@ -112,4 +119,35 @@ function fillDefaultGlass(node: CellNode, glassKey: string): CellNode {
     return { ...node, top: fillDefaultGlass(node.top, glassKey), bottom: fillDefaultGlass(node.bottom, glassKey) };
   }
   return { ...node, left: fillDefaultGlass(node.left, glassKey), right: fillDefaultGlass(node.right, glassKey) };
+}
+
+/**
+ * Returns a clone of the cell tree where each hsplit/vsplit node's `splitAtRatio`
+ * is replaced by an override keyed on the node's pathId ("root", "root.top", …).
+ * The path scheme is identical to `solveTopology`'s walk, and matches the
+ * `parentPathId` carried on each solved transom/mullion. Values are full-window
+ * fractions (clamped defensively to avoid degenerate cells); unknown keys are
+ * ignored so a stale UI key can't break a live preview. Pure; never mutates the
+ * input tree, and a no-op for any node not addressed by `ratios`.
+ */
+function applySplitRatios(node: CellNode, ratios: Record<string, number>, pathId = "root"): CellNode {
+  if (node.kind === "leaf") return node;
+  const override = ratios[pathId];
+  const splitAtRatio = Number.isFinite(override)
+    ? Math.min(0.98, Math.max(0.02, override))
+    : node.splitAtRatio;
+  if (node.kind === "hsplit") {
+    return {
+      ...node,
+      splitAtRatio,
+      top: applySplitRatios(node.top, ratios, pathId + ".top"),
+      bottom: applySplitRatios(node.bottom, ratios, pathId + ".bottom"),
+    };
+  }
+  return {
+    ...node,
+    splitAtRatio,
+    left: applySplitRatios(node.left, ratios, pathId + ".left"),
+    right: applySplitRatios(node.right, ratios, pathId + ".right"),
+  };
 }

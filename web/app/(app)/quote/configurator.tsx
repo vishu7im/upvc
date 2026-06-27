@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiGet, quote, createOrder, addOrderItem, ApiError } from "@/lib/api";
 import type { QuoteResult, SystemOptions, SystemSummary } from "@/lib/types";
 import { normalizeSvgForPreview } from "@/lib/svg-preview";
+import WindowDesigner from "@/components/window-designer";
 import {
   Alert,
   Badge,
@@ -39,6 +40,9 @@ export default function Configurator(props: ConfiguratorProps) {
   const [height, setHeight] = useState(1200);
   const [glassKey, setGlassKey] = useState("");
   const [colourKey, setColourKey] = useState("");
+  // Per-quote internal split overrides (multi-span editing), keyed by split-node
+  // pathId; full-window fractions. Empty ⇒ the design's baked splits.
+  const [splitRatios, setSplitRatios] = useState<Record<string, number>>({});
 
   const [result, setResult] = useState<QuoteResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -69,6 +73,15 @@ export default function Configurator(props: ConfiguratorProps) {
       .catch(() => setOptions(null));
   }, [systemId]);
 
+  // Reset split overrides when the design changes — the pathId scheme is
+  // design-specific. (Width/height changes keep them: full-window fractions
+  // scale panels proportionally.) Render-phase reset per the React docs pattern.
+  const [splitDesignId, setSplitDesignId] = useState(props.designId);
+  if (splitDesignId !== props.designId) {
+    setSplitDesignId(props.designId);
+    setSplitRatios({});
+  }
+
   const runQuote = useCallback(() => {
     if (!props.designId || !systemId || width <= 0 || height <= 0) return;
     setLoading(true);
@@ -80,11 +93,12 @@ export default function Configurator(props: ConfiguratorProps) {
       heightMm: height,
       glassKey: glassKey || undefined,
       colourKey: colourKey || undefined,
+      splitRatios: Object.keys(splitRatios).length ? splitRatios : undefined,
     })
       .then((r) => setResult(r))
       .catch((e) => setError(e instanceof ApiError ? e.message : "Quote failed"))
       .finally(() => setLoading(false));
-  }, [props.designId, systemId, width, height, glassKey, colourKey]);
+  }, [props.designId, systemId, width, height, glassKey, colourKey, splitRatios]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -153,8 +167,9 @@ export default function Configurator(props: ConfiguratorProps) {
   const selectedColour = options?.colours.find((c) => c.key === colourKey);
   const selectedGlass = options?.glass.find((g) => g.key === glassKey);
   const lines = result?.pricing.lines ?? [];
-  const previewSvg = props.designSvg || result?.geometry.svg || null;
+  const previewSvg = result?.geometry.svg || props.designSvg || null;
   const normalizedPreviewSvg = previewSvg ? normalizeSvgForPreview(previewSvg) : null;
+  const canUseDesigner = Boolean(result?.geometry.outer && result.geometry.cells?.length);
 
   return (
     <div className="space-y-4">
@@ -287,6 +302,18 @@ export default function Configurator(props: ConfiguratorProps) {
               <div className="quote-preview-frame relative flex min-h-0 w-full min-w-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white/[0.84] p-4 shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-6">
                 {error ? (
                   <Alert tone="red" title="Quote failed">{error}</Alert>
+                ) : canUseDesigner && result ? (
+                  <WindowDesigner
+                    geometry={result.geometry}
+                    widthMm={width}
+                    heightMm={height}
+                    glassLabel={selectedGlass?.name ?? "Design default"}
+                    onWidthChange={setWidth}
+                    onHeightChange={setHeight}
+                    onSplitRatioChange={(pathId, ratio) =>
+                      setSplitRatios((prev) => ({ ...prev, [pathId]: ratio }))
+                    }
+                  />
                 ) : normalizedPreviewSvg ? (
                   <div
                     className="design-preview-svg flex h-full min-h-0 w-full min-w-0 items-center justify-center"

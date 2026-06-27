@@ -89,10 +89,53 @@ export interface QuoteTotals {
   tax: number;
   grandTotal: number;
 }
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+export interface SolvedCell {
+  pathId: string;
+  outer: Rect;
+  daylight: Rect;
+  content: string;
+  sashKey?: string;
+  beadKey: string;
+  glassKey: string;
+  sashOuter?: Rect;
+  sashInner?: Rect;
+  glassRect: Rect;
+  beadIntW: number;
+  beadIntH: number;
+}
+export interface SolvedTransom {
+  rect: Rect;
+  parentPathId: string;
+  transomKey: string;
+  extLengthMm: number;
+  intLengthMm: number;
+  jointType: "T" | "Z";
+}
+export interface SolvedMullion {
+  rect: Rect;
+  parentPathId: string;
+  mullionKey: string;
+  extLengthMm: number;
+  intLengthMm: number;
+  jointType: "T" | "Z";
+}
+export interface QuoteGeometry {
+  outer?: Rect;
+  cells?: SolvedCell[];
+  transoms?: SolvedTransom[];
+  mullions?: SolvedMullion[];
+  svg: string;
+}
 export interface QuoteResult {
   systemName: string;
   designName: string;
-  geometry: { svg: string };
+  geometry: QuoteGeometry;
   pricing: { currency: string; lines: QuoteLine[]; totals: QuoteTotals };
 }
 

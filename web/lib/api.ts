@@ -85,6 +85,8 @@ export interface QuoteRequest {
   heightMm: number;
   glassKey?: string;
   colourKey?: string;
+  /** Internal split overrides keyed by split-node pathId; full-window fraction 0..1. */
+  splitRatios?: Record<string, number>;
 }
 
 /** Run the engine for a live preview (public endpoint; no order persisted). */

@@ -481,6 +481,14 @@ export interface QuoteInput {
    * (base White = 0%), so a quote without it is byte-identical to pre-U3.
    */
   colourKey?: string;
+  /**
+   * Per-quote internal split overrides (multi-span editing). Keyed by the split
+   * node's pathId ("root", "root.top", …); value is a FULL-WINDOW fraction 0..1
+   * (hsplit ⇒ y/heightMm, vsplit ⇒ x/widthMm, matching solveTopology's
+   * splitAtRatio*windowH / *windowW). Omitted/empty ⇒ the design's baked splits,
+   * so a quote without it is byte-identical to pre-existing quotes.
+   */
+  splitRatios?: Record<string, number>;
 }
 
 export interface QuoteOutput {
