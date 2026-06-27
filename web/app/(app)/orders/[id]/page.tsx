@@ -38,6 +38,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const isDraft = order.status === "draft";
 
+  // The confirm step stores up to two rows per doc type (normal + welded for the
+  // length-bearing docs). Collapse to one card per type, carrying its variants.
+  const docTypes: { type: string; variants: string[]; createdAt: string }[] = [];
+  const seenType = new Map<string, number>();
+  for (const d of order.documents) {
+    const at = seenType.get(d.type);
+    if (at === undefined) {
+      seenType.set(d.type, docTypes.length);
+      docTypes.push({ type: d.type, variants: [d.variant], createdAt: d.createdAt });
+    } else {
+      docTypes[at].variants.push(d.variant);
+    }
+  }
+
   return (
     <div>
       <Link href="/orders" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-950">
@@ -87,7 +101,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase text-slate-500">Documents</p>
-          <p className="mt-2 text-xl font-bold text-slate-950">{order.documents.length}</p>
+          <p className="mt-2 text-xl font-bold text-slate-950">{docTypes.length}</p>
           <p className="mt-1 text-sm text-slate-500">{isDraft ? "Confirm order to generate pack" : "Generated production assets"}</p>
         </Card>
       </section>
@@ -173,11 +187,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             title="Documents"
             description="Preview generated documents in place or download PDFs through the authenticated proxy."
           />
-          {order.documents.length === 0 ? (
+          {docTypes.length === 0 ? (
             <EmptyState icon="document" title="No documents generated" description="The engine did not return any generated documents for this order." />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {order.documents.map((document, index) => (
+              {docTypes.map((document, index) => (
                 <Card key={document.type} className="flex min-h-56 flex-col p-5">
                   <div className="flex items-start justify-between gap-4">
                     <span className="flex h-12 w-12 items-center justify-center rounded-md bg-slate-100 text-slate-700">
@@ -187,12 +201,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   </div>
                   <h3 className="mt-6 text-xl font-bold text-slate-950">{docLabel(document.type)}</h3>
                   <p className="mt-2 flex-1 text-sm leading-6 text-slate-500">
-                    Production-ready fabrication document generated from confirmed order data.
+                    {document.variants.includes("welded")
+                      ? "Choose Normal (finished sizes) or Welded (lengths include weld-shrinkage allowance)."
+                      : "Production-ready fabrication document generated from confirmed order data."}
                   </p>
                   <DocumentViewer
                     label={docLabel(document.type)}
                     viewHref={`/api/orders/${order.id}/documents/${document.type}`}
                     pdfHref={`/api/orders/${order.id}/documents/${document.type}/pdf`}
+                    variants={document.variants}
                   />
                 </Card>
               ))}

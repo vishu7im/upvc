@@ -8,15 +8,28 @@ export function DocumentViewer({
   label,
   viewHref,
   pdfHref,
+  variants = ["normal"],
 }: {
   label: string;
+  /** Base document HTML href (no ?variant). */
   viewHref: string;
+  /** Base document PDF href (no ?variant). */
   pdfHref: string;
+  /** Stored variants for this doc type, e.g. ["normal","welded"] or ["normal"]. */
+  variants?: string[];
 }) {
   const [open, setOpen] = useState(false);
+  const [variant, setVariant] = useState<"normal" | "welded">("normal");
   const titleId = useId();
-  const downloadHref = `${pdfHref}?download=1`;
-  const fileName = `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "document"}.pdf`;
+
+  const hasWelded = variants.includes("welded");
+  const welded = variant === "welded";
+  // Welded length docs carry the weld-shrinkage allowance; normal is the default.
+  const q = welded ? "?variant=welded" : "";
+  const fullViewHref = `${viewHref}${q}`;
+  const downloadHref = `${pdfHref}${welded ? "?variant=welded&download=1" : "?download=1"}`;
+  const suffix = welded ? "-welded" : "";
+  const fileName = `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "document"}${suffix}.pdf`;
 
   useEffect(() => {
     if (!open) return;
@@ -36,18 +49,43 @@ export function DocumentViewer({
 
   return (
     <>
-      <div className="mt-5 flex gap-2">
+      {hasWelded && (
+        <div className="mt-5 inline-flex rounded-md border border-slate-300 bg-slate-50 p-0.5 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setVariant("normal")}
+            className={cn(
+              "rounded px-2.5 py-1 transition",
+              !welded ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800",
+            )}
+          >
+            Normal
+          </button>
+          <button
+            type="button"
+            onClick={() => setVariant("welded")}
+            className={cn(
+              "rounded px-2.5 py-1 transition",
+              welded ? "bg-white text-amber-700 shadow-sm" : "text-slate-500 hover:text-slate-800",
+            )}
+          >
+            Welded
+          </button>
+        </div>
+      )}
+
+      <div className={cn("flex gap-2", hasWelded ? "mt-2" : "mt-5")}>
         <button
           type="button"
           onClick={() => setOpen(true)}
           className="inline-flex h-10 flex-1 items-center justify-center rounded-md bg-[#0f172a] px-3 text-sm font-semibold text-white transition hover:bg-[#172033] focus:ring-4 focus:ring-slate-300"
         >
-          View document
+          View {welded ? "welded" : "document"}
         </button>
         <a
           href={downloadHref}
           download={fileName}
-          aria-label={`Download ${label} PDF`}
+          aria-label={`Download ${label}${welded ? " (welded)" : ""} PDF`}
           className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-50 focus:ring-4 focus:ring-slate-200"
         >
           <Icon name="download" className="h-4 w-4" />
@@ -68,6 +106,7 @@ export function DocumentViewer({
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3">
               <h2 id={titleId} className="min-w-0 truncate text-base font-semibold text-slate-950">
                 {label}
+                {welded && <span className="ml-2 text-sm font-medium text-amber-700">(Welded)</span>}
               </h2>
               <div className="flex items-center gap-2">
                 <a href={downloadHref} download={fileName} className={cn(buttonClasses("secondary"), "px-3")} aria-label={`Download ${label} PDF`}>
@@ -88,7 +127,7 @@ export function DocumentViewer({
               <div className="flex min-w-max justify-center">
                 <iframe
                   title={label}
-                  src={viewHref}
+                  src={fullViewHref}
                   className="shrink-0 border-0 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.22)]"
                   style={{ width: 794, height: "min(1123px, calc(100vh - 11rem))" }}
                 />

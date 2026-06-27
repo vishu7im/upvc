@@ -123,7 +123,7 @@ export interface OrderItem {
 }
 export interface OrderDetail extends OrderSummary {
   items: OrderItem[];
-  documents: { type: string; createdAt: string }[];
+  documents: { type: string; variant: string; createdAt: string }[];
 }
 
 // ---------- Admin (U5) -----------------------------------------------
@@ -154,6 +154,8 @@ export interface CatalogPart {
   cost: number;
   price: number;
   weight: number;
+  /** Welding-shrinkage allowance per welded end (mm). Profile parts only. */
+  weldAllowanceMm?: number;
   [extra: string]: unknown;
 }
 export interface CatalogColour {

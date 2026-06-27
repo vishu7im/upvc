@@ -98,7 +98,7 @@ function emitFrameBars(
     const r = system.reinforcement[reinfKey];
     bars.forEach((b) => {
       if (b.code === frame.code) {
-        reinf.push({
+        reinf.push(withWeld({
           code: r.code,
           name: r.name,
           position: `Reinf for ${b.position}`,
@@ -106,7 +106,7 @@ function emitFrameBars(
           extMm: b.intMm - 2 * r.endClearance,
           intMm: b.intMm - 2 * r.endClearance,
           endPrep: "[ - ]",
-        });
+        }, r.weldAllowanceMm));
       }
     });
   }
@@ -120,15 +120,18 @@ function barFrame(
   orientation: "H" | "V",
   endPrep: string,
 ): BarPiece {
-  return {
-    code: frame.code,
-    name: frame.name,
-    position,
-    orientation,
-    extMm: round1(ext),
-    intMm: round1(int),
-    endPrep,
-  };
+  return withWeld(
+    {
+      code: frame.code,
+      name: frame.name,
+      position,
+      orientation,
+      extMm: round1(ext),
+      intMm: round1(int),
+      endPrep,
+    },
+    frame.weldAllowanceMm ?? 0,
+  );
 }
 
 // ---------------------------------------------------------------------
@@ -137,7 +140,7 @@ function barFrame(
 function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeometry, system: ProfileSystem): void {
   for (const t of geom.transoms) {
     const profile = system.transoms[t.transomKey];
-    const piece: BarPiece = {
+    const piece: BarPiece = withWeld({
       code: profile.code,
       name: profile.name,
       position: `Transom (${t.parentPathId})`,
@@ -145,14 +148,14 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       extMm: round1(t.extLengthMm),
       intMm: round1(t.intLengthMm),
       endPrep: "< - >",
-    };
+    }, profile.weldAllowanceMm);
     // Reinforcement (e.g. Job 85: Z-transom gets 13x29 steel)
     const reinfKey = system.reinforcementMap[profile.code];
     if (reinfKey) {
       const r = system.reinforcement[reinfKey];
       piece.reinforcementCode = r.code;
       piece.reinforcementLengthMm = round1(t.intLengthMm - 2 * r.endClearance);
-      reinf.push({
+      reinf.push(withWeld({
         code: r.code,
         name: r.name,
         position: `Reinf for ${piece.position}`,
@@ -160,7 +163,7 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
         extMm: piece.reinforcementLengthMm,
         intMm: piece.reinforcementLengthMm,
         endPrep: "[ - ]",
-      });
+      }, r.weldAllowanceMm));
     }
     bars.push(piece);
   }
@@ -172,7 +175,7 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
 function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeometry, system: ProfileSystem): void {
   for (const m of geom.mullions) {
     const profile = system.transoms[m.mullionKey];
-    const piece: BarPiece = {
+    const piece: BarPiece = withWeld({
       code: profile.code,
       name: profile.name,
       position: `Mullion (${m.parentPathId})`,
@@ -180,13 +183,13 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       extMm: round1(m.extLengthMm),
       intMm: round1(m.intLengthMm),
       endPrep: "< - >",
-    };
+    }, profile.weldAllowanceMm);
     const reinfKey = system.reinforcementMap[profile.code];
     if (reinfKey) {
       const r = system.reinforcement[reinfKey];
       piece.reinforcementCode = r.code;
       piece.reinforcementLengthMm = round1(m.intLengthMm - 2 * r.endClearance);
-      reinf.push({
+      reinf.push(withWeld({
         code: r.code,
         name: r.name,
         position: `Reinf for ${piece.position}`,
@@ -194,7 +197,7 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
         extMm: piece.reinforcementLengthMm,
         intMm: piece.reinforcementLengthMm,
         endPrep: "[ - ]",
-      });
+      }, r.weldAllowanceMm));
     }
     bars.push(piece);
   }
@@ -210,11 +213,12 @@ function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, sys
   const intW = so.w - 2 * fw;
   const intH = so.h - 2 * fw;
 
+  const wa = sash.weldAllowanceMm;
   const pieces: BarPiece[] = [
-    { code: sash.code, name: sash.name, position: `Sash ${cell.pathId} head`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" },
-    { code: sash.code, name: sash.name, position: `Sash ${cell.pathId} sill`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" },
-    { code: sash.code, name: sash.name, position: `Sash ${cell.pathId} left`,  orientation: "V", extMm: round1(so.h), intMm: round1(intH), endPrep: "\\ - /" },
-    { code: sash.code, name: sash.name, position: `Sash ${cell.pathId} right`, orientation: "V", extMm: round1(so.h), intMm: round1(intH), endPrep: "\\ - /" },
+    withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} head`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" }, wa),
+    withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} sill`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" }, wa),
+    withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} left`,  orientation: "V", extMm: round1(so.h), intMm: round1(intH), endPrep: "\\ - /" }, wa),
+    withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} right`, orientation: "V", extMm: round1(so.h), intMm: round1(intH), endPrep: "\\ - /" }, wa),
   ];
 
   // Reinforcement for every sash bar — always required in your system.
@@ -225,7 +229,7 @@ function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, sys
       const reinfLen = p.intMm - 2 * r.endClearance;
       p.reinforcementCode = r.code;
       p.reinforcementLengthMm = round1(reinfLen);
-      reinf.push({
+      reinf.push(withWeld({
         code: r.code,
         name: r.name,
         position: `Reinf for ${p.position}`,
@@ -233,7 +237,7 @@ function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, sys
         extMm: round1(reinfLen),
         intMm: round1(reinfLen),
         endPrep: "[ - ]",
-      });
+      }, r.weldAllowanceMm));
     }
   }
   bars.push(...pieces);
@@ -250,11 +254,12 @@ function emitBeadBars(bars: BarPiece[], cell: SolvedCell, system: ProfileSystem)
   const intW = cell.beadIntW;
   const intH = cell.beadIntH;
 
+  const wa = bead.weldAllowanceMm; // 0 — beads are not welded
   bars.push(
-    { code: bead.code, name: bead.name, position: `Bead ${cell.pathId} top`,    orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" },
-    { code: bead.code, name: bead.name, position: `Bead ${cell.pathId} bottom`, orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" },
-    { code: bead.code, name: bead.name, position: `Bead ${cell.pathId} left`,   orientation: "V", extMm: round1(intH + 2 * bf), intMm: round1(intH), endPrep: "[ - ]" },
-    { code: bead.code, name: bead.name, position: `Bead ${cell.pathId} right`,  orientation: "V", extMm: round1(intH + 2 * bf), intMm: round1(intH), endPrep: "[ - ]" },
+    withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} top`,    orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" }, wa),
+    withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} bottom`, orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" }, wa),
+    withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} left`,   orientation: "V", extMm: round1(intH + 2 * bf), intMm: round1(intH), endPrep: "[ - ]" }, wa),
+    withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} right`,  orientation: "V", extMm: round1(intH + 2 * bf), intMm: round1(intH), endPrep: "[ - ]" }, wa),
   );
 }
 
@@ -304,3 +309,37 @@ function computeGaskets(geom: SolvedGeometry, system: ProfileSystem): GasketPiec
 // ---------- Helpers --------------------------------------------------
 function round1(n: number): number { return Math.round(n * 10) / 10; }
 function round3(n: number): number { return Math.round(n * 1000) / 1000; }
+
+/**
+ * Count the welded ends of a bar from its end-prep notation. A miter ("\"/"/")
+ * or a horn ("<"/">") end is welded; a Y-notch ("Y]"/"[Y") butts into the mating
+ * profile (no length-bearing weld here) and a square cut ("[ ]") is snapped/inserted.
+ *   "\ - /"  → 2   (frame & sash corners, both welded)
+ *   "< - >"  → 2   (transom/mullion horns, both welded)
+ *   "\ - Y]" → 1   (Z-broken jamb: miter welded, Y-notch not)
+ *   "[Y - /" → 1
+ *   "[ - ]"  → 0   (bead, reinforcement)
+ */
+function weldedEnds(endPrep: string): number {
+  let n = 0;
+  if (/^[\\/]|^</.test(endPrep)) n++;   // left/outer end is a miter or horn
+  if (/[\\/]$|>$/.test(endPrep)) n++;   // right/inner end is a miter or horn
+  return n;
+}
+
+/** A bar piece before its welding-compensation fields are computed. */
+type RawBar = Omit<BarPiece, "weldedExtMm" | "weldedEndCount">;
+
+/**
+ * Finalise a piece by adding its welding-shrinkage compensation. The saw must
+ * cut longer by `weldAllowanceMm` at each welded end so the welded assembly
+ * shrinks back to the finished (Ext) size. allowanceMm = 0 ⇒ weldedExtMm === extMm.
+ */
+function withWeld(piece: RawBar, allowanceMm: number): BarPiece {
+  const ends = weldedEnds(piece.endPrep);
+  return {
+    ...piece,
+    weldedEndCount: ends,
+    weldedExtMm: round1(piece.extMm + allowanceMm * ends),
+  };
+}

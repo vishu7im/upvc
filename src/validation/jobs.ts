@@ -295,12 +295,87 @@ function validateCustomMode(): void {
   expect("default unchanged after custom solve (Int = 1072)", def2Top?.intMm ?? -1, 1072);
 }
 
+// ---------- Welding-shrinkage check --------------------------------
+// Proves weldedExtMm = extMm + weldAllowanceMm × weldedEndCount, that extMm is
+// UNTOUCHED (so the geometry assertions above stay valid), and that the welded-end
+// count is derived correctly per joint (frame corner=2, Z-jamb=1, transom=2,
+// bead/steel=0). Seeded allowance is 2.5 mm/end on frame/sash/transom.
+function validateWeldMath(): void {
+  console.log("\n==================================================");
+  console.log("Welding shrinkage compensation");
+  console.log("==================================================");
+
+  const job85: QuoteOutput = solve({
+    orderNo: "TEST", customer: "Validation",
+    designId: "win-th-over-fixed-z", widthMm: 1200, heightMm: 1200,
+    systemId: "sunnyplast-70",
+  });
+
+  // Frame top (continuous, "\ - /"): 2 welded ends; extMm untouched at 1200;
+  // welded = 1200 + 2×2.5 = 1205.
+  const frameTop = job85.parts.bars.find(
+    (b) => b.code === "SPQ-5-10252" && b.position === "Frame top",
+  );
+  expect("frame top extMm unchanged = 1200", frameTop?.extMm ?? -1, 1200);
+  expect("frame top weldedEndCount = 2", frameTop?.weldedEndCount ?? -1, 2);
+  expect("frame top weldedExtMm = 1205", frameTop?.weldedExtMm ?? -1, 1205);
+
+  // Z-broken jamb ("\ - Y]"): only the mitered end is welded → 1 end.
+  // extMm 400 → welded = 400 + 1×2.5 = 402.5.
+  const jambTop = job85.parts.bars.find(
+    (b) => b.code === "SPQ-5-10252" && b.position === "Frame left top",
+  );
+  expect("Z-jamb weldedEndCount = 1", jambTop?.weldedEndCount ?? -1, 1);
+  expect("Z-jamb weldedExtMm = 402.5", jambTop?.weldedExtMm ?? -1, 402.5);
+
+  // Z-transom (horns "< - >"): 2 welded ends; extMm 1206 → welded = 1211.
+  const transom = job85.parts.bars.find((b) => b.code === "SPQ-005-30252");
+  expect("transom weldedEndCount = 2", transom?.weldedEndCount ?? -1, 2);
+  expect("transom weldedExtMm = 1211", transom?.weldedExtMm ?? -1, 1211);
+
+  // Bead (square "[ - ]", allowance 0): no welds, welded == finished.
+  const bead = job85.parts.bars.find((b) => b.code === "BEAD-28");
+  expect("bead weldedEndCount = 0", bead?.weldedEndCount ?? -1, 0);
+  expect("bead weldedExtMm == extMm", bead?.weldedExtMm ?? -1, bead?.extMm ?? -2);
+
+  // Reinforcement (steel insert): never welded.
+  const steel = job85.parts.reinforcement[0];
+  expect("reinforcement weldedEndCount = 0", steel?.weldedEndCount ?? -1, 0);
+
+  // Override path: bump frame-5ch weld allowance to 5 mm/end → frame top welded
+  // = extMm + 2×5 = +10. extMm still untouched.
+  const custom: QuoteOutput = solve({
+    orderNo: "TEST", customer: "Validation",
+    designId: "win-th-over-fixed-z", widthMm: 1200, heightMm: 1200,
+    systemId: "sunnyplast-70",
+    mode: "custom",
+    overrides: { frames: { "frame-5ch": { weldAllowanceMm: 5 } } },
+  });
+  const cusTop = custom.parts.bars.find(
+    (b) => b.code === "SPQ-5-10252" && b.position === "Frame top",
+  );
+  expect("override frame top extMm still 1200", cusTop?.extMm ?? -1, 1200);
+  expect("override frame top weldedExtMm = 1210", cusTop?.weldedExtMm ?? -1, 1210);
+
+  // Default mode unchanged after a custom solve (no catalog mutation).
+  const def2: QuoteOutput = solve({
+    orderNo: "TEST", customer: "Validation",
+    designId: "win-th-over-fixed-z", widthMm: 1200, heightMm: 1200,
+    systemId: "sunnyplast-70",
+  });
+  const def2Top = def2.parts.bars.find(
+    (b) => b.code === "SPQ-5-10252" && b.position === "Frame top",
+  );
+  expect("default weld unchanged after custom (welded = 1205)", def2Top?.weldedExtMm ?? -1, 1205);
+}
+
 // Load the catalog from PostgreSQL before solving, then run all jobs.
 (async () => {
   await loadCatalog();
 
   [JOB_85, JOB_88, JOB_90].forEach(validate);
   validateCustomMode();
+  validateWeldMath();
   validateExtractor(expect);
   validatePricing(expect);
 

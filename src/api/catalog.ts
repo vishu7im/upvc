@@ -57,13 +57,26 @@ const priceSchema = z
   .partial()
   .refine((d) => Object.keys(d).length > 0, "Provide at least one of cost, price, weight");
 
+// Profile parts also carry a welding-shrinkage allowance (mm per welded end).
+// Only profile_part has this column, so it lives on the parts PUT — not on the
+// shared glass/gasket/hardware updater below.
+const partSchema = z
+  .object({
+    cost: z.number().min(0),
+    price: z.number().min(0),
+    weight: z.number().min(0),
+    weldAllowanceMm: z.number().min(0),
+  })
+  .partial()
+  .refine((d) => Object.keys(d).length > 0, "Provide at least one of cost, price, weight, weldAllowanceMm");
+
 catalogRouter.put(
   "/:systemId/parts/:kind/:partKey",
   asyncHandler(async (req, res) => {
     await assertSystem(req.params.systemId);
     const kind = req.params.kind.toUpperCase();
     if (!(kind in PartKind)) throw new HttpError(400, `Unknown part kind: ${req.params.kind}`);
-    const data = validate(priceSchema, req.body);
+    const data = validate(partSchema, req.body);
     const result = await prisma.profilePart.updateMany({
       where: { systemId: req.params.systemId, kind: kind as PartKind, partKey: req.params.partKey },
       data,

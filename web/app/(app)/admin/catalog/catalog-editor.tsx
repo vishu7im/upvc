@@ -30,7 +30,10 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icons";
 
-type SaveFn = (partKey: string, patch: { cost: number; price: number; weight: number }) => Promise<void>;
+type SaveFn = (
+  partKey: string,
+  patch: { cost: number; price: number; weight: number; weldAllowanceMm?: number },
+) => Promise<void>;
 
 const PROFILE_GROUPS: { key: keyof CatalogDump; kind: string; label: string }[] = [
   { key: "frames", kind: "FRAME", label: "Frames" },
@@ -73,6 +76,7 @@ export default function CatalogEditor({ systems, dump }: { systems: SystemSummar
           key={g.key}
           title={g.label}
           rows={dump[g.key] as Record<string, CatalogPart>}
+          showWeld
           onSave={(partKey, patch) => updateProfilePart(sys, g.kind, partKey, patch).then(() => {})}
           onSaved={() => router.refresh()}
         />
@@ -112,11 +116,13 @@ function PriceTable({
   rows,
   onSave,
   onSaved,
+  showWeld = false,
 }: {
   title: string;
   rows: Record<string, CatalogPart>;
   onSave: SaveFn;
   onSaved: () => void;
+  showWeld?: boolean;
 }) {
   const entries = Object.entries(rows ?? {});
   return (
@@ -144,19 +150,20 @@ function PriceTable({
               <th className={thClass + " w-32 text-right"}>Cost</th>
               <th className={thClass + " w-32 text-right"}>Price</th>
               <th className={thClass + " w-32 text-right"}>Weight</th>
+              {showWeld && <th className={thClass + " w-36 text-right"}>Weld /end (mm)</th>}
               <th className={thClass + " w-24"} />
             </tr>
           </thead>
           <tbody>
             {entries.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
+                <td colSpan={showWeld ? 7 : 6} className="px-4 py-8 text-center text-sm text-slate-400">
                   None
                 </td>
               </tr>
             ) : (
               entries.map(([key, row]) => (
-                <PriceRow key={key} partKey={key} row={row} onSave={onSave} onSaved={onSaved} />
+                <PriceRow key={key} partKey={key} row={row} onSave={onSave} onSaved={onSaved} showWeld={showWeld} />
               ))
             )}
           </tbody>
@@ -171,24 +178,31 @@ function PriceRow({
   row,
   onSave,
   onSaved,
+  showWeld = false,
 }: {
   partKey: string;
   row: CatalogPart;
   onSave: SaveFn;
   onSaved: () => void;
+  showWeld?: boolean;
 }) {
   const [cost, setCost] = useState(row.cost);
   const [price, setPrice] = useState(row.price);
   const [weight, setWeight] = useState(row.weight);
+  const [weld, setWeld] = useState(row.weldAllowanceMm ?? 0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(false);
-  const dirty = cost !== row.cost || price !== row.price || weight !== row.weight;
+  const dirty =
+    cost !== row.cost ||
+    price !== row.price ||
+    weight !== row.weight ||
+    (showWeld && weld !== (row.weldAllowanceMm ?? 0));
 
   async function save() {
     setBusy(true);
     setErr(false);
     try {
-      await onSave(partKey, { cost, price, weight });
+      await onSave(partKey, showWeld ? { cost, price, weight, weldAllowanceMm: weld } : { cost, price, weight });
       onSaved();
     } catch {
       setErr(true);
@@ -212,6 +226,19 @@ function PriceRow({
       <td className={tdClass}>
         <input type="number" step="0.001" value={weight} onChange={(e) => setWeight(+e.target.value)} className={inp} />
       </td>
+      {showWeld && (
+        <td className={tdClass}>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            value={weld}
+            onChange={(e) => setWeld(+e.target.value)}
+            className={inp}
+            aria-label={`Weld allowance per end for ${row.name}`}
+          />
+        </td>
+      )}
       <td className={tdClass + " text-right"}>
         <Button
           onClick={save}

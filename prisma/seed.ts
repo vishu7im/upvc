@@ -79,6 +79,7 @@ async function seedSystem(
       code: string;
       name: string;
       faceWidth: number;
+      weldAllowanceMm: number;
       cost: number;
       price: number;
       per: string;

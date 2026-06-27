@@ -46,6 +46,32 @@ async function ownDraftOrder(req: AuthedRequest, id: string) {
   return order;
 }
 
+type DocVariant = "normal" | "welded";
+
+/** Validate the ?variant query param (default "normal"). */
+function parseVariant(q: unknown): DocVariant {
+  const v = typeof q === "string" ? q.toLowerCase() : "normal";
+  if (v !== "normal" && v !== "welded") throw new HttpError(400, `Unknown document variant: ${v}`);
+  return v;
+}
+
+/**
+ * Find a stored document by variant, falling back to the "normal" variant when a
+ * welded copy doesn't exist (e.g. pricing docs, which have no welded variant), so
+ * the UI never dead-links a Welded button.
+ */
+async function findDoc(orderId: string, type: DocumentType, variant: DocVariant) {
+  let doc = await prisma.document.findUnique({
+    where: { orderId_type_variant: { orderId, type, variant } },
+  });
+  if (!doc && variant !== "normal") {
+    doc = await prisma.document.findUnique({
+      where: { orderId_type_variant: { orderId, type, variant: "normal" } },
+    });
+  }
+  return doc;
+}
+
 // ---- create / list / get -------------------------------------------
 
 const createOrderSchema = z.object({
@@ -98,7 +124,7 @@ ordersRouter.get(
       where: { id: req.params.id, userId: req.user!.id },
       include: {
         items: { include: { design: { select: { name: true } }, product: { select: { name: true } } } },
-        documents: { select: { type: true, createdAt: true } },
+        documents: { select: { type: true, variant: true, createdAt: true } },
       },
     });
     if (!order) throw new HttpError(404, "Order not found");
@@ -249,22 +275,30 @@ ordersRouter.post(
     const sysName = system.name;
 
     const brand = settings.branding;
-    const docs: Record<DocumentType, string> = {
-      WORK_ORDER: renderWorkOrder(synth, sysName, label, agg.parts, brand, images),
-      CUTTING_LIST: renderCuttingList(synth, sysName, label, agg.parts, brand, images),
-      BOM: renderBom(synth, sysName, label, agg.pricing, brand, images),
-      PRICE_SUMMARY: renderPriceSummary(synth, sysName, label, agg.pricing, brand, images),
-      WORK_PLANNER: renderWorkPlanner(synth, sysName, label, agg.parts, brand, images),
-      DMO: renderDmo(synth, sysName, label, agg.pricing, brand, images),
-      PLANNER_LIST: renderPlannerList(synth, sysName, plannerLines, agg.pricing.currency, brand, images),
-    };
+    // The 3 length-bearing docs (Work Order, Cutting List, Work Planner) are
+    // rendered TWICE: a "normal" copy (finished sizes) and a "welded" copy (sizes
+    // with welding-shrinkage compensation). The pricing/summary docs carry no cut
+    // lengths, so they only get the single "normal" variant. Both copies share the
+    // same aggregated parts; only the printed length column differs.
+    const docRows: { type: DocumentType; variant: string; html: string }[] = [
+      { type: DocumentType.WORK_ORDER,   variant: "normal", html: renderWorkOrder(synth, sysName, label, agg.parts, brand, images, "normal") },
+      { type: DocumentType.WORK_ORDER,   variant: "welded", html: renderWorkOrder(synth, sysName, label, agg.parts, brand, images, "welded") },
+      { type: DocumentType.CUTTING_LIST, variant: "normal", html: renderCuttingList(synth, sysName, label, agg.parts, brand, images, "normal") },
+      { type: DocumentType.CUTTING_LIST, variant: "welded", html: renderCuttingList(synth, sysName, label, agg.parts, brand, images, "welded") },
+      { type: DocumentType.WORK_PLANNER, variant: "normal", html: renderWorkPlanner(synth, sysName, label, agg.parts, brand, images, "normal") },
+      { type: DocumentType.WORK_PLANNER, variant: "welded", html: renderWorkPlanner(synth, sysName, label, agg.parts, brand, images, "welded") },
+      { type: DocumentType.BOM,           variant: "normal", html: renderBom(synth, sysName, label, agg.pricing, brand, images) },
+      { type: DocumentType.PRICE_SUMMARY, variant: "normal", html: renderPriceSummary(synth, sysName, label, agg.pricing, brand, images) },
+      { type: DocumentType.DMO,           variant: "normal", html: renderDmo(synth, sysName, label, agg.pricing, brand, images) },
+      { type: DocumentType.PLANNER_LIST,  variant: "normal", html: renderPlannerList(synth, sysName, plannerLines, agg.pricing.currency, brand, images) },
+    ];
 
     await prisma.$transaction([
-      ...Object.entries(docs).map(([type, html]) =>
+      ...docRows.map((d) =>
         prisma.document.upsert({
-          where: { orderId_type: { orderId: order.id, type: type as DocumentType } },
-          update: { html },
-          create: { orderId: order.id, type: type as DocumentType, html },
+          where: { orderId_type_variant: { orderId: order.id, type: d.type, variant: d.variant } },
+          update: { html: d.html },
+          create: { orderId: order.id, type: d.type, variant: d.variant, html: d.html },
         }),
       ),
       ...snapshotUpdates,
@@ -279,7 +313,7 @@ ordersRouter.post(
     res.json({
       orderId: order.id,
       status: "confirmed",
-      documents: Object.keys(docs),
+      documents: docRows.map((d) => ({ type: d.type, variant: d.variant })),
       totals: agg.pricing.totals,
     });
   }),
@@ -293,7 +327,7 @@ ordersRouter.get(
     await ownOrder(req, req.params.id);
     const docs = await prisma.document.findMany({
       where: { orderId: req.params.id },
-      select: { type: true, createdAt: true },
+      select: { type: true, variant: true, createdAt: true },
     });
     res.json(docs);
   }),
@@ -305,9 +339,8 @@ ordersRouter.get(
     await ownOrder(req, req.params.id);
     const type = req.params.type.toUpperCase() as DocumentType;
     if (!(type in DocumentType)) throw new HttpError(400, `Unknown document type: ${req.params.type}`);
-    const doc = await prisma.document.findUnique({
-      where: { orderId_type: { orderId: req.params.id, type } },
-    });
+    const variant = parseVariant(req.query.variant);
+    const doc = await findDoc(req.params.id, type, variant);
     if (!doc) throw new HttpError(404, "Document not generated yet (confirm the order first)");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(doc.html);
@@ -323,22 +356,23 @@ ordersRouter.get(
     await ownOrder(req, req.params.id);
     const type = req.params.type.toUpperCase() as DocumentType;
     if (!(type in DocumentType)) throw new HttpError(400, `Unknown document type: ${req.params.type}`);
+    const variant = parseVariant(req.query.variant);
 
-    const key = `orders/${req.params.id}/${type}.pdf`;
+    // Variant-keyed cache: existence == cached, and confirmed orders are immutable.
+    const key = `orders/${req.params.id}/${type}__${variant}.pdf`;
     let pdf: Buffer;
     if (await objectExists(key)) {
       pdf = (await getObject(key)).body; // cache hit
     } else {
-      const doc = await prisma.document.findUnique({
-        where: { orderId_type: { orderId: req.params.id, type } },
-      });
+      const doc = await findDoc(req.params.id, type, variant);
       if (!doc) throw new HttpError(404, "Document not generated yet (confirm the order first)");
       pdf = await htmlToPdf(doc.html);
       await putObject(key, pdf, "application/pdf"); // cache for next time
     }
 
+    const suffix = variant === "welded" ? "-welded" : "";
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="${type.toLowerCase()}.pdf"`);
+    res.setHeader("Content-Disposition", `inline; filename="${type.toLowerCase()}${suffix}.pdf"`);
     res.send(pdf);
   }),
 );

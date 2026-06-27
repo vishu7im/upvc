@@ -32,7 +32,7 @@ function makeSystem(defaultColourKey?: string): ProfileSystem {
     sawKerfMm: 5,
     frames: {
       f1: {
-        code: "F1", name: "Test Frame", faceWidth: 64, glassRebate: 15,
+        code: "F1", name: "Test Frame", faceWidth: 64, glassRebate: 15, weldAllowanceMm: 0,
         cost: 10, price: 20, per: "m", weight: 0, financialCategory: "Frame",
       },
     },
@@ -41,7 +41,7 @@ function makeSystem(defaultColourKey?: string): ProfileSystem {
     beads: {},
     reinforcement: {
       r1: {
-        code: "R1", name: "Test Reinf", faceWidth: 0, endClearance: 0,
+        code: "R1", name: "Test Reinf", faceWidth: 0, endClearance: 0, weldAllowanceMm: 0,
         cost: 5, price: 8, per: "m", weight: 0, financialCategory: "Reinf",
       },
     },

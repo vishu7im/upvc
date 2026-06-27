@@ -49,6 +49,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "Frame 5 Chamber",
       faceWidth: 64,
       glassRebate: 15,          // fixed-glazing rebate per side (Job 85 bottom)
+      weldAllowanceMm: 2.5,     // welded corners: 2.5mm/end (5mm/bar) — owner-tunable
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -59,6 +60,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "Frame 6 Chamber",
       faceWidth: 68,
       glassRebate: 15,
+      weldAllowanceMm: 2.5,     // welded corners: 2.5mm/end (5mm/bar)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -74,6 +76,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       faceWidth: 79,
       overlap: 28,              // sash extends 28mm into frame/transom rebate per side
       glassRebate: 18.5,        // sash glazing rebate per side (Job 85/88 top sashes)
+      weldAllowanceMm: 2.5,     // welded sash corners: 2.5mm/end (5mm/bar)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -85,6 +88,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       faceWidth: 105,
       overlap: 28,
       glassRebate: 15,          // door glazing rebate per side (Job 90 door)
+      weldAllowanceMm: 2.5,     // welded door-sash corners: 2.5mm/end (5mm/bar)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -102,6 +106,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "T Transom 67mm",
       faceWidth: 67,
       jointType: "T",
+      weldAllowanceMm: 2.5,     // welded horned ends: 2.5mm/end (5mm/bar)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -112,6 +117,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "Chasement Z Sash",
       faceWidth: 67,
       jointType: "Z",
+      weldAllowanceMm: 2.5,     // welded horned ends: 2.5mm/end (5mm/bar)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -122,6 +128,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "T Transom/Mullion 78mm",
       faceWidth: 78,
       jointType: "T",
+      weldAllowanceMm: 2.5,     // welded horned ends: 2.5mm/end (5mm/bar)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -136,6 +143,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "28mm Bead",
       faceWidth: 20,            // bead face contribution per side (Ext-Int = 40 = 2x20)
       stickOut: 28,
+      weldAllowanceMm: 0,       // beads are square-cut & snapped in, never welded
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -151,6 +159,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "28 x 24 Steel Reinforcement",
       faceWidth: 0,
       endClearance: 0,
+      weldAllowanceMm: 0,       // internal steel insert, not welded
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -161,6 +170,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "13 x 29 Steel Reinforcement",
       faceWidth: 0,
       endClearance: 0,
+      weldAllowanceMm: 0,       // internal steel insert, not welded
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -171,6 +181,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "26 x 26 U Steel Reinforcement",
       faceWidth: 0,
       endClearance: 0,
+      weldAllowanceMm: 0,       // internal steel insert, not welded
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -181,6 +192,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "28 x 44.5 U Steel Reinforcement",
       faceWidth: 0,
       endClearance: 0,
+      weldAllowanceMm: 0,       // internal steel insert, not welded
       cost: 0, price: 0,
       per: "m",
       weight: 0,

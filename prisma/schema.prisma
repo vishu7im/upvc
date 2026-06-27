@@ -68,6 +68,10 @@ model ProfilePart {
   code              String
   name              String
   faceWidth         Decimal @db.Decimal(10, 4)
+  // Welding shrinkage allowance per welded end (mm). @default(0) keeps the
+  // additive migration safe on existing rows and engine output byte-identical
+  // until an admin edits it. See src/types.ts ProfileSection.weldAllowanceMm.
+  weldAllowanceMm   Decimal @default(0) @db.Decimal(10, 4)
   cost              Decimal @db.Decimal(12, 4)
   price             Decimal @db.Decimal(12, 4)
   per               String // "m" | "pc" | "m2" | "set"
@@ -312,10 +316,14 @@ model Document {
   orderId   String
   order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   type      DocumentType
+  // Cut-length variant: "normal" (finished sizes) or "welded" (sizes with weld
+  // shrinkage compensation). Pricing docs only ever have "normal". @default keeps
+  // existing rows as the normal variant after the migration.
+  variant   String       @default("normal")
   html      String
   createdAt DateTime     @default(now())
 
-  @@unique([orderId, type])
+  @@unique([orderId, type, variant])
   @@index([orderId])
   @@map("document")
 }

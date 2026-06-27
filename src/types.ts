@@ -17,6 +17,15 @@ export interface ProfileSection {
    * For Sunny Plast: Frame-5ch=64, Sash-T=79, Door-Z=105, Transom-67=67, Bead=20.
    */
   faceWidth: number;
+  /**
+   * Welding shrinkage allowance in mm consumed at EACH welded end of a bar cut
+   * from this profile. The engine adds `weldAllowanceMm × weldedEndCount` to the
+   * finished Ext length to get the "welded" (saw-cut) length, so the welded
+   * assembly shrinks back to the input W×H. 0 ⇒ no compensation (e.g. beads,
+   * steel reinforcement). Configurable per part via the admin catalog.
+   * Sunny Plast default: frame/sash/transom = 2.5 mm/end (5 mm/bar).
+   */
+  weldAllowanceMm: number;
   /** Cost £/per-unit, price £/per-unit. Fill from your supplier price list. */
   cost: number;
   price: number;
@@ -309,8 +318,18 @@ export interface BarPiece {
   position: string;
   /** Horizontal or vertical bar — drives V/H column on docs. */
   orientation: "H" | "V";
-  /** Cut length (raw bar length needed). */
+  /** Cut length (raw bar length needed) — the FINISHED size, pre-weld-allowance. */
   extMm: number;
+  /**
+   * Saw-cut length WITH welding shrinkage compensation, i.e.
+   *   weldedExtMm = extMm + weldAllowanceMm × weldedEndCount
+   * Cut to THIS on a welded line so the finished assembly equals the input W×H.
+   * Equals `extMm` whenever the profile's weld allowance is 0, so the default
+   * ("normal") output is byte-identical.
+   */
+  weldedExtMm: number;
+  /** How many of this piece's ends are welded (drives the compensation + doc note). */
+  weldedEndCount: number;
   /** Visible (internal) length — Ext minus miter losses. */
   intMm: number;
   /** End-prep notation matching Quotila docs: e.g. "\\ - /", "< - >", "[ - ]", "\\ - Y]" */
@@ -415,14 +434,14 @@ export interface Pricing {
 export interface EngineOverrides {
   /** Saw blade width per cut (affects cutting plan only). */
   sawKerfMm?: number;
-  frames?: Record<string, Partial<Pick<FrameSection, "faceWidth" | "glassRebate">>>;
+  frames?: Record<string, Partial<Pick<FrameSection, "faceWidth" | "glassRebate" | "weldAllowanceMm">>>;
   sashes?: Record<
     string,
-    Partial<Pick<SashSection, "faceWidth" | "overlap" | "glassRebate">>
+    Partial<Pick<SashSection, "faceWidth" | "overlap" | "glassRebate" | "weldAllowanceMm">>
   >;
-  transoms?: Record<string, Partial<Pick<TransomSection, "faceWidth">>>;
-  beads?: Record<string, Partial<Pick<BeadSection, "faceWidth">>>;
-  reinforcement?: Record<string, Partial<Pick<Reinforcement, "endClearance">>>;
+  transoms?: Record<string, Partial<Pick<TransomSection, "faceWidth" | "weldAllowanceMm">>>;
+  beads?: Record<string, Partial<Pick<BeadSection, "faceWidth" | "weldAllowanceMm">>>;
+  reinforcement?: Record<string, Partial<Pick<Reinforcement, "endClearance" | "weldAllowanceMm">>>;
 }
 
 export interface QuoteInput {

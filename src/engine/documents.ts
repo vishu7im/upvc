@@ -28,6 +28,32 @@ const STYLE = `
   .preview figcaption { margin-top: 5px; font-size: 10.5px; color: #555; }
 `;
 
+/**
+ * Cut-length variant for the length-bearing docs:
+ *   "normal" → finished sizes (BarPiece.extMm)         — default, byte-identical
+ *   "welded" → sizes WITH welding-shrinkage allowance (BarPiece.weldedExtMm)
+ */
+export type DocVariant = "normal" | "welded";
+
+/** Pick the length column to print for the chosen variant. */
+function barLen(b: { extMm: number; weldedExtMm?: number }, variant: DocVariant): number {
+  return variant === "welded" ? b.weldedExtMm ?? b.extMm : b.extMm;
+}
+
+/** A banner clarifying that welded lengths already include the weld allowance. */
+function weldNote(variant: DocVariant): string {
+  if (variant !== "welded") return "";
+  return `<div class="meta weld-note" style="border-left:3px solid #b45309;background:#fffbeb;padding:6px 10px;color:#92400e;">
+    <b>Welded cut list.</b> Lengths below INCLUDE the welding-shrinkage allowance — cut bars to these sizes.
+    After welding, the finished assembly returns to the ordered dimensions.
+  </div>`;
+}
+
+/** " (Welded)" suffix on titles so the two printouts can't be mixed up. */
+function variantSuffix(variant: DocVariant): string {
+  return variant === "welded" ? " (Welded)" : "";
+}
+
 /** True when any branding field is set (otherwise we render the plain header). */
 function hasBranding(b?: DocBranding): b is DocBranding {
   return Boolean(b && (b.companyName || b.address || b.logoDataUri || b.accentColor));
@@ -98,6 +124,7 @@ export function renderWorkOrder(
   parts: SolvedParts,
   branding?: DocBranding,
   images?: DocImage[],
+  variant: DocVariant = "normal",
 ): string {
   const sectionsRow = parts.bars.map((b) => `
     <tr>
@@ -105,7 +132,7 @@ export function renderWorkOrder(
       <td>${section(b)}</td>
       <td>${esc(b.name)}</td>
       <td class="right">${qtyOf(parts.bars, b)}</td>
-      <td class="right">${b.extMm}</td>
+      <td class="right">${barLen(b, variant)}</td>
       <td>${b.endPrep}</td>
       <td>${b.reinforcementCode ? esc(b.reinforcementCode) : ""}</td>
       <td class="right">${b.reinforcementLengthMm ?? ""}</td>
@@ -118,7 +145,7 @@ export function renderWorkOrder(
       <td>Sash</td>
       <td>${esc(r.name)}</td>
       <td class="right">1</td>
-      <td class="right">${r.extMm}</td>
+      <td class="right">${barLen(r, variant)}</td>
       <td>${r.endPrep}</td>
       <td></td>
       <td></td>
@@ -149,8 +176,9 @@ export function renderWorkOrder(
     </tr>
   `).join("");
 
-  return wrap("Work Order", `
-    ${header(input, "WORK ORDER", systemName, designName, branding, images)}
+  return wrap("Work Order" + variantSuffix(variant), `
+    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images)}
+    ${weldNote(variant)}
 
     <div class="section-title">Sections Required</div>
     <table>
@@ -182,6 +210,7 @@ export function renderCuttingList(
   parts: SolvedParts,
   branding?: DocBranding,
   images?: DocImage[],
+  variant: DocVariant = "normal",
 ): string {
   // Group by section description (matches Quotila — one table per profile).
   const all = [...parts.bars, ...parts.reinforcement];
@@ -199,22 +228,24 @@ export function renderCuttingList(
         <td>${esc(b.name)}</td>
         <td class="right">1</td>
         <td class="right">${b.intMm}</td>
-        <td class="right">${b.extMm}</td>
+        <td class="right">${barLen(b, variant)}</td>
         <td>${b.orientation === "H" ? "Hor" : "Vert"}</td>
         <td>${b.endPrep}</td>
       </tr>
     `).join("");
+    const extHeader = variant === "welded" ? "Length Ext (welded)" : "Length Ext";
     return `
       <div class="section-title">${esc(name)}</div>
       <table>
-        <thead><tr><th>Item</th><th>Section</th><th>Description</th><th class="right">Qty</th><th class="right">Length Int</th><th class="right">Length Ext</th><th>H/V</th><th>End Prep</th></tr></thead>
+        <thead><tr><th>Item</th><th>Section</th><th>Description</th><th class="right">Qty</th><th class="right">Length Int</th><th class="right">${extHeader}</th><th>H/V</th><th>End Prep</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
   }).join("");
 
-  return wrap("Cutting List", `
-    ${header(input, "CUTTING LIST", systemName, designName, branding, images)}
+  return wrap("Cutting List" + variantSuffix(variant), `
+    ${header(input, "CUTTING LIST" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images)}
+    ${weldNote(variant)}
     ${sections}
   `, branding);
 }
@@ -302,10 +333,14 @@ export function renderWorkPlanner(
   parts: SolvedParts,
   branding?: DocBranding,
   images?: DocImage[],
+  variant: DocVariant = "normal",
 ): string {
   // Group identical cut pieces (same code + length + end-prep) into a qty.
-  const cut = groupPieces(parts.bars);
-  const reinf = groupPieces(parts.reinforcement);
+  // Key/print on the chosen variant's length so welded pieces of the same
+  // finished size but different weld counts don't wrongly collapse together.
+  const lenSel = (p: { extMm: number; weldedExtMm?: number }) => barLen(p, variant);
+  const cut = groupPieces(parts.bars, lenSel);
+  const reinf = groupPieces(parts.reinforcement, lenSel);
 
   const cutRows = cut.map((g, i) => `
     <tr><td>${i + 1}</td><td>${section({ name: g.name })}</td><td>${esc(g.name)}</td>
@@ -332,8 +367,9 @@ export function renderWorkPlanner(
     ...parts.gaskets.map((g) => `<tr><td>${esc(g.name)}</td><td class="right">${g.lengthMm}</td><td>Metres</td><td></td></tr>`),
   ].join("");
 
-  return wrap("Work Planner", `
-    ${header(input, "WORK PLANNER", systemName, designName, branding, images)}
+  return wrap("Work Planner" + variantSuffix(variant), `
+    ${header(input, "WORK PLANNER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images)}
+    ${weldNote(variant)}
 
     <div class="section-title">Station 1 — Cutting (Saw)</div>
     <table><thead><tr><th>#</th><th>Section</th><th>Profile</th><th class="right">Qty</th><th class="right">Cut Length</th><th>End Prep</th><th>Done</th></tr></thead>
@@ -435,12 +471,21 @@ export function renderPlannerList(
 }
 
 // ---------- helpers --------------------------------------------------
-/** Group identical bar pieces by name+length+endPrep into a single qty row. */
-function groupPieces(pieces: { name: string; extMm: number; endPrep: string }[]) {
+/**
+ * Group identical bar pieces by name+length+endPrep into a single qty row.
+ * `len` selects which length to group/print on (default extMm = finished size);
+ * the welded planner passes weldedExtMm so it groups on the compensated length.
+ * The returned `extMm` field carries whichever length was selected.
+ */
+function groupPieces(
+  pieces: { name: string; extMm: number; weldedExtMm?: number; endPrep: string }[],
+  len: (p: { extMm: number; weldedExtMm?: number }) => number = (p) => p.extMm,
+) {
   const map = new Map<string, { name: string; extMm: number; endPrep: string; qty: number }>();
   for (const p of pieces) {
-    const key = `${p.name}|${p.extMm}|${p.endPrep}`;
-    const slot = map.get(key) ?? { name: p.name, extMm: p.extMm, endPrep: p.endPrep, qty: 0 };
+    const L = len(p);
+    const key = `${p.name}|${L}|${p.endPrep}`;
+    const slot = map.get(key) ?? { name: p.name, extMm: L, endPrep: p.endPrep, qty: 0 };
     slot.qty++;
     map.set(key, slot);
   }

@@ -84,6 +84,7 @@ export async function loadCatalog(): Promise<void> {
         code: p.code,
         name: p.name,
         faceWidth: num(p.faceWidth),
+        weldAllowanceMm: num(p.weldAllowanceMm),
         cost: num(p.cost),
         price: num(p.price),
         per: p.per as "m" | "pc" | "m2" | "set",

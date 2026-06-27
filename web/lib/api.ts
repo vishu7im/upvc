@@ -127,12 +127,14 @@ export function uploadLogo(file: File): Promise<{ ok: boolean; logoUrl: string }
 }
 
 type PricePatch = { cost?: number; price?: number; weight?: number };
+/** Profile parts also accept a welding-shrinkage allowance (mm per welded end). */
+type PartPatch = PricePatch & { weldAllowanceMm?: number };
 
 export function updateProfilePart(
   systemId: string,
   kind: string,
   partKey: string,
-  body: PricePatch,
+  body: PartPatch,
 ): Promise<{ ok: boolean; updated: number }> {
   return apiSend(`/api/catalog/${systemId}/parts/${kind}/${partKey}`, "PUT", body);
 }
