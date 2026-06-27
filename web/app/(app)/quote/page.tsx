@@ -6,6 +6,8 @@
 // =====================================================================
 
 import Configurator from "./configurator";
+import { serverApiGet } from "@/lib/server-api";
+import type { DesignDetail } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,12 @@ export default async function QuotePage({
   }>;
 }) {
   const sp = await searchParams;
+  const designSvg = sp.designId
+    ? await serverApiGet<DesignDetail>(`/api/designs/${sp.designId}`)
+        .then((design) => design.imageSvg)
+        .catch(() => null)
+    : null;
+
   return (
     <Configurator
       systemId={sp.systemId}
@@ -28,6 +36,7 @@ export default async function QuotePage({
       productId={sp.productId}
       designName={sp.name}
       orderId={sp.orderId}
+      designSvg={designSvg}
     />
   );
 }

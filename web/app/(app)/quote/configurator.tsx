@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGet, quote, createOrder, addOrderItem, ApiError } from "@/lib/api";
 import type { QuoteResult, SystemOptions, SystemSummary } from "@/lib/types";
+import { normalizeSvgForPreview } from "@/lib/svg-preview";
 import {
   Alert,
   Badge,
@@ -24,6 +25,7 @@ export interface ConfiguratorProps {
   designName?: string;
   systemId?: string;
   orderId?: string;
+  designSvg?: string | null;
 }
 
 export default function Configurator(props: ConfiguratorProps) {
@@ -151,6 +153,8 @@ export default function Configurator(props: ConfiguratorProps) {
   const selectedColour = options?.colours.find((c) => c.key === colourKey);
   const selectedGlass = options?.glass.find((g) => g.key === glassKey);
   const lines = result?.pricing.lines ?? [];
+  const previewSvg = props.designSvg || result?.geometry.svg || null;
+  const normalizedPreviewSvg = previewSvg ? normalizeSvgForPreview(previewSvg) : null;
 
   return (
     <div className="space-y-5">
@@ -274,7 +278,7 @@ export default function Configurator(props: ConfiguratorProps) {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge tone="blue">SVG</Badge>
+              <Badge tone="blue">Preview</Badge>
               <Badge tone={error ? "red" : result ? "green" : "slate"}>{error ? "Issue" : result ? "Solved" : "Waiting"}</Badge>
             </div>
           </div>
@@ -282,10 +286,10 @@ export default function Configurator(props: ConfiguratorProps) {
             <div className="relative flex min-h-[460px] w-full max-w-3xl items-center justify-center rounded-lg border border-slate-200 bg-white/[0.84] p-8 shadow-[0_28px_70px_rgba(15,23,42,0.12)]">
               {error ? (
                 <Alert tone="red" title="Quote failed">{error}</Alert>
-              ) : result ? (
+              ) : normalizedPreviewSvg ? (
                 <div
-                  className="flex h-full max-h-[620px] min-h-[360px] w-full items-center justify-center [&>svg]:h-auto [&>svg]:max-h-full [&>svg]:w-full [&>svg]:max-w-full"
-                  dangerouslySetInnerHTML={{ __html: result.geometry.svg }}
+                  className="design-preview-svg flex h-full max-h-[620px] min-h-[360px] w-full items-center justify-center"
+                  dangerouslySetInnerHTML={{ __html: normalizedPreviewSvg }}
                 />
               ) : (
                 <div className="flex w-full max-w-md flex-col items-center">
