@@ -49,7 +49,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "Frame 5 Chamber",
       faceWidth: 64,
       glassRebate: 15,          // fixed-glazing rebate per side (Job 85 bottom)
-      weldAllowanceMm: 2.5,     // welded corners: 2.5mm/end (5mm/bar) — owner-tunable
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -60,7 +60,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "Frame 6 Chamber",
       faceWidth: 68,
       glassRebate: 15,
-      weldAllowanceMm: 2.5,     // welded corners: 2.5mm/end (5mm/bar)
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -76,7 +76,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       faceWidth: 79,
       overlap: 28,              // sash extends 28mm into frame/transom rebate per side
       glassRebate: 18.5,        // sash glazing rebate per side (Job 85/88 top sashes)
-      weldAllowanceMm: 2.5,     // welded sash corners: 2.5mm/end (5mm/bar)
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -88,7 +88,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       faceWidth: 105,
       overlap: 28,
       glassRebate: 15,          // door glazing rebate per side (Job 90 door)
-      weldAllowanceMm: 2.5,     // welded door-sash corners: 2.5mm/end (5mm/bar)
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -106,7 +106,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "T Transom 67mm",
       faceWidth: 67,
       jointType: "T",
-      weldAllowanceMm: 2.5,     // welded horned ends: 2.5mm/end (5mm/bar)
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -117,7 +117,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "Chasement Z Sash",
       faceWidth: 67,
       jointType: "Z",
-      weldAllowanceMm: 2.5,     // welded horned ends: 2.5mm/end (5mm/bar)
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -128,7 +128,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       name: "T Transom/Mullion 78mm",
       faceWidth: 78,
       jointType: "T",
-      weldAllowanceMm: 2.5,     // welded horned ends: 2.5mm/end (5mm/bar)
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
       weight: 0,

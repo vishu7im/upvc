@@ -243,6 +243,7 @@ async function main() {
       labourPerSash: s.labour.perSash,
       labourPerDoor: s.labour.perDoor,
       labourBase: s.labour.base,
+      weldAllowanceMm: s.weldAllowanceMm ?? 2.5,
     },
     create: {
       id: 1,
@@ -254,6 +255,7 @@ async function main() {
       labourPerSash: s.labour.perSash,
       labourPerDoor: s.labour.perDoor,
       labourBase: s.labour.base,
+      weldAllowanceMm: s.weldAllowanceMm ?? 2.5,
     },
   });
 

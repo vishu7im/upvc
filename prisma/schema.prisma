@@ -340,6 +340,10 @@ model Setting {
   labourPerDoor Decimal @db.Decimal(12, 4)
   labourBase    Decimal @db.Decimal(12, 4)
 
+  // Global welding-shrinkage allowance (mm per welded end) — the default for
+  // every welded profile. A profile_part.weldAllowanceMm > 0 overrides it.
+  weldAllowanceMm Decimal @default(2.5) @db.Decimal(10, 4)
+
   // Global company branding (M4) — printed on every document header.
   // logoKey is the object-storage key of the uploaded logo (resolved to an
   // embedded data-URI by the catalog loader); all nullable until configured.

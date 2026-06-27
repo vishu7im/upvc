@@ -138,6 +138,8 @@ export interface SettingsResponse {
   labourPerSash: number;
   labourPerDoor: number;
   labourBase: number;
+  /** Global welding-shrinkage default (mm per welded end). */
+  weldAllowanceMm: number;
   branding: {
     companyName: string | null;
     companyAddress: string | null;

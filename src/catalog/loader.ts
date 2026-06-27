@@ -53,6 +53,7 @@ export let DEFAULT_SETTINGS: Settings = {
   markupPct: 75,
   wastagePct: 10,
   labour: { perSash: 25, perDoor: 60, base: 30 },
+  weldAllowanceMm: 2.5,
 };
 
 let loaded = false;
@@ -223,6 +224,7 @@ export async function loadCatalog(): Promise<void> {
         perDoor: num(dbSettings.labourPerDoor),
         base: num(dbSettings.labourBase),
       },
+      weldAllowanceMm: num(dbSettings.weldAllowanceMm),
       branding: await loadBranding(dbSettings),
     };
   }

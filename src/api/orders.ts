@@ -8,7 +8,10 @@ import { DocumentType, type Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../db/client.ts";
 import { solve } from "../engine/solve.ts";
-import { aggregateOrder, type ItemForAggregation } from "../engine/aggregate.ts";
+import {
+  aggregateOrder,
+  type ItemForAggregation,
+} from "../engine/aggregate.ts";
 import {
   renderBom,
   renderCuttingList,
@@ -20,8 +23,18 @@ import {
   type PlannerLine,
 } from "../engine/documents.ts";
 import { DEFAULT_SETTINGS, getSystem } from "../catalog/index.ts";
-import type { DocImage, EngineOverrides, QuoteInput, Settings } from "../types.ts";
-import { asyncHandler, type AuthedRequest, HttpError, validate } from "./http.ts";
+import type {
+  DocImage,
+  EngineOverrides,
+  QuoteInput,
+  Settings,
+} from "../types.ts";
+import {
+  asyncHandler,
+  type AuthedRequest,
+  HttpError,
+  validate,
+} from "./http.ts";
 import { paginated, parsePagination } from "./pagination.ts";
 import { htmlToPdf } from "../services/pdf.ts";
 import { getObject, objectExists, putObject } from "../services/storage.ts";
@@ -32,7 +45,9 @@ export const ordersRouter = Router();
 
 /** Fetch an order owned by the caller, or 404. */
 async function ownOrder(req: AuthedRequest, id: string) {
-  const order = await prisma.order.findFirst({ where: { id, userId: req.user!.id } });
+  const order = await prisma.order.findFirst({
+    where: { id, userId: req.user!.id },
+  });
   if (!order) throw new HttpError(404, "Order not found");
   return order;
 }
@@ -41,17 +56,21 @@ async function ownOrder(req: AuthedRequest, id: string) {
 async function ownDraftOrder(req: AuthedRequest, id: string) {
   const order = await ownOrder(req, id);
   if (order.status !== "draft") {
-    throw new HttpError(409, "Order is already confirmed and cannot be modified");
+    throw new HttpError(
+      409,
+      "Order is already confirmed and cannot be modified",
+    );
   }
   return order;
 }
 
 type DocVariant = "normal" | "welded";
 
-/** Validate the ?variant query param (default "normal"). */
+/** Validate the ?variant query param (default "welded"). */
 function parseVariant(q: unknown): DocVariant {
-  const v = typeof q === "string" ? q.toLowerCase() : "normal";
-  if (v !== "normal" && v !== "welded") throw new HttpError(400, `Unknown document variant: ${v}`);
+  const v = typeof q === "string" ? q.toLowerCase() : "welded";
+  if (v !== "normal" && v !== "welded")
+    throw new HttpError(400, `Unknown document variant: ${v}`);
   return v;
 }
 
@@ -60,7 +79,11 @@ function parseVariant(q: unknown): DocVariant {
  * welded copy doesn't exist (e.g. pricing docs, which have no welded variant), so
  * the UI never dead-links a Welded button.
  */
-async function findDoc(orderId: string, type: DocumentType, variant: DocVariant) {
+async function findDoc(
+  orderId: string,
+  type: DocumentType,
+  variant: DocVariant,
+) {
   let doc = await prisma.document.findUnique({
     where: { orderId_type_variant: { orderId, type, variant } },
   });
@@ -123,7 +146,12 @@ ordersRouter.get(
     const order = await prisma.order.findFirst({
       where: { id: req.params.id, userId: req.user!.id },
       include: {
-        items: { include: { design: { select: { name: true } }, product: { select: { name: true } } } },
+        items: {
+          include: {
+            design: { select: { name: true } },
+            product: { select: { name: true } },
+          },
+        },
         documents: { select: { type: true, variant: true, createdAt: true } },
       },
     });
@@ -150,7 +178,9 @@ ordersRouter.post(
     const order = await ownDraftOrder(req, req.params.id);
     const body = validate(addItemSchema, req.body);
 
-    const design = await prisma.design.findUnique({ where: { designId: body.designId } });
+    const design = await prisma.design.findUnique({
+      where: { designId: body.designId },
+    });
     if (!design) throw new HttpError(404, "Design not found");
     if (!design.quotable) {
       throw new HttpError(
@@ -158,21 +188,28 @@ ordersRouter.post(
         "Design is not quotable yet (no fabrication topology). Pick a quotable design.",
       );
     }
-    const product = await prisma.product.findUnique({ where: { id: body.productId } });
+    const product = await prisma.product.findUnique({
+      where: { id: body.productId },
+    });
     if (!product) throw new HttpError(404, "Product not found");
 
     // Validate the dimensions/overrides by actually solving once.
     try {
-      solve(buildQuoteInput(order.orderNo, order.customerName, order.reference, {
-        designId: design.designId,
-        widthMm: body.widthMm,
-        heightMm: body.heightMm,
-        systemId: product.systemId,
-        mode: body.mode,
-        overrides: body.overrides as EngineOverrides | undefined,
-      }));
+      solve(
+        buildQuoteInput(order.orderNo, order.customerName, order.reference, {
+          designId: design.designId,
+          widthMm: body.widthMm,
+          heightMm: body.heightMm,
+          systemId: product.systemId,
+          mode: body.mode,
+          overrides: body.overrides as EngineOverrides | undefined,
+        }),
+      );
     } catch (e: any) {
-      throw new HttpError(400, `Cannot solve this design at those dimensions: ${e.message}`);
+      throw new HttpError(
+        400,
+        `Cannot solve this design at those dimensions: ${e.message}`,
+      );
     }
 
     const item = await prisma.orderItem.create({
@@ -185,7 +222,9 @@ ordersRouter.post(
         heightMm: body.heightMm,
         qty: body.qty ?? 1,
         mode: body.mode ?? "default",
-        overrides: (body.overrides ?? undefined) as Prisma.InputJsonValue | undefined,
+        overrides: (body.overrides ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
       },
     });
     res.status(201).json(item);
@@ -212,10 +251,14 @@ ordersRouter.post(
     const order = await ownDraftOrder(req, req.params.id);
     const items = await prisma.orderItem.findMany({
       where: { orderId: order.id },
-      include: { product: { select: { name: true } } },
+      include: {
+        design: { select: { imageSvg: true, svgPreview: true } },
+        product: { select: { name: true } },
+      },
       orderBy: { id: "asc" },
     });
-    if (items.length === 0) throw new HttpError(400, "Order has no items to confirm");
+    if (items.length === 0)
+      throw new HttpError(400, "Order has no items to confirm");
 
     const systemId = items[0].systemId;
     const system = getSystem(systemId);
@@ -224,8 +267,8 @@ ordersRouter.post(
 
     const solved: ItemForAggregation[] = [];
     const plannerLines: PlannerLine[] = [];
-    // One design preview per line item, drawn at its *modified* (chosen W×H)
-    // dimensions, embedded in every order document.
+    // Match the product gallery/configurator preview in every generated document.
+    // Fallback to engine SVG only for designs without a stored catalog preview.
     const images: DocImage[] = [];
     const snapshotUpdates: Prisma.PrismaPromise<unknown>[] = [];
 
@@ -252,25 +295,33 @@ ordersRouter.post(
         totalPrice: output.pricing.totals.grandTotal * item.qty,
       });
       images.push({
-        svg: output.geometry.svg,
+        svg: item.design.imageSvg ?? item.design.svgPreview ?? output.geometry.svg,
         caption: `${i + 1}. ${output.designName} — ${item.widthMm} × ${item.heightMm} mm${item.qty > 1 ? ` ×${item.qty}` : ""}`,
       });
       snapshotUpdates.push(
         prisma.orderItem.update({
           where: { id: item.id },
-          data: { pricingSnapshot: output.pricing.totals as unknown as Prisma.InputJsonValue },
+          data: {
+            pricingSnapshot: output.pricing
+              .totals as unknown as Prisma.InputJsonValue,
+          },
         }),
       );
     });
 
     // Order-level aggregation (multi-window).
     const agg = aggregateOrder(solved, system, settings);
-    const synth = buildQuoteInput(order.orderNo, order.customerName, order.reference, {
-      designId: "",
-      widthMm: 0,
-      heightMm: 0,
-      systemId,
-    });
+    const synth = buildQuoteInput(
+      order.orderNo,
+      order.customerName,
+      order.reference,
+      {
+        designId: "",
+        widthMm: 0,
+        heightMm: 0,
+        systemId,
+      },
+    );
     const label = `${items.length} line(s)`;
     const sysName = system.name;
 
@@ -281,24 +332,137 @@ ordersRouter.post(
     // lengths, so they only get the single "normal" variant. Both copies share the
     // same aggregated parts; only the printed length column differs.
     const docRows: { type: DocumentType; variant: string; html: string }[] = [
-      { type: DocumentType.WORK_ORDER,   variant: "normal", html: renderWorkOrder(synth, sysName, label, agg.parts, brand, images, "normal") },
-      { type: DocumentType.WORK_ORDER,   variant: "welded", html: renderWorkOrder(synth, sysName, label, agg.parts, brand, images, "welded") },
-      { type: DocumentType.CUTTING_LIST, variant: "normal", html: renderCuttingList(synth, sysName, label, agg.parts, brand, images, "normal") },
-      { type: DocumentType.CUTTING_LIST, variant: "welded", html: renderCuttingList(synth, sysName, label, agg.parts, brand, images, "welded") },
-      { type: DocumentType.WORK_PLANNER, variant: "normal", html: renderWorkPlanner(synth, sysName, label, agg.parts, brand, images, "normal") },
-      { type: DocumentType.WORK_PLANNER, variant: "welded", html: renderWorkPlanner(synth, sysName, label, agg.parts, brand, images, "welded") },
-      { type: DocumentType.BOM,           variant: "normal", html: renderBom(synth, sysName, label, agg.pricing, brand, images) },
-      { type: DocumentType.PRICE_SUMMARY, variant: "normal", html: renderPriceSummary(synth, sysName, label, agg.pricing, brand, images) },
-      { type: DocumentType.DMO,           variant: "normal", html: renderDmo(synth, sysName, label, agg.pricing, brand, images) },
-      { type: DocumentType.PLANNER_LIST,  variant: "normal", html: renderPlannerList(synth, sysName, plannerLines, agg.pricing.currency, brand, images) },
+      {
+        type: DocumentType.WORK_ORDER,
+        variant: "normal",
+        html: renderWorkOrder(
+          synth,
+          sysName,
+          label,
+          agg.parts,
+          brand,
+          images,
+          "normal",
+        ),
+      },
+      {
+        type: DocumentType.WORK_ORDER,
+        variant: "welded",
+        html: renderWorkOrder(
+          synth,
+          sysName,
+          label,
+          agg.parts,
+          brand,
+          images,
+          "welded",
+        ),
+      },
+      {
+        type: DocumentType.CUTTING_LIST,
+        variant: "normal",
+        html: renderCuttingList(
+          synth,
+          sysName,
+          label,
+          agg.parts,
+          brand,
+          images,
+          "normal",
+        ),
+      },
+      {
+        type: DocumentType.CUTTING_LIST,
+        variant: "welded",
+        html: renderCuttingList(
+          synth,
+          sysName,
+          label,
+          agg.parts,
+          brand,
+          images,
+          "welded",
+        ),
+      },
+      {
+        type: DocumentType.WORK_PLANNER,
+        variant: "normal",
+        html: renderWorkPlanner(
+          synth,
+          sysName,
+          label,
+          agg.parts,
+          brand,
+          images,
+          "normal",
+        ),
+      },
+      {
+        type: DocumentType.WORK_PLANNER,
+        variant: "welded",
+        html: renderWorkPlanner(
+          synth,
+          sysName,
+          label,
+          agg.parts,
+          brand,
+          images,
+          "welded",
+        ),
+      },
+      {
+        type: DocumentType.BOM,
+        variant: "normal",
+        html: renderBom(synth, sysName, label, agg.pricing, brand, images),
+      },
+      {
+        type: DocumentType.PRICE_SUMMARY,
+        variant: "normal",
+        html: renderPriceSummary(
+          synth,
+          sysName,
+          label,
+          agg.pricing,
+          brand,
+          images,
+        ),
+      },
+      {
+        type: DocumentType.DMO,
+        variant: "normal",
+        html: renderDmo(synth, sysName, label, agg.pricing, brand, images),
+      },
+      {
+        type: DocumentType.PLANNER_LIST,
+        variant: "normal",
+        html: renderPlannerList(
+          synth,
+          sysName,
+          plannerLines,
+          agg.pricing.currency,
+          brand,
+          images,
+        ),
+      },
     ];
 
     await prisma.$transaction([
       ...docRows.map((d) =>
         prisma.document.upsert({
-          where: { orderId_type_variant: { orderId: order.id, type: d.type, variant: d.variant } },
+          where: {
+            orderId_type_variant: {
+              orderId: order.id,
+              type: d.type,
+              variant: d.variant,
+            },
+          },
           update: { html: d.html },
-          create: { orderId: order.id, type: d.type, variant: d.variant, html: d.html },
+          create: {
+            orderId: order.id,
+            type: d.type,
+            variant: d.variant,
+            html: d.html,
+          },
         }),
       ),
       ...snapshotUpdates,
@@ -306,7 +470,10 @@ ordersRouter.post(
         where: { id: order.id },
         // Denormalise the order grand total (M5) so the orders list can show a
         // price without re-solving every item.
-        data: { status: "confirmed", totalPrice: agg.pricing.totals.grandTotal },
+        data: {
+          status: "confirmed",
+          totalPrice: agg.pricing.totals.grandTotal,
+        },
       }),
     ]);
 
@@ -338,12 +505,18 @@ ordersRouter.get(
   asyncHandler(async (req: AuthedRequest, res) => {
     await ownOrder(req, req.params.id);
     const type = req.params.type.toUpperCase() as DocumentType;
-    if (!(type in DocumentType)) throw new HttpError(400, `Unknown document type: ${req.params.type}`);
+    if (!(type in DocumentType))
+      throw new HttpError(400, `Unknown document type: ${req.params.type}`);
     const variant = parseVariant(req.query.variant);
     const doc = await findDoc(req.params.id, type, variant);
-    if (!doc) throw new HttpError(404, "Document not generated yet (confirm the order first)");
+    if (!doc)
+      throw new HttpError(
+        404,
+        "Document not generated yet (confirm the order first)",
+      );
+    const html = await hydrateDocumentPreviews(req.params.id, doc.html);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(doc.html);
+    res.send(html);
   }),
 );
 
@@ -355,29 +528,57 @@ ordersRouter.get(
   asyncHandler(async (req: AuthedRequest, res) => {
     await ownOrder(req, req.params.id);
     const type = req.params.type.toUpperCase() as DocumentType;
-    if (!(type in DocumentType)) throw new HttpError(400, `Unknown document type: ${req.params.type}`);
+    if (!(type in DocumentType))
+      throw new HttpError(400, `Unknown document type: ${req.params.type}`);
     const variant = parseVariant(req.query.variant);
 
     // Variant-keyed cache: existence == cached, and confirmed orders are immutable.
-    const key = `orders/${req.params.id}/${type}__${variant}.pdf`;
+    const key = `orders/${req.params.id}/${type}__${variant}__catalog-preview-v1.pdf`;
     let pdf: Buffer;
     if (await objectExists(key)) {
       pdf = (await getObject(key)).body; // cache hit
     } else {
       const doc = await findDoc(req.params.id, type, variant);
-      if (!doc) throw new HttpError(404, "Document not generated yet (confirm the order first)");
-      pdf = await htmlToPdf(doc.html);
+      if (!doc)
+        throw new HttpError(
+          404,
+          "Document not generated yet (confirm the order first)",
+        );
+      const html = await hydrateDocumentPreviews(req.params.id, doc.html);
+      pdf = await htmlToPdf(html);
       await putObject(key, pdf, "application/pdf"); // cache for next time
     }
 
     const suffix = variant === "welded" ? "-welded" : "";
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `inline; filename="${type.toLowerCase()}${suffix}.pdf"`);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${type.toLowerCase()}${suffix}.pdf"`,
+    );
     res.send(pdf);
   }),
 );
 
 // ---- shared ---------------------------------------------------------
+
+async function hydrateDocumentPreviews(orderId: string, html: string): Promise<string> {
+  if (!html.includes('class="preview-svg"')) return html;
+
+  const previews = await prisma.orderItem.findMany({
+    where: { orderId },
+    orderBy: { id: "asc" },
+    select: {
+      design: { select: { imageSvg: true, svgPreview: true } },
+    },
+  });
+  const svgs = previews.map((item) => item.design.imageSvg ?? item.design.svgPreview ?? null);
+  let index = 0;
+
+  return html.replace(/<div class="preview-svg">[\s\S]*?<\/div>/g, (block) => {
+    const svg = svgs[index++];
+    return svg ? `<div class="preview-svg">${svg}</div>` : block;
+  });
+}
 
 function buildQuoteInput(
   orderNo: string,

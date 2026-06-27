@@ -6,7 +6,7 @@
 // Puppeteer or Playwright — the HTML is already print-ready.
 // =====================================================================
 
-import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage } from "../types.ts";
+import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, BarPiece } from "../types.ts";
 
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #28323c; margin: 32px; }
@@ -54,6 +54,27 @@ function variantSuffix(variant: DocVariant): string {
   return variant === "welded" ? " (Welded)" : "";
 }
 
+/**
+ * Club identical bar pieces into quantity rows. Two pieces club when they share
+ * profile, internal length, end-prep, orientation, reinforcement AND the printed
+ * length (`len`, which is Ext for Normal / weldedExt for Welded). So a square
+ * frame's 4 bars become 2 rows × qty 2 (one H, one V); the cut count is unchanged.
+ */
+function groupBars(
+  pieces: BarPiece[],
+  len: (b: BarPiece) => number,
+): { piece: BarPiece; lenMm: number; qty: number }[] {
+  const map = new Map<string, { piece: BarPiece; lenMm: number; qty: number }>();
+  for (const b of pieces) {
+    const L = len(b);
+    const key = `${b.code}|${b.name}|${b.intMm}|${L}|${b.endPrep}|${b.orientation}|${b.reinforcementCode ?? ""}|${b.reinforcementLengthMm ?? ""}`;
+    const slot = map.get(key) ?? { piece: b, lenMm: L, qty: 0 };
+    slot.qty++;
+    map.set(key, slot);
+  }
+  return [...map.values()];
+}
+
 /** True when any branding field is set (otherwise we render the plain header). */
 function hasBranding(b?: DocBranding): b is DocBranding {
   return Boolean(b && (b.companyName || b.address || b.logoDataUri || b.accentColor));
@@ -82,10 +103,9 @@ function brandBar(b?: DocBranding): string {
 }
 
 /**
- * Design-preview band: the solved geometry (at the *modified* dimensions) drawn
- * as inline SVG, one card per supplied image. SVGs are first-party engine output
- * (from `renderSvg`), embedded directly. Absent/empty ⇒ nothing rendered, so a
- * doc built without images is byte-identical to the pre-image output.
+ * Design-preview band: one inline SVG card per supplied image. Order documents
+ * pass catalog previews so this matches the product gallery/configurator; engine
+ * SVG is still valid fallback markup. Absent/empty ⇒ nothing rendered.
  */
 function previewBand(images?: DocImage[]): string {
   if (!images || images.length === 0) return "";
@@ -126,26 +146,28 @@ export function renderWorkOrder(
   images?: DocImage[],
   variant: DocVariant = "normal",
 ): string {
-  const sectionsRow = parts.bars.map((b) => `
+  // Club identical pieces into qty rows (e.g. a frame's 4 bars → 2 rows × qty 2).
+  const len = (b: BarPiece) => barLen(b, variant);
+  const sectionsRow = groupBars(parts.bars, len).map(({ piece: b, lenMm, qty }) => `
     <tr>
       <td>${b.orientation === "H" ? "Hor" : "Vert"}</td>
       <td>${section(b)}</td>
       <td>${esc(b.name)}</td>
-      <td class="right">${qtyOf(parts.bars, b)}</td>
-      <td class="right">${barLen(b, variant)}</td>
+      <td class="right">${qty}</td>
+      <td class="right">${lenMm}</td>
       <td>${b.endPrep}</td>
       <td>${b.reinforcementCode ? esc(b.reinforcementCode) : ""}</td>
       <td class="right">${b.reinforcementLengthMm ?? ""}</td>
     </tr>
   `).join("");
 
-  const reinfRow = parts.reinforcement.map((r) => `
+  const reinfRow = groupBars(parts.reinforcement, len).map(({ piece: r, lenMm, qty }) => `
     <tr>
       <td>${r.orientation === "H" ? "Hor" : "Vert"}</td>
       <td>Sash</td>
       <td>${esc(r.name)}</td>
-      <td class="right">1</td>
-      <td class="right">${barLen(r, variant)}</td>
+      <td class="right">${qty}</td>
+      <td class="right">${lenMm}</td>
       <td>${r.endPrep}</td>
       <td></td>
       <td></td>
@@ -220,15 +242,17 @@ export function renderCuttingList(
     groups.get(b.name)!.push(b);
   }
 
+  const len = (b: BarPiece) => barLen(b, variant);
   const sections = Array.from(groups.entries()).map(([name, list], idx) => {
-    const rows = list.map((b) => `
+    // Club identical pieces in this profile group into qty rows.
+    const rows = groupBars(list, len).map(({ piece: b, lenMm, qty }) => `
       <tr>
         <td>${idx + 1}</td>
         <td>${section(b)}</td>
         <td>${esc(b.name)}</td>
-        <td class="right">1</td>
+        <td class="right">${qty}</td>
         <td class="right">${b.intMm}</td>
-        <td class="right">${barLen(b, variant)}</td>
+        <td class="right">${lenMm}</td>
         <td>${b.orientation === "H" ? "Hor" : "Vert"}</td>
         <td>${b.endPrep}</td>
       </tr>
@@ -506,8 +530,4 @@ function section(b: any): string {
   if (n.toLowerCase().includes("sash")) return "Sash";
   if (n.toLowerCase().includes("reinf")) return "Reinf";
   return "—";
-}
-function qtyOf(_bars: any[], _b: any): number {
-  // Each row is one piece in our model; if your shop prefers aggregated qty, do it here.
-  return 1;
 }

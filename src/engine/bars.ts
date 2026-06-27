@@ -29,22 +29,29 @@ export function computeParts(
   system: ProfileSystem,
   widthMm: number,
   heightMm: number,
+  /**
+   * Global welding-shrinkage default (mm per welded end) from Settings. Each
+   * profile uses its own `weldAllowanceMm` when > 0, else this. Defaults to 0
+   * so direct (non-solve) callers stay byte-identical; `solve()` passes the
+   * loaded setting. Mirrors the `computePricing(…, settings)` precedent.
+   */
+  weldDefaultMm: number = 0,
 ): SolvedParts {
   const bars: BarPiece[] = [];
   const reinforcement: BarPiece[] = [];
   const glass: GlassPiece[] = [];
 
-  emitFrameBars(bars, reinforcement, geometry, design, system, widthMm, heightMm);
-  emitTransomBars(bars, reinforcement, geometry, system);
-  emitMullionBars(bars, reinforcement, geometry, system);
+  emitFrameBars(bars, reinforcement, geometry, design, system, widthMm, heightMm, weldDefaultMm);
+  emitTransomBars(bars, reinforcement, geometry, system, weldDefaultMm);
+  emitMullionBars(bars, reinforcement, geometry, system, weldDefaultMm);
 
   // Per-leaf-cell: sashes, beads, reinforcement-inside-sashes, glass.
   let glassIdx = 1;
   for (const cell of geometry.cells) {
     if (cell.sashKey && cell.sashOuter) {
-      emitSashBars(bars, reinforcement, cell, system);
+      emitSashBars(bars, reinforcement, cell, system, weldDefaultMm);
     }
-    emitBeadBars(bars, cell, system);
+    emitBeadBars(bars, cell, system, weldDefaultMm);
     emitGlass(glass, cell, glassIdx++, system);
   }
 
@@ -64,13 +71,15 @@ function emitFrameBars(
   system: ProfileSystem,
   W: number,
   H: number,
+  weldDefaultMm: number,
 ): void {
   const frame = system.frames[design.frameKey];
   const fw = frame.faceWidth;
+  const wd = weldDefaultMm;
 
   // Top & bottom — always continuous, fully mitered.
-  bars.push(barFrame(frame, "Frame top",    W, W - 2 * fw, "H", "\\ - /"));
-  bars.push(barFrame(frame, "Frame bottom", W, W - 2 * fw, "H", "\\ - /"));
+  bars.push(barFrame(frame, "Frame top",    W, W - 2 * fw, "H", "\\ - /", wd));
+  bars.push(barFrame(frame, "Frame bottom", W, W - 2 * fw, "H", "\\ - /", wd));
 
   if (geom.jambsBrokenAtY !== undefined) {
     const splitY = geom.jambsBrokenAtY;
@@ -82,14 +91,14 @@ function emitFrameBars(
     const bottomPieceExt = H - splitY;
     const bottomPieceInt = (H - splitY) - fw;
 
-    bars.push(barFrame(frame, "Frame left top",     topPieceExt,    topPieceInt,    "V", "\\ - Y]"));
-    bars.push(barFrame(frame, "Frame left bottom",  bottomPieceExt, bottomPieceInt, "V", "[Y - /"));
-    bars.push(barFrame(frame, "Frame right top",    topPieceExt,    topPieceInt,    "V", "\\ - Y]"));
-    bars.push(barFrame(frame, "Frame right bottom", bottomPieceExt, bottomPieceInt, "V", "[Y - /"));
+    bars.push(barFrame(frame, "Frame left top",     topPieceExt,    topPieceInt,    "V", "\\ - Y]", wd));
+    bars.push(barFrame(frame, "Frame left bottom",  bottomPieceExt, bottomPieceInt, "V", "[Y - /", wd));
+    bars.push(barFrame(frame, "Frame right top",    topPieceExt,    topPieceInt,    "V", "\\ - Y]", wd));
+    bars.push(barFrame(frame, "Frame right bottom", bottomPieceExt, bottomPieceInt, "V", "[Y - /", wd));
   } else {
     // Continuous jambs (Job 88 / Job 90 style)
-    bars.push(barFrame(frame, "Frame left",  H, H - 2 * fw, "V", "\\ - /"));
-    bars.push(barFrame(frame, "Frame right", H, H - 2 * fw, "V", "\\ - /"));
+    bars.push(barFrame(frame, "Frame left",  H, H - 2 * fw, "V", "\\ - /", wd));
+    bars.push(barFrame(frame, "Frame right", H, H - 2 * fw, "V", "\\ - /", wd));
   }
 
   // Frame reinforcement (none in your data — left as a hook).
@@ -106,7 +115,7 @@ function emitFrameBars(
           extMm: b.intMm - 2 * r.endClearance,
           intMm: b.intMm - 2 * r.endClearance,
           endPrep: "[ - ]",
-        }, r.weldAllowanceMm));
+        }, effectiveWeld(r, weldDefaultMm)));
       }
     });
   }
@@ -119,6 +128,7 @@ function barFrame(
   int: number,
   orientation: "H" | "V",
   endPrep: string,
+  weldDefaultMm: number,
 ): BarPiece {
   return withWeld(
     {
@@ -130,14 +140,14 @@ function barFrame(
       intMm: round1(int),
       endPrep,
     },
-    frame.weldAllowanceMm ?? 0,
+    effectiveWeld(frame, weldDefaultMm),
   );
 }
 
 // ---------------------------------------------------------------------
 // TRANSOMS
 // ---------------------------------------------------------------------
-function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeometry, system: ProfileSystem): void {
+function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeometry, system: ProfileSystem, weldDefaultMm: number): void {
   for (const t of geom.transoms) {
     const profile = system.transoms[t.transomKey];
     const piece: BarPiece = withWeld({
@@ -148,7 +158,7 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       extMm: round1(t.extLengthMm),
       intMm: round1(t.intLengthMm),
       endPrep: "< - >",
-    }, profile.weldAllowanceMm);
+    }, effectiveWeld(profile, weldDefaultMm));
     // Reinforcement (e.g. Job 85: Z-transom gets 13x29 steel)
     const reinfKey = system.reinforcementMap[profile.code];
     if (reinfKey) {
@@ -163,7 +173,7 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
         extMm: piece.reinforcementLengthMm,
         intMm: piece.reinforcementLengthMm,
         endPrep: "[ - ]",
-      }, r.weldAllowanceMm));
+      }, effectiveWeld(r, weldDefaultMm)));
     }
     bars.push(piece);
   }
@@ -172,7 +182,7 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
 // ---------------------------------------------------------------------
 // MULLIONS
 // ---------------------------------------------------------------------
-function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeometry, system: ProfileSystem): void {
+function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeometry, system: ProfileSystem, weldDefaultMm: number): void {
   for (const m of geom.mullions) {
     const profile = system.transoms[m.mullionKey];
     const piece: BarPiece = withWeld({
@@ -183,7 +193,7 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       extMm: round1(m.extLengthMm),
       intMm: round1(m.intLengthMm),
       endPrep: "< - >",
-    }, profile.weldAllowanceMm);
+    }, effectiveWeld(profile, weldDefaultMm));
     const reinfKey = system.reinforcementMap[profile.code];
     if (reinfKey) {
       const r = system.reinforcement[reinfKey];
@@ -197,7 +207,7 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
         extMm: piece.reinforcementLengthMm,
         intMm: piece.reinforcementLengthMm,
         endPrep: "[ - ]",
-      }, r.weldAllowanceMm));
+      }, effectiveWeld(r, weldDefaultMm)));
     }
     bars.push(piece);
   }
@@ -206,14 +216,14 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
 // ---------------------------------------------------------------------
 // SASH BARS — 4 mitered pieces per opening sash. Reinforcement = bar Int.
 // ---------------------------------------------------------------------
-function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, system: ProfileSystem): void {
+function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, system: ProfileSystem, weldDefaultMm: number): void {
   const sash = system.sashes[cell.sashKey!];
   const so = cell.sashOuter!;
   const fw = sash.faceWidth;
   const intW = so.w - 2 * fw;
   const intH = so.h - 2 * fw;
 
-  const wa = sash.weldAllowanceMm;
+  const wa = effectiveWeld(sash, weldDefaultMm);
   const pieces: BarPiece[] = [
     withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} head`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" }, wa),
     withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} sill`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" }, wa),
@@ -237,7 +247,7 @@ function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, sys
         extMm: round1(reinfLen),
         intMm: round1(reinfLen),
         endPrep: "[ - ]",
-      }, r.weldAllowanceMm));
+      }, effectiveWeld(r, weldDefaultMm)));
     }
   }
   bars.push(...pieces);
@@ -248,13 +258,14 @@ function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, sys
 //   bead Int = sash inner (or cell daylight for fixed)
 //   bead Ext = Int + 2 × bead face (20mm in your system)
 // ---------------------------------------------------------------------
-function emitBeadBars(bars: BarPiece[], cell: SolvedCell, system: ProfileSystem): void {
+function emitBeadBars(bars: BarPiece[], cell: SolvedCell, system: ProfileSystem, weldDefaultMm: number): void {
   const bead = system.beads[cell.beadKey];
   const bf = bead.faceWidth;
   const intW = cell.beadIntW;
   const intH = cell.beadIntH;
 
-  const wa = bead.weldAllowanceMm; // 0 — beads are not welded
+  // Beads are square-cut (0 welded ends) so this is multiplied by 0 anyway.
+  const wa = effectiveWeld(bead, weldDefaultMm);
   bars.push(
     withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} top`,    orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" }, wa),
     withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} bottom`, orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" }, wa),
@@ -325,6 +336,16 @@ function weldedEnds(endPrep: string): number {
   if (/^[\\/]|^</.test(endPrep)) n++;   // left/outer end is a miter or horn
   if (/[\\/]$|>$/.test(endPrep)) n++;   // right/inner end is a miter or horn
   return n;
+}
+
+/**
+ * The weld allowance actually applied to a profile's pieces: the profile's own
+ * `weldAllowanceMm` when set (> 0), otherwise the global `Settings` default.
+ * So a per-profile 0 means "inherit the global". (Non-welded pieces get 0 welded
+ * ends from their end-prep, so the value is multiplied by 0 and never matters.)
+ */
+function effectiveWeld(profile: { weldAllowanceMm: number }, weldDefaultMm: number): number {
+  return profile.weldAllowanceMm > 0 ? profile.weldAllowanceMm : weldDefaultMm;
 }
 
 /** A bar piece before its welding-compensation fields are computed. */

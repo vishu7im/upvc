@@ -21,6 +21,7 @@ export default function SettingsForm({ initial }: { initial: SettingsResponse })
     labourPerSash: initial.labourPerSash,
     labourPerDoor: initial.labourPerDoor,
     labourBase: initial.labourBase,
+    weldAllowanceMm: initial.weldAllowanceMm,
     companyName: initial.branding.companyName ?? "",
     companyAddress: initial.branding.companyAddress ?? "",
     accentColor: initial.branding.accentColor ?? "#1f6feb",
@@ -80,6 +81,7 @@ export default function SettingsForm({ initial }: { initial: SettingsResponse })
           <Num label="Labour / sash" value={f.labourPerSash} onChange={num("labourPerSash")} />
           <Num label="Labour / door" value={f.labourPerDoor} onChange={num("labourPerDoor")} />
           <Num label="Labour base" value={f.labourBase} onChange={num("labourBase")} />
+          <Num label="Weld allowance (mm/end)" value={f.weldAllowanceMm} onChange={num("weldAllowanceMm")} />
           <label className="flex h-11 items-center gap-3 self-end rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
             <input
               type="checkbox"

@@ -19,11 +19,14 @@ export interface ProfileSection {
   faceWidth: number;
   /**
    * Welding shrinkage allowance in mm consumed at EACH welded end of a bar cut
-   * from this profile. The engine adds `weldAllowanceMm × weldedEndCount` to the
+   * from this profile. The engine adds `effective × weldedEndCount` to the
    * finished Ext length to get the "welded" (saw-cut) length, so the welded
-   * assembly shrinks back to the input W×H. 0 ⇒ no compensation (e.g. beads,
-   * steel reinforcement). Configurable per part via the admin catalog.
-   * Sunny Plast default: frame/sash/transom = 2.5 mm/end (5 mm/bar).
+   * assembly shrinks back to the input W×H.
+   *   effective = weldAllowanceMm > 0 ? weldAllowanceMm : Settings.weldAllowanceMm
+   * i.e. **0 means "inherit the global default"** (Settings.weldAllowanceMm); a
+   * positive value overrides it for this profile. Beads/steel never weld (0
+   * welded ends), so the global never leaks onto them. Edited per part in the
+   * admin catalog; the global is edited in admin settings.
    */
   weldAllowanceMm: number;
   /** Cost £/per-unit, price £/per-unit. Fill from your supplier price list. */
@@ -166,13 +169,12 @@ export interface DocBranding {
 }
 
 /**
- * A design preview embedded in a document header: the solved-geometry SVG
- * rendered at the *modified* (chosen W×H) dimensions, plus a caption. Pure data
- * (the SVG is already produced by `renderSvg`); documents stay pure. Order-level
- * docs carry one image per line item; a single quote carries exactly one.
+ * A design preview embedded in a document header, plus a caption. Order
+ * documents prefer the stored catalog `imageSvg` so they match the product
+ * gallery/configurator; engine-generated SVG remains a fallback.
  */
 export interface DocImage {
-  svg: string;        // SVG markup at the modified dimensions (from renderSvg)
+  svg: string;        // SVG markup from catalog preview or engine fallback
   caption: string;    // e.g. "Casement 2×1 — 1200 × 1500 mm"
 }
 
@@ -188,6 +190,13 @@ export interface Settings {
     perDoor: number;      // £ per door panel
     base: number;         // £ flat per order
   };
+  /**
+   * Global welding-shrinkage allowance (mm per welded end) used as the DEFAULT
+   * for every welded profile. A profile's own `weldAllowanceMm` overrides this
+   * when it is > 0; a profile value of 0 means "inherit this global". Non-welded
+   * pieces (beads/steel) have 0 welded ends so this never affects them.
+   */
+  weldAllowanceMm?: number;
   /** Global company branding for document headers (M4). Undefined ⇒ plain header. */
   branding?: DocBranding;
 }

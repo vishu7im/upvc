@@ -54,7 +54,7 @@ export function solve(input: QuoteInput): QuoteOutput {
   const geometry = solveTopology(design, input.widthMm, input.heightMm, system);
 
   // 2. Bars — derive cut pieces, glass, gaskets
-  const parts = computeParts(geometry, design, system, input.widthMm, input.heightMm);
+  const parts = computeParts(geometry, design, system, input.widthMm, input.heightMm, settings.weldAllowanceMm ?? 0);
 
   // 3. Hardware — allocate per cell
   parts.hardware = computeHardware(geometry, system);

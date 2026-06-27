@@ -150,7 +150,11 @@ function PriceTable({
               <th className={thClass + " w-32 text-right"}>Cost</th>
               <th className={thClass + " w-32 text-right"}>Price</th>
               <th className={thClass + " w-32 text-right"}>Weight</th>
-              {showWeld && <th className={thClass + " w-36 text-right"}>Weld /end (mm)</th>}
+              {showWeld && (
+                <th className={thClass + " w-36 text-right"} title="Welding shrinkage per welded end (mm). 0 = inherit the global default from Settings.">
+                  Weld /end (0=global)
+                </th>
+              )}
               <th className={thClass + " w-24"} />
             </tr>
           </thead>

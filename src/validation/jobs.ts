@@ -299,7 +299,8 @@ function validateCustomMode(): void {
 // Proves weldedExtMm = extMm + weldAllowanceMm × weldedEndCount, that extMm is
 // UNTOUCHED (so the geometry assertions above stay valid), and that the welded-end
 // count is derived correctly per joint (frame corner=2, Z-jamb=1, transom=2,
-// bead/steel=0). Seeded allowance is 2.5 mm/end on frame/sash/transom.
+// bead/steel=0). Per-profile allowance seeds to 0 (inherit) and the global
+// Settings default seeds to 2.5, so the effective allowance is 2.5 mm/end.
 function validateWeldMath(): void {
   console.log("\n==================================================");
   console.log("Welding shrinkage compensation");

@@ -40,6 +40,7 @@ settingsRouter.get(
       labourPerSash: Number(s.labourPerSash),
       labourPerDoor: Number(s.labourPerDoor),
       labourBase: Number(s.labourBase),
+      weldAllowanceMm: Number(s.weldAllowanceMm),
       branding: {
         companyName: s.companyName,
         companyAddress: s.companyAddress,
@@ -61,6 +62,7 @@ const updateSchema = z
     labourPerSash: z.number().min(0),
     labourPerDoor: z.number().min(0),
     labourBase: z.number().min(0),
+    weldAllowanceMm: z.number().min(0),
     companyName: z.string().max(200).nullable(),
     companyAddress: z.string().max(500).nullable(),
     accentColor: z

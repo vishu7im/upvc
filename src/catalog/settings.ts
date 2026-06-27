@@ -17,4 +17,6 @@ export const DEFAULT_SETTINGS: Settings = {
     perDoor: 60,    // £ per door panel
     base: 30,       // £ flat per order (setup, glazing, packaging)
   },
+  // Global welding-shrinkage default (mm per welded end); per-profile overrides it when > 0.
+  weldAllowanceMm: 2.5,
 };
