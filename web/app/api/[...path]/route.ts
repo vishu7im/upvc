@@ -57,6 +57,10 @@ async function proxy(
     const v = upstream.headers.get(h);
     if (v) out.set(h, v);
   }
+  if (req.nextUrl.searchParams.get("download") === "1" && path[path.length - 1] === "pdf") {
+    const type = path[path.length - 2] ?? "document";
+    out.set("content-disposition", `attachment; filename="${type.toLowerCase()}.pdf"`);
+  }
   return new Response(upstream.body, { status: upstream.status, headers: out });
 }
 

@@ -6,6 +6,7 @@ import type { OrderDetail } from "@/lib/types";
 import { money, dateShort, docLabel } from "@/lib/format";
 import { StatusBadge } from "../page";
 import { RemoveItemButton, ConfirmOrderButton } from "./order-actions";
+import { DocumentViewer } from "./document-viewer";
 import {
   Badge,
   ButtonLink,
@@ -170,7 +171,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <PageHeader
             eyebrow="Generated assets"
             title="Documents"
-            description="Open HTML documents in a new tab or download PDFs through the authenticated proxy."
+            description="Preview generated documents in place or download PDFs through the authenticated proxy."
           />
           {order.documents.length === 0 ? (
             <EmptyState icon="document" title="No documents generated" description="The engine did not return any generated documents for this order." />
@@ -188,25 +189,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <p className="mt-2 flex-1 text-sm leading-6 text-slate-500">
                     Production-ready fabrication document generated from confirmed order data.
                   </p>
-                  <div className="mt-5 flex gap-2">
-                    <a
-                      href={`/api/orders/${order.id}/documents/${document.type}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-10 flex-1 items-center justify-center rounded-md bg-[#0f172a] px-3 text-sm font-semibold text-white transition hover:bg-[#172033]"
-                    >
-                      View document
-                    </a>
-                    <a
-                      href={`/api/orders/${order.id}/documents/${document.type}/pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Download ${docLabel(document.type)} PDF`}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-50"
-                    >
-                      <Icon name="download" className="h-4 w-4" />
-                    </a>
-                  </div>
+                  <DocumentViewer
+                    label={docLabel(document.type)}
+                    viewHref={`/api/orders/${order.id}/documents/${document.type}`}
+                    pdfHref={`/api/orders/${order.id}/documents/${document.type}/pdf`}
+                  />
                 </Card>
               ))}
             </div>
