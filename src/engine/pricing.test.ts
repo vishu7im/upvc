@@ -53,6 +53,7 @@ function makeSystem(defaultColourKey?: string): ProfileSystem {
       oak:   { key: "oak",   code: "COL-OAK",   name: "Golden Oak", costUpliftPct: 20, priceUpliftPct: 30, isBase: false },
     },
     ...(defaultColourKey ? { defaultColourKey } : {}),
+    cills: {},
     reinforcementMap: {},
   };
 }

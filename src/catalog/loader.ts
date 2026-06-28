@@ -27,6 +27,7 @@ import type {
   Gasket,
   HardwareItem,
   ColourOption,
+  CillOption,
   CellNode,
   DocBranding,
 } from "../types.ts";
@@ -67,6 +68,7 @@ export async function loadCatalog(): Promise<void> {
       gaskets: true,
       hardware: true,
       colours: true,
+      cills: true,
       reinforcementMap: true,
     },
   });
@@ -176,6 +178,21 @@ export async function loadCatalog(): Promise<void> {
       };
     }
 
+    const cills: Record<string, CillOption> = {};
+    for (const c of s.cills) {
+      cills[c.partKey] = {
+        key: c.partKey,
+        code: c.code,
+        name: c.name,
+        projectionMm: c.projectionMm,
+        cost: num(c.cost),
+        price: num(c.price),
+        per: "m",
+        weight: num(c.weight),
+        financialCategory: c.financialCategory,
+      };
+    }
+
     const reinforcementMap: Record<string, string> = {};
     for (const r of s.reinforcementMap) {
       reinforcementMap[r.profileCode] = r.reinforcementKey;
@@ -197,6 +214,7 @@ export async function loadCatalog(): Promise<void> {
       hardware,
       colours,
       ...(s.defaultColourKey ? { defaultColourKey: s.defaultColourKey } : {}),
+      cills,
       reinforcementMap,
     };
   }

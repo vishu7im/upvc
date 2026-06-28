@@ -202,6 +202,36 @@ async function seedSystem(
     });
   }
 
+  // 6b. Cills (window sills) — 3 sizes × 3 finishes; cost/price/weight = 0
+  // (golden rule). The owner fills prices via the admin catalog CRUD / CSV.
+  for (const [partKey, c] of Object.entries(sys.cills)) {
+    await tx.cill.upsert({
+      where: { systemId_partKey: { systemId: sys.systemId, partKey } },
+      update: {
+        code: c.code,
+        name: c.name,
+        projectionMm: c.projectionMm,
+        cost: c.cost,
+        price: c.price,
+        per: c.per,
+        weight: c.weight,
+        financialCategory: c.financialCategory,
+      },
+      create: {
+        systemId: sys.systemId,
+        partKey,
+        code: c.code,
+        name: c.name,
+        projectionMm: c.projectionMm,
+        cost: c.cost,
+        price: c.price,
+        per: c.per,
+        weight: c.weight,
+        financialCategory: c.financialCategory,
+      },
+    });
+  }
+
   // 7. reinforcementMap (profile code -> reinforcement record key)
   for (const [profileCode, reinforcementKey] of Object.entries(
     sys.reinforcementMap,

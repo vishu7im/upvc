@@ -8,6 +8,9 @@ import type { QuoteGeometry, Rect } from "@/lib/types";
 // and the window frame at [0,0,w,h]. We mirror that pad here so the overlay's
 // computed window-frame rect lines up exactly with the rendered profile SVG.
 const PROFILE_VIEWBOX_PAD_MM = 20;
+// Horizontal cill overhang each side — MUST match CILL_OVERHANG in
+// src/engine/svg.ts so the overlay's viewBox equals the rendered engine SVG's.
+const CILL_OVERHANG_MM = 30;
 const MIN_FRAME_MM = 300;
 const MIN_SPAN_MM = 120;
 const LABEL_WIDTH_PX = 76;
@@ -106,17 +109,27 @@ export default function WindowDesigner({
   // The real profile SVG — ALWAYS rendered, never replaced by topology shapes.
   const profileSvg = useMemo(() => normalizeSvgForPreview(geometry.svg), [geometry.svg]);
 
-  // Window outer box in mm. outer.w === widthMm by construction (engine convention).
-  const outer: Rect = useMemo(() => ({ x: 0, y: 0, w: widthMm, h: heightMm }), [heightMm, widthMm]);
-  const profileViewBox = useMemo(
-    () => ({
-      x: -PROFILE_VIEWBOX_PAD_MM,
-      y: -PROFILE_VIEWBOX_PAD_MM,
-      w: widthMm + PROFILE_VIEWBOX_PAD_MM * 2,
-      h: heightMm + PROFILE_VIEWBOX_PAD_MM * 2,
-    }),
-    [heightMm, widthMm],
+  // Window outer box in mm = the SOLVED manufacturing frame (engine geometry.outer).
+  // With a cill, outer.h is the manufacturing height (display height − 30 mm); the
+  // splits/cells are solved against this, so the overlay must use it too. No cill ⇒
+  // outer.h === heightMm, identical to before. Falls back to props pre-first-solve.
+  const outer: Rect = useMemo(
+    () => geometry.outer ?? { x: 0, y: 0, w: widthMm, h: heightMm },
+    [geometry.outer, heightMm, widthMm],
   );
+  // Mirror the engine SVG viewBox exactly (src/engine/svg.ts) so the overlay maps
+  // mm→px identically and the SVG fills svgRect with no letterboxing. With a cill
+  // the box grows by the overhang (sides) and the cill depth (bottom).
+  const profileViewBox = useMemo(() => {
+    const overhang = geometry.cill ? CILL_OVERHANG_MM : 0;
+    const cillH = geometry.cill?.rect.h ?? 0;
+    return {
+      x: -(PROFILE_VIEWBOX_PAD_MM + overhang),
+      y: -PROFILE_VIEWBOX_PAD_MM,
+      w: outer.w + (PROFILE_VIEWBOX_PAD_MM + overhang) * 2,
+      h: outer.h + cillH + PROFILE_VIEWBOX_PAD_MM * 2,
+    };
+  }, [geometry.cill, outer.w, outer.h]);
   // ProfileRenderer owns the one scaling calc; the overlay only consumes it.
   const metrics = useMemo(() => getOverlayMetrics(stageSize, profileViewBox, outer), [outer, profileViewBox, stageSize]);
 
@@ -138,8 +151,8 @@ export default function WindowDesigner({
   const selectedPanel = selectedPanelId ? cells.find((cell) => cell.pathId === selectedPanelId) ?? null : null;
 
   const dimensions = useMemo(
-    () => buildScreenDimensions(splits, displayPositions, solvedPositions, outer, metrics),
-    [displayPositions, metrics, outer, solvedPositions, splits],
+    () => buildScreenDimensions(splits, displayPositions, solvedPositions, outer, metrics, heightMm),
+    [displayPositions, heightMm, metrics, outer, solvedPositions, splits],
   );
 
   function parentBoundsOf(split: SolvedSplit): Rect {
@@ -149,7 +162,9 @@ export default function WindowDesigner({
   function commitSplitCenter(split: SolvedSplit, centerMm: number) {
     const parent = parentBoundsOf(split);
     const clamped = clampSplitCenter(centerMm, split.orientation, parent);
-    const windowDim = split.orientation === "horizontal" ? heightMm : widthMm;
+    // Ratio is a fraction of the SOLVE dimension (= manufacturing frame, outer),
+    // matching the engine's splitRatios convention — not the customer height.
+    const windowDim = split.orientation === "horizontal" ? outer.h : outer.w;
     if (windowDim <= 0) return;
     onSplitRatioChange(split.pathId, clamp(clamped / windowDim, 0.02, 0.98));
   }
@@ -535,8 +550,17 @@ function buildScreenDimensions(
   parentPositions: Record<string, number>,
   outer: Rect,
   metrics: OverlayMetrics,
+  // Customer-facing overall height (mm). With a cill this differs from outer.h
+  // (the manufacturing frame): the label shows the customer height while the line
+  // still spans the drawn frame. No cill ⇒ === outer.h.
+  displayHeightMm: number,
 ): DimensionSpec[] {
   const outerRect = metrics.outerRect;
+  // The overall-height line spans the full CUSTOMER height: frame (outer.h) plus
+  // the cill engagement (displayHeightMm − outer.h, the fixed 30 mm deduction), so
+  // the "1200" reaches down into the cill rather than stopping at the frame bottom.
+  // No cill ⇒ displayHeightMm === outer.h, so the bottom is the frame bottom (== old).
+  const overallHeightBottomY = yToScreen(outer.y + displayHeightMm, metrics);
   const dimensions: DimensionSpec[] = [
     {
       id: "overall-width",
@@ -556,10 +580,10 @@ function buildScreenDimensions(
       x1: outerRect.x - OVERALL_OFFSET_PX,
       y1: outerRect.y,
       x2: outerRect.x - OVERALL_OFFSET_PX,
-      y2: outerRect.y + outerRect.h,
+      y2: overallHeightBottomY,
       labelX: clampLabelX(outerRect.x - OVERALL_OFFSET_PX - 2, metrics),
-      labelY: clampLabelY(outerRect.y + outerRect.h / 2, metrics),
-      valueMm: outer.h,
+      labelY: clampLabelY((outerRect.y + overallHeightBottomY) / 2, metrics),
+      valueMm: displayHeightMm,
       edit: { type: "overall-height" },
     },
   ];

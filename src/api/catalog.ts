@@ -12,7 +12,9 @@
 //   PUT  /api/catalog/:systemId/glass/:partKey          glass cost/price/weight
 //   PUT  /api/catalog/:systemId/gaskets/:partKey        gasket cost/price/weight
 //   PUT  /api/catalog/:systemId/hardware/:partKey       hardware cost/price/weight
+//   PUT  /api/catalog/:systemId/cills/:partKey          cill cost/price/weight
 //   POST /api/catalog/:systemId/glass                   add a glass variant
+//   POST /api/catalog/:systemId/cills                   add a cill variant
 //   POST /api/catalog/:systemId/colours                 add a colour/finish
 //   PUT  /api/catalog/:systemId/colours/:key            edit a colour/finish
 //   POST /api/catalog/:systemId/import                  CSV bulk price import
@@ -87,9 +89,9 @@ catalogRouter.put(
   }),
 );
 
-/** Shared cost/price updater for the single-table parts (glass/gasket/hardware). */
+/** Shared cost/price updater for the single-table parts (glass/gasket/hardware/cill). */
 function makePartPriceUpdater(
-  table: "glass" | "gasket" | "hardware",
+  table: "glass" | "gasket" | "hardware" | "cill",
   label: string,
 ) {
   return asyncHandler(async (req, res) => {
@@ -109,6 +111,7 @@ function makePartPriceUpdater(
 catalogRouter.put("/:systemId/glass/:partKey", makePartPriceUpdater("glass", "glass"));
 catalogRouter.put("/:systemId/gaskets/:partKey", makePartPriceUpdater("gasket", "gasket"));
 catalogRouter.put("/:systemId/hardware/:partKey", makePartPriceUpdater("hardware", "hardware"));
+catalogRouter.put("/:systemId/cills/:partKey", makePartPriceUpdater("cill", "cill"));
 
 // ---- Add a glass variant --------------------------------------------
 const newGlassSchema = z.object({
@@ -141,6 +144,46 @@ catalogRouter.post(
         cost: b.cost ?? 0,
         price: b.price ?? 0,
         per: "m2",
+        weight: b.weight ?? 0,
+        financialCategory: b.financialCategory ?? "Glazing Accessories",
+      },
+    });
+    await loadCatalog();
+    res.status(201).json({ ok: true, partKey: b.partKey });
+  }),
+);
+
+// ---- Add a cill variant ---------------------------------------------
+const newCillSchema = z.object({
+  partKey: z.string().min(1),
+  code: z.string().min(1),
+  name: z.string().min(1),
+  projectionMm: z.number().int().positive(),
+  cost: z.number().min(0).optional(),
+  price: z.number().min(0).optional(),
+  weight: z.number().min(0).optional(),
+  financialCategory: z.string().min(1).optional(),
+});
+
+catalogRouter.post(
+  "/:systemId/cills",
+  asyncHandler(async (req, res) => {
+    await assertSystem(req.params.systemId);
+    const b = validate(newCillSchema, req.body);
+    const exists = await prisma.cill.findUnique({
+      where: { systemId_partKey: { systemId: req.params.systemId, partKey: b.partKey } },
+    });
+    if (exists) throw new HttpError(409, `Cill "${b.partKey}" already exists (use PUT to edit)`);
+    await prisma.cill.create({
+      data: {
+        systemId: req.params.systemId,
+        partKey: b.partKey,
+        code: b.code,
+        name: b.name,
+        projectionMm: b.projectionMm,
+        cost: b.cost ?? 0,
+        price: b.price ?? 0,
+        per: "m",
         weight: b.weight ?? 0,
         financialCategory: b.financialCategory ?? "Glazing Accessories",
       },
@@ -226,18 +269,20 @@ catalogRouter.post(
 
     // Build code → {table, partKey} index for this system.
     const systemId = req.params.systemId;
-    const [parts, glass, gaskets, hardware] = await Promise.all([
+    const [parts, glass, gaskets, hardware, cills] = await Promise.all([
       prisma.profilePart.findMany({ where: { systemId }, select: { code: true, kind: true, partKey: true } }),
       prisma.glass.findMany({ where: { systemId }, select: { code: true, partKey: true } }),
       prisma.gasket.findMany({ where: { systemId }, select: { code: true, partKey: true } }),
       prisma.hardware.findMany({ where: { systemId }, select: { code: true, partKey: true } }),
+      prisma.cill.findMany({ where: { systemId }, select: { code: true, partKey: true } }),
     ]);
-    type Target = { table: "profilePart" | "glass" | "gasket" | "hardware"; kind?: PartKind; partKey: string };
+    type Target = { table: "profilePart" | "glass" | "gasket" | "hardware" | "cill"; kind?: PartKind; partKey: string };
     const byCode = new Map<string, Target>();
     for (const p of parts) byCode.set(p.code, { table: "profilePart", kind: p.kind, partKey: p.partKey });
     for (const g of glass) byCode.set(g.code, { table: "glass", partKey: g.partKey });
     for (const g of gaskets) byCode.set(g.code, { table: "gasket", partKey: g.partKey });
     for (const h of hardware) byCode.set(h.code, { table: "hardware", partKey: h.partKey });
+    for (const c of cills) byCode.set(c.code, { table: "cill", partKey: c.partKey });
 
     const updates: Promise<unknown>[] = [];
     const unmatched: string[] = [];

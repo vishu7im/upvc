@@ -122,6 +122,26 @@ export interface ColourOption {
   isBase: boolean;
 }
 
+/**
+ * A selectable cill (window sill) — an external profile fitted BELOW the outer
+ * frame. Selecting any cill reduces the manufacturing height by a fixed 30 mm
+ * (independent of size); the customer-entered height is unchanged for display.
+ * `projectionMm` (95/150/180) is the nominal cill size and doubles as the SVG
+ * draw height. Priced per metre of product width (a costed BOM/cut line).
+ */
+export interface CillOption {
+  key: string;
+  code: string;
+  name: string;
+  /** Nominal cill size in mm (95/150/180); also the SVG draw height. */
+  projectionMm: number;
+  cost: number;
+  price: number;
+  per: "m";
+  weight: number;
+  financialCategory: string;
+}
+
 /** The full per-system catalog. */
 export interface ProfileSystem {
   systemId: string;
@@ -146,6 +166,13 @@ export interface ProfileSystem {
    */
   colours: Record<string, ColourOption>;
   defaultColourKey?: string;
+
+  /**
+   * Selectable cills (window sills). Empty ⇒ no cill concept. There is no
+   * default cill: "None" is the implicit default (omitting `cillKey` ⇒ no 30mm
+   * deduction and no cill drawn, byte-identical to a no-cill quote).
+   */
+  cills: Record<string, CillOption>;
 
   /**
    * Which reinforcement code goes inside which profile.
@@ -176,6 +203,16 @@ export interface DocBranding {
 export interface DocImage {
   svg: string;        // SVG markup from catalog preview or engine fallback
   caption: string;    // e.g. "Casement 2×1 — 1200 × 1500 mm"
+}
+
+/**
+ * Cill display info for document headers. When present, the header shows the
+ * cill name and the (reduced) manufacturing height alongside the unchanged
+ * customer Width × Height. Omitted ⇒ no cill rows (byte-identical header).
+ */
+export interface DocCill {
+  name: string;
+  manufacturingHeightMm: number;
 }
 
 /** Project-level financial & display settings (Phase 1: GBP, 20% tax, 75% markup, 10% wastage). */
@@ -314,6 +351,12 @@ export interface SolvedGeometry {
    * Undefined/0 for every calibrated job (85/88/90).
    */
   meetingStiles?: number;
+  /**
+   * The selected cill, drawn as a bar below the frame (svg.ts) and emitted as a
+   * per-metre cut/BOM line (bars.ts). `rect` sits at y = manufacturing height
+   * (outer.h). Undefined ⇒ no cill (byte-identical geometry).
+   */
+  cill?: { rect: Rect; code: string; name: string; projectionMm: number };
 }
 
 // ---------- Parts: what gets cut & purchased -----------------------
@@ -482,6 +525,13 @@ export interface QuoteInput {
    */
   colourKey?: string;
   /**
+   * Per-quote cill selection. Cill `key` whose nominal size picks the physical
+   * cill profile; selecting any cill reduces the manufacturing height by a fixed
+   * 30 mm (the customer-entered height is unchanged for display). Omitted ⇒ no
+   * cill, so a quote without it is byte-identical to a no-cill quote.
+   */
+  cillKey?: string;
+  /**
    * Per-quote internal split overrides (multi-span editing). Keyed by the split
    * node's pathId ("root", "root.top", …); value is a FULL-WINDOW fraction 0..1
    * (hsplit ⇒ y/heightMm, vsplit ⇒ x/widthMm, matching solveTopology's
@@ -502,6 +552,8 @@ export interface QuoteOutput {
     cells: SolvedCell[];
     transoms: SolvedTransom[];
     mullions: SolvedMullion[];
+    /** The selected cill drawn below the frame (absent ⇒ no cill). */
+    cill?: { rect: Rect; code: string; name: string; projectionMm: number };
     /** Generated SVG markup (mm coordinate system). */
     svg: string;
   };

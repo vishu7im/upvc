@@ -55,6 +55,22 @@ export function computeParts(
     emitGlass(glass, cell, glassIdx++, system);
   }
 
+  // Cill (window sill) — an external profile spanning the full product width,
+  // emitted as a per-metre cut/BOM line. Source of truth is `geometry.cill`
+  // (attached by solve() when a cill is selected). Square-cut, no welded ends.
+  if (geometry.cill) {
+    const c = geometry.cill;
+    bars.push(withWeld({
+      code: c.code,
+      name: c.name,
+      position: "Cill",
+      orientation: "H",
+      extMm: round1(widthMm),
+      intMm: round1(widthMm),
+      endPrep: "[ - ]",
+    }, 0));
+  }
+
   const gaskets = computeGaskets(geometry, system);
 
   return { bars, reinforcement, glass, gaskets, hardware: [] /* filled by hardware module */ };

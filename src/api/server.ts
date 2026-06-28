@@ -65,6 +65,11 @@ app.get("/api/systems/:id/options", (req, res) => {
       name: c.name,
       priceUpliftPct: c.priceUpliftPct,
     })),
+    cills: Object.values(sys.cills ?? {}).map((c) => ({
+      key: c.key,
+      name: c.name,
+      projectionMm: c.projectionMm,
+    })),
     defaultColourKey: sys.defaultColourKey ?? null,
   });
 });

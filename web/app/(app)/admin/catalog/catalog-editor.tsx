@@ -11,6 +11,7 @@ import {
   updateProfilePart,
   updateSubPart,
   addGlass,
+  addCill,
   addColour,
   updateColour,
   importCatalogCsv,
@@ -89,6 +90,14 @@ export default function CatalogEditor({ systems, dump }: { systems: SystemSummar
         onSaved={() => router.refresh()}
       />
       <AddGlass systemId={sys} onAdded={() => router.refresh()} />
+
+      <PriceTable
+        title="Cills"
+        rows={dump.cills as unknown as Record<string, CatalogPart>}
+        onSave={(k, p) => updateSubPart(sys, "cills", k, p).then(() => {})}
+        onSaved={() => router.refresh()}
+      />
+      <AddCill systemId={sys} onAdded={() => router.refresh()} />
 
       <PriceTable
         title="Gaskets"
@@ -291,6 +300,50 @@ function AddGlass({ systemId, onAdded }: { systemId: string; onAdded: () => void
       <input type="number" placeholder="cost" value={f.cost} onChange={(e) => setF({ ...f, cost: +e.target.value })} className={fieldClass} />
       <input type="number" placeholder="price" value={f.price} onChange={(e) => setF({ ...f, price: +e.target.value })} className={fieldClass} />
       <Button onClick={add} disabled={busy || !f.partKey || !f.code || !f.name} variant="success">
+        Add
+      </Button>
+      </div>
+      {msg && <p className="mt-3 text-sm text-slate-500">{msg}</p>}
+    </Card>
+  );
+}
+
+// ---------- Add cill variant -----------------------------------------
+
+function AddCill({ systemId, onAdded }: { systemId: string; onAdded: () => void }) {
+  const [f, setF] = useState({ partKey: "", code: "", name: "", projectionMm: 95, cost: 0, price: 0 });
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function add() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await addCill(systemId, f);
+      setF({ partKey: "", code: "", name: "", projectionMm: 95, cost: 0, price: 0 });
+      onAdded();
+      setMsg("Added.");
+    } catch (e) {
+      setMsg(e instanceof ApiError ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="border-dashed p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-950">Add cill variant</h3>
+        <Badge tone="blue">Cill</Badge>
+      </div>
+      <div className="grid gap-3 md:grid-cols-6 lg:grid-cols-[1fr_1fr_2fr_120px_120px_120px_auto]">
+      <input placeholder="partKey" value={f.partKey} onChange={(e) => setF({ ...f, partKey: e.target.value })} className={fieldClass} />
+      <input placeholder="code" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} className={fieldClass} />
+      <input placeholder="name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={fieldClass} />
+      <input type="number" placeholder="size mm" value={f.projectionMm} onChange={(e) => setF({ ...f, projectionMm: +e.target.value })} className={fieldClass} />
+      <input type="number" placeholder="cost" value={f.cost} onChange={(e) => setF({ ...f, cost: +e.target.value })} className={fieldClass} />
+      <input type="number" placeholder="price" value={f.price} onChange={(e) => setF({ ...f, price: +e.target.value })} className={fieldClass} />
+      <Button onClick={add} disabled={busy || !f.partKey || !f.code || !f.name || !f.projectionMm} variant="success">
         Add
       </Button>
       </div>

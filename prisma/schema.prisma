@@ -48,6 +48,7 @@ model ProfileSystem {
   gaskets           Gasket[]
   hardware          Hardware[]
   colours           ColourOption[]
+  cills             Cill[]
   reinforcementMap  ReinforcementMapEntry[]
 
   @@map("profile_system")
@@ -174,6 +175,31 @@ model ColourOption {
   @@map("colour_option")
 }
 
+// ---- Cills (window sills) --------------------------------------------
+// An external profile fitted below the frame. Selecting any cill reduces the
+// manufacturing height by a fixed 30 mm (engine, solve.ts). `projectionMm` is
+// the nominal size (95/150/180) and doubles as the SVG draw height. Priced per
+// metre of product width. Cost/price/weight default to 0 (golden rule) until
+// the owner fills them via the admin catalog CRUD / CSV import.
+model Cill {
+  id       String @id @default(uuid())
+  systemId String
+  system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  partKey           String // in-memory Record key, e.g. "cill-95-white"
+  code              String // stock code, e.g. "GL-1-00095"
+  name              String // e.g. "95mm Cill — White"
+  projectionMm      Int    // nominal size; also the SVG draw height
+  cost              Decimal @default(0) @db.Decimal(12, 4)
+  price             Decimal @default(0) @db.Decimal(12, 4)
+  per               String  @default("m")
+  weight            Decimal @default(0) @db.Decimal(12, 4)
+  financialCategory String  @default("Glazing Accessories")
+
+  @@unique([systemId, partKey])
+  @@map("cill")
+}
+
 // ---- reinforcementMap: profile code -> reinforcement record key ------
 model ReinforcementMapEntry {
   id       String @id @default(uuid())
@@ -294,6 +320,7 @@ model OrderItem {
   qty       Int    @default(1)
   mode      String @default("default") // "default" | "custom"
   overrides Json? // EngineOverrides when mode === "custom"
+  cillKey   String? // selected cill Record key (null ⇒ no cill). Drives the 30mm deduction + cill render in confirmed docs.
   pricingSnapshot Json? // totals captured at confirm
 
   @@index([orderId])

@@ -60,10 +60,11 @@ export interface DesignDetail {
   imageSvg: string | null;
 }
 
-/** GET /api/systems/:id/options — selectable glass + colours (U3). */
+/** GET /api/systems/:id/options — selectable glass + colours + cills (U3). */
 export interface SystemOptions {
   glass: { key: string; name: string }[];
   colours: { key: string; name: string; priceUpliftPct: number }[];
+  cills?: { key: string; name: string; projectionMm: number }[];
   defaultColourKey: string | null;
 }
 
@@ -130,6 +131,7 @@ export interface QuoteGeometry {
   cells?: SolvedCell[];
   transoms?: SolvedTransom[];
   mullions?: SolvedMullion[];
+  cill?: { rect: Rect; code: string; name: string; projectionMm: number };
   svg: string;
 }
 export interface QuoteResult {
@@ -161,6 +163,7 @@ export interface OrderItem {
   heightMm: number;
   qty: number;
   mode: string;
+  cillKey?: string | null;
   design?: { name: string };
   product?: { name: string };
 }
@@ -211,6 +214,15 @@ export interface CatalogColour {
   priceUpliftPct: number;
   isBase: boolean;
 }
+export interface CatalogCill {
+  key: string;
+  code: string;
+  name: string;
+  projectionMm: number;
+  cost: number;
+  price: number;
+  weight: number;
+}
 /** GET /api/catalog/:systemId — full priced dump (admin). */
 export interface CatalogDump {
   systemId: string;
@@ -225,5 +237,6 @@ export interface CatalogDump {
   glass: Record<string, CatalogPart>;
   hardware: Record<string, CatalogPart>;
   colours: Record<string, CatalogColour>;
+  cills: Record<string, CatalogCill>;
   defaultColourKey?: string;
 }

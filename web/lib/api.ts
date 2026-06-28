@@ -85,6 +85,8 @@ export interface QuoteRequest {
   heightMm: number;
   glassKey?: string;
   colourKey?: string;
+  /** Selected cill key (omitted ⇒ no cill, no 30mm deduction). */
+  cillKey?: string;
   /** Internal split overrides keyed by split-node pathId; full-window fraction 0..1. */
   splitRatios?: Record<string, number>;
 }
@@ -105,7 +107,7 @@ export function createOrder(body: {
 
 export function addOrderItem(
   orderId: string,
-  item: { productId: string; designId: string; widthMm: number; heightMm: number; qty?: number },
+  item: { productId: string; designId: string; widthMm: number; heightMm: number; qty?: number; cillKey?: string },
 ): Promise<unknown> {
   return apiSend(`/api/orders/${orderId}/items`, "POST", item);
 }
@@ -143,7 +145,7 @@ export function updateProfilePart(
 
 export function updateSubPart(
   systemId: string,
-  table: "glass" | "gaskets" | "hardware",
+  table: "glass" | "gaskets" | "hardware" | "cills",
   partKey: string,
   body: PricePatch,
 ): Promise<{ ok: boolean; updated: number }> {
@@ -152,6 +154,10 @@ export function updateSubPart(
 
 export function addGlass(systemId: string, body: Record<string, unknown>): Promise<{ ok: boolean }> {
   return apiSend(`/api/catalog/${systemId}/glass`, "POST", body);
+}
+
+export function addCill(systemId: string, body: Record<string, unknown>): Promise<{ ok: boolean }> {
+  return apiSend(`/api/catalog/${systemId}/cills`, "POST", body);
 }
 
 export function addColour(systemId: string, body: Record<string, unknown>): Promise<{ ok: boolean }> {

@@ -7,7 +7,7 @@
 //
 // =====================================================================
 
-import type { CellNode, QuoteInput, QuoteOutput, Settings } from "../types.ts";
+import type { CellNode, DocCill, QuoteInput, QuoteOutput, Settings } from "../types.ts";
 import { getSystem, getDesign, DEFAULT_SETTINGS } from "../catalog/index.ts";
 import { solveTopology } from "./topology.ts";
 import { computeParts } from "./bars.ts";
@@ -57,11 +57,33 @@ export function solve(input: QuoteInput): QuoteOutput {
     design = { ...design, topology: applySplitRatios(design.topology, input.splitRatios) };
   }
 
-  // 1. Topology — solve geometry
-  const geometry = solveTopology(design, input.widthMm, input.heightMm, system);
+  // Per-quote cill selection. Any cill reduces the MANUFACTURING height by a
+  // fixed 30 mm (independent of cill size — spec: "Automatic Cill Height
+  // Adjustment"). The customer-entered `input.heightMm` is preserved for display;
+  // only `mfgHeightMm` feeds the geometry/cut math. Omitted ⇒ no cill, so the
+  // quote is byte-identical to a no-cill quote (the 157 assertions hold).
+  const CILL_HEIGHT_DEDUCTION_MM = 30; // fixed, per the cill feature spec
+  const cill = input.cillKey ? system.cills?.[input.cillKey] : undefined;
+  if (input.cillKey && !cill) throw new Error(`Unknown cill: ${input.cillKey}`);
+  const mfgHeightMm = cill ? input.heightMm - CILL_HEIGHT_DEDUCTION_MM : input.heightMm;
 
-  // 2. Bars — derive cut pieces, glass, gaskets
-  const parts = computeParts(geometry, design, system, input.widthMm, input.heightMm, settings.weldAllowanceMm ?? 0);
+  // 1. Topology — solve geometry (at the manufacturing height)
+  const geometry = solveTopology(design, input.widthMm, mfgHeightMm, system);
+
+  // Attach the cill as a bar below the frame: full product width, sitting at
+  // y = manufacturing height (= geometry.outer.h). svg.ts draws it; bars.ts
+  // emits it as a per-metre cut/BOM line.
+  if (cill) {
+    geometry.cill = {
+      rect: { x: 0, y: mfgHeightMm, w: input.widthMm, h: cill.projectionMm },
+      code: cill.code,
+      name: cill.name,
+      projectionMm: cill.projectionMm,
+    };
+  }
+
+  // 2. Bars — derive cut pieces, glass, gaskets (at the manufacturing height)
+  const parts = computeParts(geometry, design, system, input.widthMm, mfgHeightMm, settings.weldAllowanceMm ?? 0);
 
   // 3. Hardware — allocate per cell
   parts.hardware = computeHardware(geometry, system);
@@ -80,11 +102,16 @@ export function solve(input: QuoteInput): QuoteOutput {
   const images = [
     { svg, caption: `${design.name} — ${input.widthMm} × ${input.heightMm} mm` },
   ];
+  // Cill display info (customer height stays on "Width × Height"; the header adds
+  // the cill name + reduced manufacturing height). Omitted ⇒ no cill rows.
+  const docCill: DocCill | undefined = cill
+    ? { name: cill.name, manufacturingHeightMm: mfgHeightMm }
+    : undefined;
   const documents = {
-    workOrder:    renderWorkOrder(input, system.name, design.name, parts, settings.branding, images),
-    cuttingList:  renderCuttingList(input, system.name, design.name, parts, settings.branding, images),
-    bom:          renderBom(input, system.name, design.name, pricing, settings.branding, images),
-    priceSummary: renderPriceSummary(input, system.name, design.name, pricing, settings.branding, images),
+    workOrder:    renderWorkOrder(input, system.name, design.name, parts, settings.branding, images, "normal", docCill),
+    cuttingList:  renderCuttingList(input, system.name, design.name, parts, settings.branding, images, "normal", docCill),
+    bom:          renderBom(input, system.name, design.name, pricing, settings.branding, images, docCill),
+    priceSummary: renderPriceSummary(input, system.name, design.name, pricing, settings.branding, images, docCill),
   };
 
   return {
@@ -96,6 +123,7 @@ export function solve(input: QuoteInput): QuoteOutput {
       cells: geometry.cells,
       transoms: geometry.transoms,
       mullions: geometry.mullions,
+      ...(geometry.cill ? { cill: geometry.cill } : {}),
       svg,
     },
     parts,

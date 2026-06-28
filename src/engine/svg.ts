@@ -14,6 +14,10 @@ const PROFILE_FILL = "#e6e6e6"; // grey profile material (frame/transom/mullion/
 const GLASS_FILL = "#ffffff"; // glazed openings (clear)
 const STROKE = "#1f2937"; // near-black outline
 const SYMBOL_STROKE = "rgba(30,30,30,0.55)"; // opening-direction chevron
+const CILL_FILL = "#c9ccd1"; // darker grey so the cill reads distinct from the frame
+// Drawing-only constants (NOT fabrication values): a small horizontal overhang
+// each side gives the cill its sill silhouette below the frame.
+const CILL_OVERHANG = 30;
 
 export function renderSvg(geometry: SolvedGeometry): string {
   const w = geometry.outer.w;
@@ -41,7 +45,28 @@ export function renderSvg(geometry: SolvedGeometry): string {
     drawCell(c, shapes);
   }
 
-  return `<svg viewBox="-${pad} -${pad} ${w + 2 * pad} ${h + 2 * pad}" xmlns="http://www.w3.org/2000/svg">
+  // Cill — a distinct bar attached below the outer frame, spanning the full
+  // width plus a small overhang each side. Its drawn height = the cill's
+  // nominal size, so 95/150/180 read visibly different. No cill ⇒ unchanged.
+  let minX = -pad;
+  let vbW = w + 2 * pad;
+  let vbH = h + 2 * pad;
+  if (geometry.cill) {
+    const c = geometry.cill;
+    const cillRect: Rect = {
+      x: c.rect.x - CILL_OVERHANG,
+      y: c.rect.y,
+      w: c.rect.w + 2 * CILL_OVERHANG,
+      h: c.rect.h,
+    };
+    shapes.push(rect(cillRect, CILL_FILL, STROKE, 2));
+    // Grow the viewBox to show the overhang (sides) and the cill depth (bottom).
+    minX = -(pad + CILL_OVERHANG);
+    vbW = w + 2 * CILL_OVERHANG + 2 * pad;
+    vbH = h + c.rect.h + 2 * pad;
+  }
+
+  return `<svg viewBox="${minX} -${pad} ${vbW} ${vbH}" xmlns="http://www.w3.org/2000/svg">
   ${shapes.join("\n  ")}
 </svg>`;
 }

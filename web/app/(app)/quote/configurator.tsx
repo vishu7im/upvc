@@ -50,6 +50,8 @@ export default function Configurator(props: ConfiguratorProps) {
   const [height, setHeight] = useState(1200);
   const [glassKey, setGlassKey] = useState("");
   const [colourKey, setColourKey] = useState("");
+  // Per-quote cill selection. "" ⇒ no cill (no 30mm manufacturing-height deduction).
+  const [cillKey, setCillKey] = useState("");
   // Per-quote internal split overrides (multi-span editing), keyed by split-node
   // pathId; full-window fractions. Empty ⇒ the design's baked splits.
   const [splitRatios, setSplitRatios] = useState<Record<string, number>>({});
@@ -91,6 +93,7 @@ export default function Configurator(props: ConfiguratorProps) {
         setOptions(o);
         setColourKey(o.defaultColourKey ?? "");
         setGlassKey("");
+        setCillKey("");
       })
       .catch(() => setOptions(null));
   }, [systemId]);
@@ -116,6 +119,7 @@ export default function Configurator(props: ConfiguratorProps) {
       heightMm: height,
       glassKey: glassKey || undefined,
       colourKey: colourKey || undefined,
+      cillKey: cillKey || undefined,
       splitRatios: Object.keys(splitRatios).length ? splitRatios : undefined,
     })
       .then((r) => {
@@ -128,7 +132,7 @@ export default function Configurator(props: ConfiguratorProps) {
         showToast("invalid");
       })
       .finally(() => setLoading(false));
-  }, [props.designId, systemId, width, height, glassKey, colourKey, splitRatios, showToast]);
+  }, [props.designId, systemId, width, height, glassKey, colourKey, cillKey, splitRatios, showToast]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -149,6 +153,7 @@ export default function Configurator(props: ConfiguratorProps) {
       widthMm: width,
       heightMm: height,
       qty,
+      cillKey: cillKey || undefined,
     };
     try {
       let orderId = props.orderId;
@@ -196,9 +201,13 @@ export default function Configurator(props: ConfiguratorProps) {
   const selectedSystem = systems.find((s) => s.systemId === systemId);
   const selectedColour = options?.colours.find((c) => c.key === colourKey);
   const selectedGlass = options?.glass.find((g) => g.key === glassKey);
+  const selectedCill = options?.cills?.find((c) => c.key === cillKey);
   const lines = result?.pricing.lines ?? [];
   const previewSvg = result?.geometry.svg || props.designSvg || null;
   const normalizedPreviewSvg = previewSvg ? normalizeSvgForPreview(previewSvg) : null;
+  // The editable designer renders the engine SVG (which now carries the cill at
+  // the manufacturing height) and aligns its dimension overlay to geometry.outer
+  // + geometry.cill, so it works with or without a cill.
   const canUseDesigner = Boolean(result?.geometry.outer && result.geometry.cells?.length);
 
   // Single source of truth for status, shared by every surface (header meta,
@@ -298,6 +307,23 @@ export default function Configurator(props: ConfiguratorProps) {
               </select>
             </label>
 
+            <label className="block">
+              <FieldLabel>Cill</FieldLabel>
+              <select value={cillKey} onChange={(e) => setCillKey(e.target.value)} className={selectClass}>
+                <option value="">No cill</option>
+                {options?.cills?.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              {cillKey && (
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Manufacturing height reduced by 30&nbsp;mm; overall size shown stays {height}&nbsp;mm.
+                </p>
+              )}
+            </label>
+
             <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-600">Glass</span>
@@ -306,6 +332,10 @@ export default function Configurator(props: ConfiguratorProps) {
               <div className="mt-3 flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-600">Finish</span>
                 <span className="text-right font-semibold text-slate-950">{selectedColour?.name ?? "Default"}</span>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <span className="font-semibold text-slate-600">Cill</span>
+                <span className="text-right font-semibold text-slate-950">{selectedCill?.name ?? "None"}</span>
               </div>
               <div className="mt-3 grid grid-cols-4 gap-2">
                 {["#ffffff", "#353b3f", "#9a672f", "#4d2b22"].map((color, index) => (
@@ -448,7 +478,7 @@ export default function Configurator(props: ConfiguratorProps) {
                     {props.orderId ? "Add to this order" : "Create order from quote"}
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-slate-500">
-                    Saved items use default glass and colour in the current order API.
+                    The selected cill is saved with the item; glass and colour use the order defaults.
                   </p>
                 </div>
                 <Icon name="orders" className="mt-1 h-5 w-5 text-slate-400" />

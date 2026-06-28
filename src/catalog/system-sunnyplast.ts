@@ -40,6 +40,24 @@ export const SUNNYPLAST_70: ProfileSystem = {
     },
   },
 
+  // ---------- CILLS (window sills) ---------------------------------
+  // External profiles fitted below the frame. Selecting any cill reduces the
+  // manufacturing height by a fixed 30 mm (engine, solve.ts). Three nominal
+  // sizes × three finishes (White / Foiled-on-White / Foiled), codes from
+  // collections/part-list/stockitems.json. Cost/price/weight ship at 0 (golden
+  // rule); the owner fills them via the admin catalog CRUD / CSV import.
+  cills: {
+    "cill-95-white":         { key: "cill-95-white",         code: "GL-1-00095",         name: "95mm Cill — White",            projectionMm: 95,  cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+    "cill-95-foiled-white":  { key: "cill-95-foiled-white",  code: "GL-2-00095-1P-FCA",  name: "95mm Cill — Foiled on White",  projectionMm: 95,  cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+    "cill-95-foiled":        { key: "cill-95-foiled",        code: "GL-2-00095-2P-FCA",  name: "95mm Cill — Foiled",           projectionMm: 95,  cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+    "cill-150-white":        { key: "cill-150-white",        code: "GL-1-00150",         name: "150mm Cill — White",           projectionMm: 150, cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+    "cill-150-foiled-white": { key: "cill-150-foiled-white", code: "GL-2-00150-1P-FCA",  name: "150mm Cill — Foiled on White", projectionMm: 150, cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+    "cill-150-foiled":       { key: "cill-150-foiled",       code: "GL-2-00150-2P-FCA",  name: "150mm Cill — Foiled",          projectionMm: 150, cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+    "cill-180-white":        { key: "cill-180-white",        code: "GL-1-00180",         name: "180mm Cill — White",           projectionMm: 180, cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+    "cill-180-foiled-white": { key: "cill-180-foiled-white", code: "GL-2-00180-1P-FCA",  name: "180mm Cill — Foiled on White", projectionMm: 180, cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+    "cill-180-foiled":       { key: "cill-180-foiled",       code: "GL-2-00180-2P-FCA",  name: "180mm Cill — Foiled",          projectionMm: 180, cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
+  },
+
   // ---------- FRAMES -----------------------------------------------
   // 5-Chamber 64mm is the casement/window frame.
   // 6-Chamber 68mm is used on heavier configurations (Job 90 — door).

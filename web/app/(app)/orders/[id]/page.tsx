@@ -149,6 +149,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         <span className="font-mono text-sm text-slate-800">
                           {item.widthMm} x {item.heightMm} mm
                         </span>
+                        {item.cillKey && (
+                          <div className="mt-1 text-xs font-medium text-slate-500">
+                            Cill: {item.cillKey} (mfg −30 mm)
+                          </div>
+                        )}
                       </td>
                       <td className={tdClass + " text-right font-semibold"}>{item.qty}</td>
                       <td className={tdClass}>

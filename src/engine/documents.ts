@@ -6,7 +6,7 @@
 // Puppeteer or Playwright — the HTML is already print-ready.
 // =====================================================================
 
-import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, BarPiece } from "../types.ts";
+import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, BarPiece } from "../types.ts";
 
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #28323c; margin: 32px; }
@@ -117,7 +117,19 @@ function previewBand(images?: DocImage[]): string {
   return `<div class="previews">${cards}</div>`;
 }
 
-function header(input: QuoteInput, title: string, systemName: string, designName: string, branding?: DocBranding, images?: DocImage[]): string {
+/**
+ * Cill header rows. Only rendered when a cill is selected: shows the cill name
+ * and the reduced manufacturing height (the "Width × Height" row above keeps the
+ * unchanged customer dimensions). Absent ⇒ "" (byte-identical header).
+ */
+function cillRows(cill?: DocCill): string {
+  if (!cill) return "";
+  return `
+      <b>Cill:</b><span>${esc(cill.name)}</span>
+      <b>Mfg. Height:</b><span>${cill.manufacturingHeightMm} mm</span>`;
+}
+
+function header(input: QuoteInput, title: string, systemName: string, designName: string, branding?: DocBranding, images?: DocImage[], cill?: DocCill): string {
   const today = new Date().toLocaleDateString("en-GB");
   return `
     ${brandBar(branding)}
@@ -130,7 +142,7 @@ function header(input: QuoteInput, title: string, systemName: string, designName
       <b>System:</b><span>${esc(systemName)}</span>
       <b>Design:</b><span>${esc(designName)}</span>
       <b>Width × Height:</b><span>${input.widthMm} × ${input.heightMm} mm</span>
-      <b>Quote#:</b><span>${esc(input.orderNo)}</span>
+      <b>Quote#:</b><span>${esc(input.orderNo)}</span>${cillRows(cill)}
     </div>
     ${previewBand(images)}
   `;
@@ -145,6 +157,7 @@ export function renderWorkOrder(
   branding?: DocBranding,
   images?: DocImage[],
   variant: DocVariant = "normal",
+  cill?: DocCill,
 ): string {
   // Club identical pieces into qty rows (e.g. a frame's 4 bars → 2 rows × qty 2).
   const len = (b: BarPiece) => barLen(b, variant);
@@ -199,7 +212,7 @@ export function renderWorkOrder(
   `).join("");
 
   return wrap("Work Order" + variantSuffix(variant), `
-    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images)}
+    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill)}
     ${weldNote(variant)}
 
     <div class="section-title">Sections Required</div>
@@ -233,6 +246,7 @@ export function renderCuttingList(
   branding?: DocBranding,
   images?: DocImage[],
   variant: DocVariant = "normal",
+  cill?: DocCill,
 ): string {
   // Group by section description (matches Quotila — one table per profile).
   const all = [...parts.bars, ...parts.reinforcement];
@@ -268,7 +282,7 @@ export function renderCuttingList(
   }).join("");
 
   return wrap("Cutting List" + variantSuffix(variant), `
-    ${header(input, "CUTTING LIST" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images)}
+    ${header(input, "CUTTING LIST" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill)}
     ${weldNote(variant)}
     ${sections}
   `, branding);
@@ -282,6 +296,7 @@ export function renderBom(
   pricing: Pricing,
   branding?: DocBranding,
   images?: DocImage[],
+  cill?: DocCill,
 ): string {
   // Group by financial category to mirror your spec.
   const byCat = new Map<string, typeof pricing.lines>();
@@ -313,7 +328,7 @@ export function renderBom(
   }).join("");
 
   return wrap("Bill of Materials", `
-    ${header(input, "BILL OF MATERIALS", systemName, designName, branding, images)}
+    ${header(input, "BILL OF MATERIALS", systemName, designName, branding, images, cill)}
     ${sections}
   `, branding);
 }
@@ -326,11 +341,12 @@ export function renderPriceSummary(
   pricing: Pricing,
   branding?: DocBranding,
   images?: DocImage[],
+  cill?: DocCill,
 ): string {
   const T = pricing.totals;
   const c = pricing.currency === "GBP" ? "£" : pricing.currency + " ";
   return wrap("Price Summary", `
-    ${header(input, "PRICE SUMMARY", systemName, designName, branding, images)}
+    ${header(input, "PRICE SUMMARY", systemName, designName, branding, images, cill)}
 
     <table class="totals">
       <tbody>

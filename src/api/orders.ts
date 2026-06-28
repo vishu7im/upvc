@@ -170,6 +170,7 @@ const addItemSchema = z.object({
   qty: z.number().int().positive().optional(),
   mode: z.enum(["default", "custom"]).optional(),
   overrides: z.any().optional(),
+  cillKey: z.string().optional(),
 });
 
 ordersRouter.post(
@@ -203,6 +204,7 @@ ordersRouter.post(
           systemId: product.systemId,
           mode: body.mode,
           overrides: body.overrides as EngineOverrides | undefined,
+          cillKey: body.cillKey,
         }),
       );
     } catch (e: any) {
@@ -225,6 +227,7 @@ ordersRouter.post(
         overrides: (body.overrides ?? undefined) as
           | Prisma.InputJsonValue
           | undefined,
+        cillKey: body.cillKey ?? null,
       },
     });
     res.status(201).json(item);
@@ -281,6 +284,7 @@ ordersRouter.post(
           systemId: item.systemId,
           mode: item.mode as "default" | "custom",
           overrides: item.overrides as EngineOverrides | null | undefined,
+          cillKey: item.cillKey,
         }),
       );
       solved.push({ output, qty: item.qty });
@@ -295,7 +299,12 @@ ordersRouter.post(
         totalPrice: output.pricing.totals.grandTotal * item.qty,
       });
       images.push({
-        svg: item.design.imageSvg ?? item.design.svgPreview ?? output.geometry.svg,
+        // Items WITH a cill use the engine SVG (it carries the cill drawn below
+        // the frame at the real W×H); the catalog preview has neither. Items
+        // without a cill keep the catalog preview to match the gallery.
+        svg: item.cillKey
+          ? output.geometry.svg
+          : item.design.imageSvg ?? item.design.svgPreview ?? output.geometry.svg,
         caption: `${i + 1}. ${output.designName} — ${item.widthMm} × ${item.heightMm} mm${item.qty > 1 ? ` ×${item.qty}` : ""}`,
       });
       snapshotUpdates.push(
@@ -568,10 +577,15 @@ async function hydrateDocumentPreviews(orderId: string, html: string): Promise<s
     where: { orderId },
     orderBy: { id: "asc" },
     select: {
+      cillKey: true,
       design: { select: { imageSvg: true, svgPreview: true } },
     },
   });
-  const svgs = previews.map((item) => item.design.imageSvg ?? item.design.svgPreview ?? null);
+  // Items with a cill keep their baked engine SVG (it has the cill drawn);
+  // null ⇒ leave the original block untouched. Others get the catalog preview.
+  const svgs = previews.map((item) =>
+    item.cillKey ? null : item.design.imageSvg ?? item.design.svgPreview ?? null,
+  );
   let index = 0;
 
   return html.replace(/<div class="preview-svg">[\s\S]*?<\/div>/g, (block) => {
@@ -591,6 +605,7 @@ function buildQuoteInput(
     systemId: string;
     mode?: "default" | "custom";
     overrides?: EngineOverrides | null;
+    cillKey?: string | null;
   },
 ): QuoteInput {
   return {
@@ -603,5 +618,6 @@ function buildQuoteInput(
     systemId: rest.systemId,
     mode: rest.mode,
     overrides: rest.overrides ?? undefined,
+    cillKey: rest.cillKey ?? undefined,
   };
 }
