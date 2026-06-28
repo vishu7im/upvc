@@ -388,9 +388,21 @@ export default function WindowDesigner({
               <p className="text-xs font-semibold uppercase text-[#4442e3]">Properties</p>
               <p className="mt-1 truncate font-semibold text-slate-950">{panelDisplayName(selectedPanel.pathId)}</p>
             </div>
-            <span className="rounded bg-slate-100 px-2 py-1 font-mono text-[11px] font-semibold text-slate-600">
-              {selectedPanel.pathId}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-slate-100 px-2 py-1 font-mono text-[11px] font-semibold text-slate-600">
+                {selectedPanel.pathId}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedPanelId(null)}
+                aria-label="Close properties"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                  <path d="M3 3l10 10M13 3L3 13" />
+                </svg>
+              </button>
+            </div>
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
             <Property label="Width" value={`${roundMm(selectedPanel.outer.w)} mm`} />
