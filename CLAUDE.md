@@ -412,6 +412,19 @@ glass, and Gasket 02 to ≤0.6mm. Existing casement/door assertions stay green (
 change). **OOX/XOO/XO have no dedicated job** — they reuse the verified 2-/3-panel cut math (panels
 are identical width; only slide/handle assignment differs).
 
+**Drag-to-resize spans (per-panel widths).** Like casement/door transom-drag, the configurator lets
+you drag panel boundaries and read each panel's mm width. Panels carry optional per-quote share
+fractions `fᵢ` (Σ=1, default `1/n`): the sliding `CellNode` gains `boundaries?: number[]` (n−1
+cumulative daylight fractions), written by `solve.ts#applySplitRatios` from `splitRatios` keys
+`root.b{i}` (normalised: strictly increasing, min 5% share). `buildSlidingPanels` lays columns out by
+fraction and sets `panelExtᵢ = fᵢ·(W+K) − 6` (K=3 bypass / 79 OXXO) — which **reduces exactly to the
+equal calibrated formula** when `fᵢ=1/n`, so equal-panel quotes stay byte-identical (validation:
+`validateSlidingSpans()` proves equal=745.5 and a dragged b1=0.40 → 595.2/895.8 summing to 1491).
+Unequal widths are an **interpolation, flagged uncalibrated** (no unequal-panel reference job). The
+UI is `web/components/window-designer.tsx` (a sliding branch: per-panel labels + n−1 boundary
+handles); the rest of the `splitRatios` pipeline (live quote → `order_item.splitRatios` → confirm
+re-solve → docs) was already wired, so the dragged spans flow into the work order / cutting list.
+
 ## Phase 2 — UI frontend (stack confirmed: Next.js)
 
 Stack confirmed with the owner: **Next.js (React, App Router, TypeScript)**. The **Express API stays the

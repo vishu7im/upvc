@@ -392,6 +392,35 @@ function validateCustomMode(): void {
   expect("default unchanged after custom solve (Int = 1072)", def2Top?.intMm ?? -1, 1072);
 }
 
+// ---------- Sliding drag-to-resize spans ----------------------------
+// Proves: (a) equal panels (no overrides) reproduce the calibrated cut list
+// byte-identically; (b) a dragged boundary produces unequal panels via
+// panelExtᵢ = fᵢ·(W+3) − 6, whose widths still sum to the equal-case total.
+function validateSlidingSpans(): void {
+  console.log("\n==================================================");
+  console.log("Sliding patio — drag-to-resize spans (OX 1500×1750)");
+  console.log("==================================================");
+  const OX = "0057bd49-577c-4b61-bf5f-f8d69ca760b3"; // collection UUID for the OX design
+  const base = {
+    orderNo: "TEST", customer: "Validation", systemId: "sunnyplast-70",
+    designId: OX, widthMm: 1500, heightMm: 1750,
+  };
+  const sashHorWidths = (out: QuoteOutput): number[] =>
+    out.parts.bars.filter((b) => b.name === "Sliding Sash" && b.orientation === "H").map((b) => b.extMm);
+
+  // (a) equal default — byte-identical to the calibrated job.
+  const eq = sashHorWidths(solve({ ...base }));
+  expect("equal: 4 sash-H bars (2 panels)", eq.length, 4);
+  expect("equal: every panel 745.5", eq.every((w) => approxEq(w, 745.5)), true);
+
+  // (b) drag boundary b1 → 0.40: panel1 = 0.40·1503−6 = 595.2, panel2 = 895.8.
+  const dragged = sashHorWidths(solve({ ...base, splitRatios: { "root.b1": 0.4 } }));
+  expect("dragged: panel 595.2 present", dragged.some((w) => approxEq(w, 595.2)), true);
+  expect("dragged: panel 895.8 present", dragged.some((w) => approxEq(w, 895.8)), true);
+  const distinct = Array.from(new Set(dragged.map((w) => Math.round(w * 10) / 10)));
+  expect("dragged: spans sum to equal-case total 1491", distinct.reduce((a, b) => a + b, 0), 1491);
+}
+
 // ---------- Welding-shrinkage check --------------------------------
 // Proves weldedExtMm = extMm + weldAllowanceMm × weldedEndCount, that extMm is
 // UNTOUCHED (so the geometry assertions above stay valid), and that the welded-end
@@ -472,6 +501,7 @@ function validateWeldMath(): void {
   await loadCatalog();
 
   [JOB_85, JOB_88, JOB_90, JOB_104_OX, JOB_104_OXO, JOB_104_OXXO].forEach(validate);
+  validateSlidingSpans();
   validateCustomMode();
   validateWeldMath();
   validateExtractor(expect);

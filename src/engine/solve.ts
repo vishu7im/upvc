@@ -172,8 +172,21 @@ function fillDefaultGlass(node: CellNode, glassKey: string): CellNode {
  */
 function applySplitRatios(node: CellNode, ratios: Record<string, number>, pathId = "root"): CellNode {
   if (node.kind === "leaf") return node;
-  // Sliding rows have no adjustable split line — panels are equal-width.
-  if (node.kind === "sliding") return node;
+  // Sliding rows: drag-to-resize sets per-panel boundaries via "root.b{i}" keys
+  // (n−1 cumulative daylight fractions). No keys present ⇒ equal panels, returned
+  // unchanged (byte-identical to the calibrated default).
+  if (node.kind === "sliding") {
+    const n = node.panels.length;
+    const raw: number[] = [];
+    let any = false;
+    for (let i = 1; i < n; i++) {
+      const r = ratios[`${pathId}.b${i}`];
+      if (Number.isFinite(r)) any = true;
+      raw.push(Number.isFinite(r) ? (r as number) : i / n);
+    }
+    if (!any) return node;
+    return { ...node, boundaries: normalizeBoundaries(raw, n) };
+  }
   const override = ratios[pathId];
   const splitAtRatio = Number.isFinite(override)
     ? Math.min(0.98, Math.max(0.02, override))
@@ -192,4 +205,25 @@ function applySplitRatios(node: CellNode, ratios: Record<string, number>, pathId
     left: applySplitRatios(node.left, ratios, pathId + ".left"),
     right: applySplitRatios(node.right, ratios, pathId + ".right"),
   };
+}
+
+/**
+ * Clamp n−1 cumulative sliding-panel boundary fractions to be strictly
+ * increasing within (0,1) with a minimum panel share, so a drag can never
+ * collapse a panel. Left-to-right: each boundary sits ≥ MIN past the previous
+ * one and leaves ≥ MIN for every remaining panel.
+ */
+function normalizeBoundaries(raw: number[], n: number): number[] {
+  const MIN = 0.05; // minimum panel fraction of the daylight
+  const out: number[] = [];
+  let prev = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const lo = prev + MIN;
+    const hi = 1 - (raw.length - i) * MIN; // room for the remaining boundaries + last panel
+    let b = Number.isFinite(raw[i]) ? raw[i] : (i + 1) / n;
+    b = Math.min(hi, Math.max(lo, b));
+    out.push(b);
+    prev = b;
+  }
+  return out;
 }

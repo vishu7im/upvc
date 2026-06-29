@@ -54,9 +54,9 @@ export default function DesignCard({
               // First-party catalog SVG (not user input).
               dangerouslySetInnerHTML={{ __html: previewSvg }}
             />
-            <span className="absolute right-3 top-3 rounded bg-slate-900/80 px-2 py-1 text-[10px] font-semibold uppercase text-white">
+            {/* <span className="absolute right-3 top-3 rounded bg-slate-900/80 px-2 py-1 text-[10px] font-semibold uppercase text-white">
               Normalized
-            </span>
+            </span> */}
           </div>
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white/[0.70] text-slate-400">

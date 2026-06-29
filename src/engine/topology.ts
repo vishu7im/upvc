@@ -307,7 +307,17 @@ function buildSlidingPanels(
   const n = node.panels.length;
   if (n < 1) throw new Error("Sliding design needs at least one panel");
 
-  const panelExtW = node.meeting ? (windowW + 79) / n - 6 : (windowW + 3) / n - 6;
+  // Per-panel share fractions fᵢ (Σ = 1). Default equal (1/n) ⇒ the calibrated
+  // formula. Drag-to-resize supplies n−1 cumulative `boundaries` (set by
+  // applySplitRatios), from which fᵢ = bᵢ − bᵢ₋₁ (b₀=0, bₙ=1).
+  const fractions = panelFractions(node.boundaries, n);
+
+  // Total panel material span is calibrated: Σ panelExt = (W + K) − 6n
+  // (K = 3 bypass / 79 OXXO). Distribute it per fraction so panelExtᵢ =
+  // fᵢ·(W+K) − 6, which reduces to (W+K)/n − 6 when equal (verified Job 104).
+  // For unequal panels this is an interpolation (no unequal reference job) —
+  // flagged; equal panels stay byte-identical.
+  const K = node.meeting ? 79 : 3;
   const panelExtH = windowH - 79;
   const fw = sash.faceWidth;        // 85
   const rebate = sash.glassRebate;  // 15
@@ -315,7 +325,7 @@ function buildSlidingPanels(
   const beadKey = node.beadKey ?? Object.keys(system.beads)[0];
   const glassKey = node.glassKey ?? "glass-4-20-4-lowe";
 
-  const colW = bounds.w / n; // visual column per panel (preview layout only)
+  let colX = bounds.x; // running left edge; columns tile the daylight by fraction
   for (let i = 0; i < n; i++) {
     const p = node.panels[i];
     const content: SashKind =
@@ -325,7 +335,8 @@ function buildSlidingPanels(
           : "sliding-slide-left"
         : "sliding-fixed";
 
-    const colX = bounds.x + i * colW;
+    const colW = fractions[i] * bounds.w;
+    const panelExtW = fractions[i] * (windowW + K) - 6;
     const sashOuter: Rect = {
       x: colX + (colW - panelExtW) / 2,
       y: bounds.y + (bounds.h - panelExtH) / 2,
@@ -360,7 +371,29 @@ function buildSlidingPanels(
       beadIntW: sashInner.w,
       beadIntH: sashInner.h,
     });
+
+    colX += colW; // advance to the next panel column
   }
+}
+
+/**
+ * Per-panel share fractions for a sliding row. Equal `1/n` by default; when
+ * `boundaries` (n−1 cumulative fractions) are present, fᵢ = bᵢ − bᵢ₋₁ (b₀=0,
+ * bₙ=1). `boundaries` are pre-normalised (strictly increasing, min share) by
+ * `applySplitRatios`, so the fractions are always positive and sum to 1.
+ */
+function panelFractions(boundaries: number[] | undefined, n: number): number[] {
+  if (!boundaries || boundaries.length !== n - 1) {
+    return Array.from({ length: n }, () => 1 / n);
+  }
+  const out: number[] = [];
+  let prev = 0;
+  for (const b of boundaries) {
+    out.push(b - prev);
+    prev = b;
+  }
+  out.push(1 - prev);
+  return out;
 }
 
 function firstFrameRebate(system: ProfileSystem): number {

@@ -136,6 +136,35 @@ export default function WindowDesigner({
   const splits = useMemo(() => buildSolvedSplits(geometry), [geometry]);
   const cells = useMemo(() => geometry.cells ?? [], [geometry.cells]);
 
+  // Sliding patio has no transom/mullion splits — instead it's a row of n
+  // equal/unequal framed panels. We synthesise draggable boundaries between
+  // adjacent panel columns and per-panel width labels (the panels tile the
+  // daylight, so adjacent cells share an edge).
+  const isSliding = useMemo(
+    () =>
+      cells.length > 1 &&
+      splits.length === 0 &&
+      cells.every((c) => typeof c.content === "string" && c.content.startsWith("sliding-")),
+    [cells, splits],
+  );
+  // The sliding node's pathId (cells are "<base>.pN"); boundary keys are "<base>.b{i}".
+  const slidingBase = useMemo(
+    () => (cells[0]?.pathId ? cells[0].pathId.replace(/\.p\d+$/, "") : "root"),
+    [cells],
+  );
+  // Daylight extent the panel columns tile (mm): left edge of the first column to
+  // the right edge of the last. Drag fractions are measured against this.
+  const slidingDaylight = useMemo(() => {
+    if (!isSliding) return null;
+    const first = cells[0].outer;
+    const last = cells[cells.length - 1].outer;
+    const left = first.x;
+    const w = Math.max(1, last.x + last.w - left);
+    return { left, w };
+  }, [cells, isSliding]);
+  // Live drag of one interior boundary (between panel `index` and `index+1`).
+  const [slidingDrag, setSlidingDrag] = useState<{ index: number; xMm: number } | null>(null);
+
   // Solved positions (centrelines) from the engine; drag overrides only the
   // divider being moved so its handle + span labels track the cursor live while
   // the real profile stays put until the re-solve returns.
@@ -207,13 +236,41 @@ export default function WindowDesigner({
     commitSplitCenter(split, nextCenter);
   }
 
+  // ---- Sliding-panel boundary drag (between panel `index` and `index+1`) ----
+  function updateSlidingDrag(index: number, event: React.PointerEvent<SVGElement>) {
+    const point = clientPointToSvg(overlayRef.current, event.clientX, event.clientY);
+    if (!point || !slidingDaylight) return;
+    const mm = screenPointToMm(point, metrics);
+    const left = cells[index].outer.x;                                  // left neighbour edge
+    const right = cells[index + 1].outer.x + cells[index + 1].outer.w;  // right neighbour edge
+    const minGap = 0.05 * slidingDaylight.w;
+    const xMm = clamp(mm.x, left + minGap, right - minGap);
+    setSlidingDrag({ index, xMm });
+  }
+
+  function commitSlidingDrag() {
+    if (slidingDrag && slidingDaylight) {
+      const fraction = clamp((slidingDrag.xMm - slidingDaylight.left) / slidingDaylight.w, 0.02, 0.98);
+      onSplitRatioChange(`${slidingBase}.b${slidingDrag.index + 1}`, fraction);
+    }
+    setSlidingDrag(null);
+  }
+
   function handlePointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (slidingDrag) {
+      updateSlidingDrag(slidingDrag.index, event);
+      return;
+    }
     if (!drag) return;
     const split = splits.find((item) => item.pathId === drag.pathId);
     if (split) updateDragFromPointer(split, event);
   }
 
   function finishDragging() {
+    if (slidingDrag) {
+      commitSlidingDrag();
+      return;
+    }
     if (drag) {
       const split = splits.find((item) => item.pathId === drag.pathId);
       if (split) commitSplitCenter(split, drag.centerMm);
@@ -379,6 +436,93 @@ export default function WindowDesigner({
             );
           })}
         </g>
+
+        {/* Sliding patio: per-panel width labels + draggable boundary handles. */}
+        {isSliding && slidingDaylight && (
+          <g>
+            {/* Per-panel width labels (read-only) below the frame. */}
+            {cells.map((cell) => {
+              const panel = rectToScreen(cell.outer, metrics);
+              const lineY = metrics.outerRect.y + metrics.outerRect.h + INTERNAL_BASE_OFFSET_PX;
+              const widthMmValue = (cell.sashOuter ?? cell.outer).w;
+              const labelX = clampLabelX(panel.x + panel.w / 2, metrics);
+              return (
+                <g key={`slabel-${cell.pathId}`}>
+                  <line
+                    x1={panel.x}
+                    y1={lineY}
+                    x2={panel.x + panel.w}
+                    y2={lineY}
+                    stroke="#7b8490"
+                    strokeWidth="1.4"
+                    markerStart={`url(#${markerId})`}
+                    markerEnd={`url(#${markerId})`}
+                  />
+                  <line x1={panel.x} y1={lineY - 8} x2={panel.x} y2={lineY + 8} stroke="#7b8490" strokeWidth="1.2" />
+                  <line x1={panel.x + panel.w} y1={lineY - 8} x2={panel.x + panel.w} y2={lineY + 8} stroke="#7b8490" strokeWidth="1.2" />
+                  <foreignObject
+                    x={labelX - LABEL_WIDTH_PX / 2}
+                    y={clampLabelY(lineY, metrics) - LABEL_HEIGHT_PX / 2}
+                    width={LABEL_WIDTH_PX}
+                    height={LABEL_HEIGHT_PX}
+                  >
+                    <div className="flex h-[28px] w-[76px] items-center justify-center rounded border border-slate-300 bg-white px-2 text-center font-mono text-[12px] font-semibold leading-none text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.14)]">
+                      {roundMm(widthMmValue)}
+                    </div>
+                  </foreignObject>
+                </g>
+              );
+            })}
+
+            {/* Interior boundary handles (n−1) — drag to resize adjacent panels. */}
+            {cells.slice(0, -1).map((cell, index) => {
+              const xMm =
+                slidingDrag?.index === index ? slidingDrag.xMm : cell.outer.x + cell.outer.w;
+              const cx = xToScreen(xMm, metrics);
+              const top = metrics.outerRect.y;
+              const bottom = metrics.outerRect.y + metrics.outerRect.h;
+              const cy = (top + bottom) / 2;
+              const dragging = slidingDrag?.index === index;
+              const hovered = hoveredSplitId === `${slidingBase}.b${index + 1}`;
+              const active = dragging || hovered;
+              return (
+                <g
+                  key={`sbound-${index}`}
+                  onMouseEnter={() => setHoveredSplitId(`${slidingBase}.b${index + 1}`)}
+                  onMouseLeave={() =>
+                    setHoveredSplitId((current) => (current === `${slidingBase}.b${index + 1}` ? null : current))
+                  }
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    updateSlidingDrag(index, event);
+                  }}
+                  className="cursor-ew-resize"
+                >
+                  {/* full-height hit strip */}
+                  <rect x={cx - 13} y={top} width={26} height={bottom - top} fill="transparent" />
+                  {/* live guide line while dragging */}
+                  {dragging && (
+                    <line x1={cx} y1={top} x2={cx} y2={bottom} stroke="#2563eb" strokeWidth="1.5" strokeDasharray="5 4" />
+                  )}
+                  {active && (
+                    <>
+                      <rect x={cx - 12} y={cy - 32} width={24} height={64} rx="5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
+                      <path
+                        d={`M ${cx - 3} ${cy - 15} L ${cx - 11} ${cy} L ${cx - 3} ${cy + 15} M ${cx + 3} ${cy - 15} L ${cx + 11} ${cy} L ${cx + 3} ${cy + 15}`}
+                        fill="none"
+                        stroke="#ffffff"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        )}
       </svg>
 
       {selectedPanel && (
@@ -405,7 +549,16 @@ export default function WindowDesigner({
             </div>
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-            <Property label="Width" value={`${roundMm(selectedPanel.outer.w)} mm`} />
+            {/* Sliding panels: show the actual sash (panel) cut width, not the
+                visual daylight column. Other families keep the cell outer. */}
+            <Property
+              label="Width"
+              value={`${roundMm(
+                selectedPanel.content?.startsWith("sliding-") && selectedPanel.sashOuter
+                  ? selectedPanel.sashOuter.w
+                  : selectedPanel.outer.w,
+              )} mm`}
+            />
             <Property label="Height" value={`${roundMm(selectedPanel.outer.h)} mm`} />
             <Property label="Glass Type" value={glassLabel} />
             <Property label="Opening Type" value={openingLabel(selectedPanel.content)} />
@@ -850,6 +1003,9 @@ function openingLabel(content: string): string {
     "tilt-turn": "Tilt and turn",
     "door-right": "Door right",
     "door-left": "Door left",
+    "sliding-fixed": "Fixed panel",
+    "sliding-slide-left": "Sliding ←",
+    "sliding-slide-right": "Sliding →",
   };
   return labels[content] ?? content;
 }

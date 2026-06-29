@@ -298,6 +298,13 @@ export type CellNode =
       panels: { role: "fixed" | "slide"; slideDir?: "left" | "right" }[];
       /** true only for centre-meeting OXXO (two sliders meet); selects the OXXO width formula. */
       meeting?: boolean;
+      /**
+       * Per-quote unequal-span override (drag-to-resize): n−1 cumulative daylight
+       * fractions 0<b₁<…<b_{n-1}<1. Panel i's share fᵢ = bᵢ − bᵢ₋₁ (b₀=0, bₙ=1).
+       * Absent ⇒ equal panels (1/n each) ⇒ byte-identical to the calibrated default.
+       * Written by `applySplitRatios` from `splitRatios` keys "root.b{i}".
+       */
+      boundaries?: number[];
     };
 
 /** A design = a frame profile choice + a cell-tree topology + metadata. */
