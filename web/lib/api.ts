@@ -83,6 +83,8 @@ export interface QuoteRequest {
   designId: string;
   widthMm: number;
   heightMm: number;
+  /** Selected chamber (frame partKey, e.g. "frame-6ch"); omitted ⇒ design default. */
+  frameKey?: string;
   glassKey?: string;
   colourKey?: string;
   /** Selected cill key (omitted ⇒ no cill, no 30mm deduction). */
@@ -107,7 +109,7 @@ export function createOrder(body: {
 
 export function addOrderItem(
   orderId: string,
-  item: { productId: string; designId: string; widthMm: number; heightMm: number; qty?: number; cillKey?: string; splitRatios?: Record<string, number> },
+  item: { productId: string; designId: string; widthMm: number; heightMm: number; qty?: number; frameKey?: string; cillKey?: string; splitRatios?: Record<string, number> },
 ): Promise<unknown> {
   return apiSend(`/api/orders/${orderId}/items`, "POST", item);
 }

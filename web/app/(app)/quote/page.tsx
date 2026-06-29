@@ -23,20 +23,21 @@ export default async function QuotePage({
   }>;
 }) {
   const sp = await searchParams;
-  const designSvg = sp.designId
-    ? await serverApiGet<DesignDetail>(`/api/designs/${sp.designId}`)
-        .then((design) => design.imageSvg)
-        .catch(() => null)
+  const detail = sp.designId
+    ? await serverApiGet<DesignDetail>(`/api/designs/${sp.designId}`).catch(() => null)
     : null;
 
   return (
     <Configurator
+      // Remount per design so the chamber default (and other per-design state) resets.
+      key={sp.designId ?? "none"}
       systemId={sp.systemId}
       designId={sp.designId}
       productId={sp.productId}
       designName={sp.name}
       orderId={sp.orderId}
-      designSvg={designSvg}
+      designSvg={detail?.imageSvg ?? null}
+      designFrameKey={detail?.frameKey ?? null}
     />
   );
 }

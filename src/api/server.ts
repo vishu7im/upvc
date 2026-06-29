@@ -59,6 +59,8 @@ app.get("/api/systems/:id/options", (req, res) => {
   const sys = getSystem(req.params.id);
   if (!sys) return res.status(404).json({ error: `Unknown system: ${req.params.id}` });
   res.json({
+    // Chamber options = the system's frame profiles (e.g. 5ch / 6ch).
+    chambers: Object.entries(sys.frames).map(([key, f]) => ({ key, name: f.name })),
     glass: Object.entries(sys.glass).map(([key, g]) => ({ key, name: g.name })),
     colours: Object.values(sys.colours ?? {}).map((c) => ({
       key: c.key,

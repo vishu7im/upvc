@@ -171,6 +171,7 @@ const addItemSchema = z.object({
   mode: z.enum(["default", "custom"]).optional(),
   overrides: z.any().optional(),
   splitRatios: z.record(z.string(), z.number()).optional(),
+  frameKey: z.string().optional(),
   cillKey: z.string().optional(),
 });
 
@@ -206,6 +207,7 @@ ordersRouter.post(
           mode: body.mode,
           overrides: body.overrides as EngineOverrides | undefined,
           splitRatios: body.splitRatios,
+          frameKey: body.frameKey,
           cillKey: body.cillKey,
         }),
       );
@@ -232,6 +234,7 @@ ordersRouter.post(
         splitRatios: (body.splitRatios ?? undefined) as
           | Prisma.InputJsonValue
           | undefined,
+        frameKey: body.frameKey ?? null,
         cillKey: body.cillKey ?? null,
       },
     });
@@ -293,6 +296,7 @@ ordersRouter.post(
             | Record<string, number>
             | null
             | undefined,
+          frameKey: item.frameKey,
           cillKey: item.cillKey,
         }),
       );
@@ -620,6 +624,7 @@ function buildQuoteInput(
     mode?: "default" | "custom";
     overrides?: EngineOverrides | null;
     splitRatios?: Record<string, number> | null;
+    frameKey?: string | null;
     cillKey?: string | null;
   },
 ): QuoteInput {
@@ -634,6 +639,7 @@ function buildQuoteInput(
     mode: rest.mode,
     overrides: rest.overrides ?? undefined,
     splitRatios: rest.splitRatios ?? undefined,
+    frameKey: rest.frameKey ?? undefined,
     cillKey: rest.cillKey ?? undefined,
   };
 }

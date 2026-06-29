@@ -37,6 +37,8 @@ export interface ConfiguratorProps {
   systemId?: string;
   orderId?: string;
   designSvg?: string | null;
+  /** The design's baked frame profile (chamber); pre-selects the Chamber dropdown. */
+  designFrameKey?: string | null;
 }
 
 export default function Configurator(props: ConfiguratorProps) {
@@ -50,6 +52,9 @@ export default function Configurator(props: ConfiguratorProps) {
   const [height, setHeight] = useState(1200);
   const [glassKey, setGlassKey] = useState("");
   const [colourKey, setColourKey] = useState("");
+  // Per-quote chamber selection. Defaults to the design's baked frame; switching
+  // it swaps the frame profile (e.g. 5ch→6ch faceWidth) for the whole quote.
+  const [chamberKey, setChamberKey] = useState(props.designFrameKey ?? "");
   // Per-quote cill selection. "" ⇒ no cill (no 30mm manufacturing-height deduction).
   const [cillKey, setCillKey] = useState("");
   // Per-quote internal split overrides (multi-span editing), keyed by split-node
@@ -117,6 +122,7 @@ export default function Configurator(props: ConfiguratorProps) {
       designId: props.designId,
       widthMm: width,
       heightMm: height,
+      frameKey: chamberKey || undefined,
       glassKey: glassKey || undefined,
       colourKey: colourKey || undefined,
       cillKey: cillKey || undefined,
@@ -132,7 +138,7 @@ export default function Configurator(props: ConfiguratorProps) {
         showToast("invalid");
       })
       .finally(() => setLoading(false));
-  }, [props.designId, systemId, width, height, glassKey, colourKey, cillKey, splitRatios, showToast]);
+  }, [props.designId, systemId, width, height, chamberKey, glassKey, colourKey, cillKey, splitRatios, showToast]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -153,6 +159,9 @@ export default function Configurator(props: ConfiguratorProps) {
       widthMm: width,
       heightMm: height,
       qty,
+      // Persist the chamber only when it differs from the design default
+      // (omit when equal ⇒ the saved item re-solves byte-identically).
+      frameKey: chamberKey && chamberKey !== props.designFrameKey ? chamberKey : undefined,
       cillKey: cillKey || undefined,
       splitRatios: Object.keys(splitRatios).length ? splitRatios : undefined,
     };
@@ -283,6 +292,19 @@ export default function Configurator(props: ConfiguratorProps) {
                 </div>
               </label>
             </div>
+
+            {options?.chambers && options.chambers.length > 0 && (
+              <label className="block">
+                <FieldLabel>Chamber</FieldLabel>
+                <select value={chamberKey} onChange={(e) => setChamberKey(e.target.value)} className={selectClass}>
+                  {options.chambers.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             <label className="block">
               <FieldLabel>Glass</FieldLabel>

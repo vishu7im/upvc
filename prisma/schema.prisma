@@ -321,6 +321,7 @@ model OrderItem {
   mode      String @default("default") // "default" | "custom"
   overrides Json? // EngineOverrides when mode === "custom"
   splitRatios Json? // per-quote span-drag overrides (Record<pathId, ratio>); null ⇒ default geometry
+  frameKey  String? // per-quote chamber override (frame partKey, e.g. "frame-6ch"); null ⇒ design's baked frame
   cillKey   String? // selected cill Record key (null ⇒ no cill). Drives the 30mm deduction + cill render in confirmed docs.
   pricingSnapshot Json? // totals captured at confirm
 

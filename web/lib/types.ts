@@ -62,6 +62,8 @@ export interface DesignDetail {
 
 /** GET /api/systems/:id/options — selectable glass + colours + cills (U3). */
 export interface SystemOptions {
+  /** Selectable frame profiles (chambers, e.g. 5ch / 6ch). */
+  chambers?: { key: string; name: string }[];
   glass: { key: string; name: string }[];
   colours: { key: string; name: string; priceUpliftPct: number }[];
   cills?: { key: string; name: string; projectionMm: number }[];

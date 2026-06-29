@@ -50,6 +50,14 @@ export function solve(input: QuoteInput): QuoteOutput {
     design = { ...baseDesign, topology: fillDefaultGlass(baseDesign.topology, input.glassKey) };
   }
 
+  // Per-quote chamber selection. Swap the design's frame profile (e.g. 5ch→6ch);
+  // solveTopology/bars then derive all geometry from the chosen frame's faceWidth.
+  // Omitted (or == design default) ⇒ no clone, byte-identical (the 157 assertions hold).
+  if (input.frameKey && input.frameKey !== design.frameKey) {
+    if (!system.frames[input.frameKey]) throw new Error(`Unknown frame: ${input.frameKey}`);
+    design = { ...design, frameKey: input.frameKey };
+  }
+
   // Per-quote internal split overrides (multi-span editing). Re-position each
   // transom/mullion split by its node pathId. Omitted/empty ⇒ design's baked
   // splits, so the quote stays byte-identical (and the 157 assertions hold).

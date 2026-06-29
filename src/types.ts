@@ -519,6 +519,13 @@ export interface QuoteInput {
    */
   glassKey?: string;
   /**
+   * Per-quote chamber selection. Frame `partKey` (e.g. "frame-5ch" / "frame-6ch")
+   * to swap the design's frame profile; the engine derives geometry from the
+   * chosen frame's faceWidth. Omitted (or == the design's baked `frameKey`) ⇒ the
+   * design default, so a quote without it is byte-identical.
+   */
+  frameKey?: string;
+  /**
    * Per-quote colour/finish selection (U3). Colour `key` whose % uplift applies
    * to the visible profiles at pricing time. Omitted ⇒ system `defaultColourKey`
    * (base White = 0%), so a quote without it is byte-identical to pre-U3.
