@@ -9,3 +9,6 @@ prisma/migrations/dev.db*
 # Local Postgres data (if run outside docker)
 pgdata/
 
+# Local-only docs (not for the repo)
+ENGINE_ARCHITECTURE.md
+
