@@ -1,0 +1,23 @@
+4tis.vishu.dev {
+	reverse_proxy web:3000
+	encode gzip
+}
+pgadmin.vishu.dev {
+    reverse_proxy fabricatoros_pgadmin:80
+}
+
+minio.vishu.dev {
+    reverse_proxy fabricatoros_minio:9000
+}
+
+minio-console.vishu.dev {
+    reverse_proxy fabricatoros_minio:9001
+}
+
+upvc.vishu.dev {
+reverse_proxy upvc-frontend:3000
+}
+
+api-upvc.vishu.dev {
+reverse_proxy upvc-backend:3005
+}

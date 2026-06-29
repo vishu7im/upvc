@@ -93,9 +93,32 @@ services:
       - upvc-network
       - shared_proxy_network
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: upvc-caddy
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - upvc_caddy_data:/data
+      - upvc_caddy_config:/config
+    networks:
+      - upvc-network
+      - shared_proxy_network
+
 volumes:
   upvc_pgdata:
   upvc_miniodata:
+  upvc_caddy_data:
+  upvc_caddy_config:
 
 networks:
   upvc-network:
