@@ -107,7 +107,7 @@ export function createOrder(body: {
 
 export function addOrderItem(
   orderId: string,
-  item: { productId: string; designId: string; widthMm: number; heightMm: number; qty?: number; cillKey?: string },
+  item: { productId: string; designId: string; widthMm: number; heightMm: number; qty?: number; cillKey?: string; splitRatios?: Record<string, number> },
 ): Promise<unknown> {
   return apiSend(`/api/orders/${orderId}/items`, "POST", item);
 }

@@ -141,7 +141,7 @@ function header(input: QuoteInput, title: string, systemName: string, designName
       <b>Print Date:</b><span>${today}</span>
       <b>System:</b><span>${esc(systemName)}</span>
       <b>Design:</b><span>${esc(designName)}</span>
-      <b>Width × Height:</b><span>${input.widthMm} × ${input.heightMm} mm</span>
+      <b>Width × Height:</b><span>${input.widthMm > 0 && input.heightMm > 0 ? `${input.widthMm} × ${input.heightMm} mm` : "—"}</span>
       <b>Quote#:</b><span>${esc(input.orderNo)}</span>${cillRows(cill)}
     </div>
     ${previewBand(images)}

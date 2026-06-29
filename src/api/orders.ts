@@ -170,6 +170,7 @@ const addItemSchema = z.object({
   qty: z.number().int().positive().optional(),
   mode: z.enum(["default", "custom"]).optional(),
   overrides: z.any().optional(),
+  splitRatios: z.record(z.string(), z.number()).optional(),
   cillKey: z.string().optional(),
 });
 
@@ -204,6 +205,7 @@ ordersRouter.post(
           systemId: product.systemId,
           mode: body.mode,
           overrides: body.overrides as EngineOverrides | undefined,
+          splitRatios: body.splitRatios,
           cillKey: body.cillKey,
         }),
       );
@@ -225,6 +227,9 @@ ordersRouter.post(
         qty: body.qty ?? 1,
         mode: body.mode ?? "default",
         overrides: (body.overrides ?? undefined) as
+          | Prisma.InputJsonValue
+          | undefined,
+        splitRatios: (body.splitRatios ?? undefined) as
           | Prisma.InputJsonValue
           | undefined,
         cillKey: body.cillKey ?? null,
@@ -284,6 +289,10 @@ ordersRouter.post(
           systemId: item.systemId,
           mode: item.mode as "default" | "custom",
           overrides: item.overrides as EngineOverrides | null | undefined,
+          splitRatios: item.splitRatios as
+            | Record<string, number>
+            | null
+            | undefined,
           cillKey: item.cillKey,
         }),
       );
@@ -299,12 +308,14 @@ ordersRouter.post(
         totalPrice: output.pricing.totals.grandTotal * item.qty,
       });
       images.push({
-        // Items WITH a cill use the engine SVG (it carries the cill drawn below
-        // the frame at the real W×H); the catalog preview has neither. Items
-        // without a cill keep the catalog preview to match the gallery.
-        svg: item.cillKey
-          ? output.geometry.svg
-          : item.design.imageSvg ?? item.design.svgPreview ?? output.geometry.svg,
+        // Items WITH a cill or span-drag overrides use the engine SVG (it carries
+        // the cill drawn below the frame and/or the custom span geometry at the
+        // real W×H); the catalog preview reflects neither. Items with neither keep
+        // the catalog preview to match the gallery.
+        svg:
+          item.cillKey || item.splitRatios
+            ? output.geometry.svg
+            : item.design.imageSvg ?? item.design.svgPreview ?? output.geometry.svg,
         caption: `${i + 1}. ${output.designName} — ${item.widthMm} × ${item.heightMm} mm${item.qty > 1 ? ` ×${item.qty}` : ""}`,
       });
       snapshotUpdates.push(
@@ -320,14 +331,17 @@ ordersRouter.post(
 
     // Order-level aggregation (multi-window).
     const agg = aggregateOrder(solved, system, settings);
+    // Single-item orders carry that item's real W×H in the shared header;
+    // genuine multi-window orders have no single dimension, so 0/0 ⇒ the header
+    // renders "—" (each line's own W×H still shows in the preview-band captions).
     const synth = buildQuoteInput(
       order.orderNo,
       order.customerName,
       order.reference,
       {
         designId: "",
-        widthMm: 0,
-        heightMm: 0,
+        widthMm: items.length === 1 ? items[0].widthMm : 0,
+        heightMm: items.length === 1 ? items[0].heightMm : 0,
         systemId,
       },
     );
@@ -605,6 +619,7 @@ function buildQuoteInput(
     systemId: string;
     mode?: "default" | "custom";
     overrides?: EngineOverrides | null;
+    splitRatios?: Record<string, number> | null;
     cillKey?: string | null;
   },
 ): QuoteInput {
@@ -618,6 +633,7 @@ function buildQuoteInput(
     systemId: rest.systemId,
     mode: rest.mode,
     overrides: rest.overrides ?? undefined,
+    splitRatios: rest.splitRatios ?? undefined,
     cillKey: rest.cillKey ?? undefined,
   };
 }

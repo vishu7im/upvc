@@ -154,6 +154,7 @@ export default function Configurator(props: ConfiguratorProps) {
       heightMm: height,
       qty,
       cillKey: cillKey || undefined,
+      splitRatios: Object.keys(splitRatios).length ? splitRatios : undefined,
     };
     try {
       let orderId = props.orderId;
