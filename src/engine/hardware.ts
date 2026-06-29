@@ -101,6 +101,24 @@ export function computeHardware(
       add("hw-cylinder-brass", 1, "cylinder");
       add("hw-keep-lh", 1, "L/H keep set");
       add("hw-runup-block", 1, "door run-up block");
+    } else if (c.startsWith("sliding-")) {
+      // SLIDING PATIO — calibrated from Job 104 (yogi test 1–4).
+      // Bridge packers per panel: APPROXIMATE (~4/panel; not cleanly
+      // geometry-derived — flagged like the glazing-bridge-packer rule).
+      add("hw-bridge-packer", 4, "bridge packers per panel (approx)");
+      if (c === "sliding-fixed") {
+        // 7 fixed-panel supports per FIXED panel (Job 104: 1 fixed→7, 2 fixed→14).
+        add("hw-fixed-panel-support", 7, "7 fixed-panel supports per fixed panel");
+      } else {
+        // sliding-slide-left / sliding-slide-right — per SLIDING panel.
+        add("hw-patio-handle-white", 1, "patio handle");
+        add("hw-cylinder-brass", 1, "patio cylinder");
+        add("hw-patio-lock-keep", 1, "patio lock & keep set");
+        add("hw-patio-roller", 2, "2 patio rollers per sliding panel");
+        add("hw-panel-stopper", 1, "panel stopper");
+        add("hw-brush-top", 1, "top brush block");
+        add("hw-brush-bottom", 1, "bottom brush block");
+      }
     }
   }
 

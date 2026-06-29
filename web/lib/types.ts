@@ -57,6 +57,9 @@ export interface DesignDetail {
   quantityOfSquares: number;
   externalId: string | null;
   hasTopology: boolean;
+  /** Per-design default manufacturing size (mm); preloads the configurator. */
+  defaultWidthMm: number | null;
+  defaultHeightMm: number | null;
   imageSvg: string | null;
 }
 

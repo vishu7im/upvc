@@ -23,8 +23,9 @@ import { DESIGNS } from "../src/catalog/designs.ts";
 import { solveTopology } from "../src/engine/topology.ts";
 import { renderSvg } from "../src/engine/svg.ts";
 import { DERIVED } from "../src/catalog/derived-topologies.generated.ts";
+import { SLIDING_DESIGNS } from "../src/catalog/sliding-designs.ts";
 import { DEFAULT_SETTINGS } from "../src/catalog/settings.ts";
-import type { ProfileSystem } from "../src/types.ts";
+import type { Design, ProfileSystem } from "../src/types.ts";
 
 const prisma = new PrismaClient();
 
@@ -40,9 +41,13 @@ const COLLECTIONS = join(__dirname, "..", "collections");
  * quote. The multi-panel sidelight door needs extra width for sidelight + door
  * + toplights to render without crowding.
  */
-function previewDimsFor(designId: string, productType: string): [number, number] {
-  if (designId === "door-sidelight-toplights") return [1800, 2100];
-  if (productType === "door") return [1000, 2100];
+function previewDimsFor(d: Design): [number, number] {
+  // A design's own default dimensions win when present (no more 1200×1200 guess).
+  if (d.defaultWidthMm != null && d.defaultHeightMm != null) {
+    return [d.defaultWidthMm, d.defaultHeightMm];
+  }
+  if (d.designId === "door-sidelight-toplights") return [1800, 2100];
+  if (d.productType === "door") return [1000, 2100];
   return [1200, 1200];
 }
 
@@ -265,7 +270,7 @@ async function main() {
   // (solveTopology → renderSvg), so they don't show imageless in the UI.
   // Preview-only dimensions — they never affect a real quote.
   for (const d of DESIGNS) {
-    const [w, h] = previewDimsFor(d.designId, d.productType);
+    const [w, h] = previewDimsFor(d);
     const imageSvg = renderSvg(solveTopology(d, w, h, SUNNYPLAST_70));
     await prisma.design.upsert({
       where: { designId: d.designId },
@@ -318,6 +323,7 @@ async function main() {
   await importCollectionsDesigns();
   await linkEngineDesigns();
   await applyDerivedTopologies();
+  await applySlidingTopologies();
   await seedAdminUser();
 
   // Quick summary so the operator can eyeball the counts.
@@ -477,6 +483,35 @@ async function applyDerivedTopologies() {
     quotableCount += chunk.filter(([, e]) => e.quotable).length;
   }
   console.log(`Applied ${entries.length} derived topologies (${quotableCount} quotable).`);
+}
+
+/**
+ * Sliding Patio (product 73679b0a-…): the 7 collection designs are hand-authored
+ * (src/catalog/sliding-designs.ts), matched by externalId. Each gets a sliding
+ * topology, frameKey="frame-sliding", quotable=true, and per-config default
+ * dimensions from the Job 104 work orders. The engine reproduces those cutting
+ * lists to ≤0.6mm (see src/validation/jobs.ts). The collection imageSvg is left
+ * untouched (it's the gallery art); the live at-size preview uses renderSvg.
+ */
+async function applySlidingTopologies() {
+  let applied = 0;
+  for (const d of SLIDING_DESIGNS) {
+    const updated = await prisma.design.updateMany({
+      where: { externalId: d.externalId },
+      data: {
+        topology: d.topology as unknown as Prisma.InputJsonValue,
+        frameKey: "frame-sliding",
+        quotable: true,
+        defaultWidthMm: d.defaultWidthMm,
+        defaultHeightMm: d.defaultHeightMm,
+      },
+    });
+    applied += updated.count;
+    if (updated.count === 0) {
+      console.warn(`  ! sliding design not found by externalId ${d.externalId} (${d.config})`);
+    }
+  }
+  console.log(`Applied ${applied} sliding-patio topologies (quotable).`);
 }
 
 /** One admin user (only if no users exist yet). */

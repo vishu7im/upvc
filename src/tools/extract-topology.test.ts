@@ -22,11 +22,13 @@ const VALID_CONTENT = new Set<SashKind>([
 
 function eachLeaf(n: CellNode, fn: (cell: { content: SashKind; sashKey?: string }) => void): void {
   if (n.kind === "leaf") { fn(n.cell); return; }
+  if (n.kind === "sliding") return; // the extractor never emits sliding nodes
   if (n.kind === "hsplit") { eachLeaf(n.top, fn); eachLeaf(n.bottom, fn); }
   else { eachLeaf(n.left, fn); eachLeaf(n.right, fn); }
 }
 function leafCount(n: CellNode): number {
   if (n.kind === "leaf") return 1;
+  if (n.kind === "sliding") return n.panels.length;
   return n.kind === "hsplit" ? leafCount(n.top) + leafCount(n.bottom) : leafCount(n.left) + leafCount(n.right);
 }
 

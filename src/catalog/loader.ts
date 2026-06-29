@@ -227,6 +227,8 @@ export async function loadCatalog(): Promise<void> {
     frameKey: d.frameKey,
     topology: d.topology as unknown as CellNode,
     ...(d.svgPreview ? { svgPreview: d.svgPreview } : {}),
+    ...(d.defaultWidthMm != null ? { defaultWidthMm: d.defaultWidthMm } : {}),
+    ...(d.defaultHeightMm != null ? { defaultHeightMm: d.defaultHeightMm } : {}),
   }));
 
   const dbSettings = await prisma.setting.findUnique({ where: { id: 1 } });

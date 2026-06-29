@@ -175,6 +175,100 @@ const JOB_90: ExpectedJob = {
   ],
 };
 
+// ---------- SLIDING PATIO jobs (Job 104 — yogi test 1, 2, 4) ---------
+// Calibrated from the supplied patio-docs/ work orders + cutting lists (all
+// height 1750). Frame face 48, sash face 85, bead face 20, glass rebate 15,
+// reinforcement = bar Int − 10 (endClearance 5/end). Panel width:
+//   bypass (W+3)/n − 6  [OX/OXO];  centre-meeting (W+79)/4 − 6  [OXXO].
+// designIds are the collection design UUIDs (the seed attaches the topology by
+// externalId == designId). Reinforcement int == ext (square-cut steel).
+
+const JOB_104_OX: ExpectedJob = {
+  name: "Job 104 OX: 1500×1750 sliding patio (2-panel: 1 fixed + 1 slide)",
+  designId: "0057bd49-577c-4b61-bf5f-f8d69ca760b3",
+  widthMm: 1500,
+  heightMm: 1750,
+  bars: [
+    // Frame (face 48)
+    { code: "SPQ-SL-FRAME", ext: 1500, int: 1404, orientation: "H" },
+    { code: "SPQ-SL-FRAME", ext: 1750, int: 1654, orientation: "V" },
+    // Sash (face 85) — both panels cut identically
+    { code: "SPQ-SL-SASH", ext: 745.5, int: 575.5, orientation: "H" },
+    { code: "SPQ-SL-SASH", ext: 1671,  int: 1501,  orientation: "V" },
+    // Beads (face 20)
+    { code: "BEAD-28", ext: 615.5, int: 575.5, orientation: "H" },
+    { code: "BEAD-28", ext: 1541,  int: 1501,  orientation: "V" },
+    // Frame reinforcement 44×12 (= frameInt − 10)
+    { code: "REINF-44x12", ext: 1394, int: 1394, orientation: "H" },
+    { code: "REINF-44x12", ext: 1644, int: 1644, orientation: "V" },
+    // Sash reinforcement 25×27 U (= sashInt − 10)
+    { code: "REINF-25x27-U", ext: 565.5, int: 565.5, orientation: "H" },
+    { code: "REINF-25x27-U", ext: 1491,  int: 1491,  orientation: "V" },
+  ],
+  glass: [{ width: 606, height: 1531 }],
+  gaskets: [{ code: "GKT-02", lengthMm: 8546 }], // Σ glass perimeter (exact)
+  hardware: [
+    { code: "SL-FIX-SUP",  qty: 7 },  // 1 fixed panel × 7
+    { code: "SL-HDL-W",    qty: 1 },  // 1 slider
+    { code: "DR-CYL-BR",   qty: 1 },
+    { code: "SL-LOCK-KEEP", qty: 1 },
+    { code: "SL-ROLLER",   qty: 2 },
+  ],
+};
+
+const JOB_104_OXO: ExpectedJob = {
+  name: "Job 104 OXO: 2000×1750 sliding patio (3-panel)",
+  designId: "8a1b8a80-e31a-4f0b-aa62-2771e04ec985",
+  widthMm: 2000,
+  heightMm: 1750,
+  bars: [
+    { code: "SPQ-SL-FRAME", ext: 2000, int: 1904, orientation: "H" },
+    { code: "SPQ-SL-FRAME", ext: 1750, int: 1654, orientation: "V" },
+    { code: "SPQ-SL-SASH", ext: 661.7, int: 491.7, orientation: "H" },
+    { code: "SPQ-SL-SASH", ext: 1671,  int: 1501,  orientation: "V" },
+    { code: "BEAD-28", ext: 531.7, int: 491.7, orientation: "H" },
+    { code: "BEAD-28", ext: 1541,  int: 1501,  orientation: "V" },
+    { code: "REINF-44x12", ext: 1894, int: 1894, orientation: "H" },
+    { code: "REINF-44x12", ext: 1644, int: 1644, orientation: "V" },
+    { code: "REINF-25x27-U", ext: 481.7, int: 481.7, orientation: "H" },
+    { code: "REINF-25x27-U", ext: 1491,  int: 1491,  orientation: "V" },
+  ],
+  glass: [{ width: 522, height: 1531 }],
+  gaskets: [{ code: "GKT-02", lengthMm: 12316 }],
+  hardware: [
+    { code: "SL-FIX-SUP", qty: 14 }, // 2 fixed panels × 7
+    { code: "SL-HDL-W",   qty: 1 },  // 1 slider
+    { code: "SL-ROLLER",  qty: 2 },
+  ],
+};
+
+const JOB_104_OXXO: ExpectedJob = {
+  name: "Job 104 OXXO: 2600×1750 sliding patio (4-panel, centre-meeting)",
+  designId: "bd0ad364-3313-442d-871f-db7fab0502c4",
+  widthMm: 2600,
+  heightMm: 1750,
+  bars: [
+    { code: "SPQ-SL-FRAME", ext: 2600, int: 2504, orientation: "H" },
+    { code: "SPQ-SL-FRAME", ext: 1750, int: 1654, orientation: "V" },
+    // OXXO panel width = (2600+79)/4 − 6 = 663.75 → 663.8 (matches PDF 663.7/663.8)
+    { code: "SPQ-SL-SASH", ext: 663.8, int: 493.8, orientation: "H" },
+    { code: "SPQ-SL-SASH", ext: 1671,  int: 1501,  orientation: "V" },
+    { code: "BEAD-28", ext: 533.8, int: 493.8, orientation: "H" },
+    { code: "BEAD-28", ext: 1541,  int: 1501,  orientation: "V" },
+    { code: "REINF-44x12", ext: 2494, int: 2494, orientation: "H" },
+    { code: "REINF-44x12", ext: 1644, int: 1644, orientation: "V" },
+    { code: "REINF-25x27-U", ext: 483.8, int: 483.8, orientation: "H" },
+    { code: "REINF-25x27-U", ext: 1491,  int: 1491,  orientation: "V" },
+  ],
+  glass: [{ width: 524, height: 1531 }],
+  gaskets: [{ code: "GKT-02", lengthMm: 16438 }],
+  hardware: [
+    { code: "SL-FIX-SUP", qty: 14 }, // 2 fixed panels × 7
+    { code: "SL-HDL-W",   qty: 2 },  // 2 sliders
+    { code: "SL-ROLLER",  qty: 4 },  // 2 per slider
+  ],
+};
+
 // ---------- runner ---------------------------------------------------
 
 let passCount = 0, failCount = 0;
@@ -208,10 +302,13 @@ function validate(job: ExpectedJob): void {
     systemId: "sunnyplast-70",
   });
 
-  // --- Bars: each expected bar must exist (by code + Ext + orientation)
+  // --- Bars: each expected bar must exist (by code + Ext + orientation).
+  // Search profiles AND reinforcement (reinforcement lives in a separate array
+  // but is also a cut bar; sliding-patio jobs assert reinforcement lengths).
   console.log("\n[Bars]");
+  const allBars = [...result.parts.bars, ...result.parts.reinforcement];
   for (const expected of job.bars) {
-    const matches = result.parts.bars.filter(
+    const matches = allBars.filter(
       (b) => b.code === expected.code &&
              approxEq(b.extMm, expected.ext) &&
              (!expected.orientation || b.orientation === expected.orientation)
@@ -374,7 +471,7 @@ function validateWeldMath(): void {
 (async () => {
   await loadCatalog();
 
-  [JOB_85, JOB_88, JOB_90].forEach(validate);
+  [JOB_85, JOB_88, JOB_90, JOB_104_OX, JOB_104_OXO, JOB_104_OXXO].forEach(validate);
   validateCustomMode();
   validateWeldMath();
   validateExtractor(expect);

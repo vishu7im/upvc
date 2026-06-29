@@ -260,6 +260,7 @@ function buildTree(cells: ClassifiedCell[], ctx: BuildCtx): CellNode {
 function round4(n: number): number { return Math.round(n * 10000) / 10000; }
 function leafCount(n: CellNode): number {
   if (n.kind === "leaf") return 1;
+  if (n.kind === "sliding") return n.panels.length;
   return n.kind === "hsplit" ? leafCount(n.top) + leafCount(n.bottom) : leafCount(n.left) + leafCount(n.right);
 }
 

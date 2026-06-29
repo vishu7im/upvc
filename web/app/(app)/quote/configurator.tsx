@@ -39,7 +39,14 @@ export interface ConfiguratorProps {
   designSvg?: string | null;
   /** The design's baked frame profile (chamber); pre-selects the Chamber dropdown. */
   designFrameKey?: string | null;
+  /** The design's default manufacturing size (mm); preloads Width/Height. */
+  defaultWidthMm?: number | null;
+  defaultHeightMm?: number | null;
 }
+
+// Fallback when a design carries no stored default dimensions.
+const FALLBACK_WIDTH_MM = 1200;
+const FALLBACK_HEIGHT_MM = 1200;
 
 export default function Configurator(props: ConfiguratorProps) {
   const router = useRouter();
@@ -48,8 +55,10 @@ export default function Configurator(props: ConfiguratorProps) {
   const [systemId, setSystemId] = useState(props.systemId ?? "");
   const [options, setOptions] = useState<SystemOptions | null>(null);
 
-  const [width, setWidth] = useState(1200);
-  const [height, setHeight] = useState(1200);
+  // Preload the design's stored default dimensions (page remounts per design via
+  // `key`, so these initial values are correct for each design).
+  const [width, setWidth] = useState(props.defaultWidthMm ?? FALLBACK_WIDTH_MM);
+  const [height, setHeight] = useState(props.defaultHeightMm ?? FALLBACK_HEIGHT_MM);
   const [glassKey, setGlassKey] = useState("");
   const [colourKey, setColourKey] = useState("");
   // Per-quote chamber selection. Defaults to the design's baked frame; switching

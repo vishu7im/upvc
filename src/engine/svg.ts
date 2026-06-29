@@ -138,6 +138,10 @@ function openingSymbol(c: SolvedCell): string | null {
     // Tilt&turn: turn (side hinge) + tilt (bottom hinge) marks, conventionally
     // drawn together.
     case "tilt-turn":                          chevrons = [hingeLeft(), tiltUp()]; break;
+    // Sliding patio: chevron points in the panel's travel direction. Fixed
+    // sliding panels (sliding-fixed) draw no symbol (fall through to default).
+    case "sliding-slide-left":                 chevrons = [hingeLeft()]; break;
+    case "sliding-slide-right":                chevrons = [hingeRight()]; break;
     default: return null;
   }
 

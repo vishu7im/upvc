@@ -21,6 +21,7 @@ import type {
   Design,
   ProfileSystem,
   Rect,
+  SashKind,
   SolvedCell,
   SolvedGeometry,
   SolvedMullion,
@@ -85,6 +86,11 @@ function walk(
 ): void {
   if (node.kind === "leaf") {
     out.cells.push(buildLeafCell(node, pathId, bounds, system));
+    return;
+  }
+
+  if (node.kind === "sliding") {
+    buildSlidingPanels(node, pathId, bounds, system, out, windowW, windowH);
     return;
   }
 
@@ -267,6 +273,94 @@ function buildLeafCell(
     beadIntW,
     beadIntH,
   };
+}
+
+// ---------------------------------------------------------------------
+// SLIDING PATIO — a single row of `n` equal-width framed panels.
+//
+// Calibrated against Job 104 (yogi test 1–4), height 1750:
+//   • Frame face 48 (handled by the frame profile in emitFrameBars).
+//   • Panel outer width (Ext):
+//       bypass (OX/XO/OXO/OOX/XOO):  (W + 3)/n − 6     [exact for n=2 and n=3]
+//       centre-meeting (OXXO):       (W + 79)/4 − 6     [n=4 — SINGLE data point;
+//         reproduces the 2600-wide job exactly but its W-scaling is UNVERIFIED.
+//         Needs a 2nd OXXO job at another width before trusting other sizes.]
+//   • Panel outer height (Ext): H − 79  (sash engages frame head/sill 8.5mm/side).
+//   • Sash face 85 ⇒ sash Int = Ext − 170; glass rebate 15 ⇒ glass = beadInt + 30.
+// Every panel (fixed or sliding) is cut identically — only hardware (hardware.ts)
+// and the SVG slide arrow (svg.ts) differ, via the cell `content`.
+//
+// Panels are laid out left→right across the daylight for the PREVIEW only; cut
+// lengths use the explicit panel envelope (panelExtW/H), never the x position.
+// ---------------------------------------------------------------------
+function buildSlidingPanels(
+  node: Extract<CellNode, { kind: "sliding" }>,
+  pathId: string,
+  bounds: Rect,
+  system: ProfileSystem,
+  out: SolvedGeometry,
+  windowW: number,
+  windowH: number,
+): void {
+  const sash = system.sashes[node.sashKey];
+  if (!sash) throw new Error(`Unknown sliding sash: ${node.sashKey}`);
+  const n = node.panels.length;
+  if (n < 1) throw new Error("Sliding design needs at least one panel");
+
+  const panelExtW = node.meeting ? (windowW + 79) / n - 6 : (windowW + 3) / n - 6;
+  const panelExtH = windowH - 79;
+  const fw = sash.faceWidth;        // 85
+  const rebate = sash.glassRebate;  // 15
+
+  const beadKey = node.beadKey ?? Object.keys(system.beads)[0];
+  const glassKey = node.glassKey ?? "glass-4-20-4-lowe";
+
+  const colW = bounds.w / n; // visual column per panel (preview layout only)
+  for (let i = 0; i < n; i++) {
+    const p = node.panels[i];
+    const content: SashKind =
+      p.role === "slide"
+        ? p.slideDir === "right"
+          ? "sliding-slide-right"
+          : "sliding-slide-left"
+        : "sliding-fixed";
+
+    const colX = bounds.x + i * colW;
+    const sashOuter: Rect = {
+      x: colX + (colW - panelExtW) / 2,
+      y: bounds.y + (bounds.h - panelExtH) / 2,
+      w: panelExtW,
+      h: panelExtH,
+    };
+    const sashInner: Rect = {
+      x: sashOuter.x + fw,
+      y: sashOuter.y + fw,
+      w: sashOuter.w - 2 * fw,
+      h: sashOuter.h - 2 * fw,
+    };
+    const glassRect: Rect = {
+      x: sashInner.x - rebate,
+      y: sashInner.y - rebate,
+      w: sashInner.w + 2 * rebate,
+      h: sashInner.h + 2 * rebate,
+    };
+    const daylight: Rect = { x: colX, y: bounds.y, w: colW, h: bounds.h };
+
+    out.cells.push({
+      pathId: `${pathId}.p${i + 1}`,
+      outer: daylight,
+      daylight,
+      content,
+      sashKey: node.sashKey,
+      beadKey,
+      glassKey,
+      sashOuter,
+      sashInner,
+      glassRect,
+      beadIntW: sashInner.w,
+      beadIntH: sashInner.h,
+    });
+  }
 }
 
 function firstFrameRebate(system: ProfileSystem): number {

@@ -84,6 +84,21 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Frame – (Standard)",
     },
+    // Sliding patio outer frame. Face 48 derived from Job 104 (yogi test):
+    //   1500 Ext − 1404 Int = 96 = 2×48 (verified across the 1500/2000/2600 jobs).
+    // Code is a PLACEHOLDER pending the authentic Sunnyplast sliding-frame code
+    // (cf. the existing SPQ-T-SASH placeholder); reconcile before going live.
+    "frame-sliding": {
+      code: "SPQ-SL-FRAME",
+      name: "Sliding Frame",
+      faceWidth: 48,
+      glassRebate: 15,
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Frame – (Standard)",
+    },
   },
 
   // ---------- SASHES ------------------------------------------------
@@ -106,6 +121,24 @@ export const SUNNYPLAST_70: ProfileSystem = {
       faceWidth: 105,
       overlap: 28,
       glassRebate: 15,          // door glazing rebate per side (Job 90 door)
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Sash – (Standard)",
+    },
+    // Sliding patio sash/pane (used for BOTH fixed and sliding panels — they are
+    // cut identically; only hardware differs). Face 85 derived from Job 104:
+    //   745.5 Ext − 575.5 Int = 170 = 2×85. Glass rebate 15 (glass = beadInt + 30,
+    //   matches 606/522/524 × 1531 within the engine's ≤0.6mm tolerance). The
+    //   sliding solver computes the panel envelope directly, so `overlap` is unused
+    //   here (set 0). Code is a PLACEHOLDER (cf. SPQ-T-SASH).
+    "sash-sliding": {
+      code: "SPQ-SL-SASH",
+      name: "Sliding Sash",
+      faceWidth: 85,
+      overlap: 0,               // unused by the sliding solver (panel envelope is explicit)
+      glassRebate: 15,
       weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
@@ -216,6 +249,33 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Reinf - (steel)",
     },
+    // Sliding patio reinforcement. UNLIKE casement/door (endClearance 0), the
+    // sliding profiles lose 10mm of steel (5mm per end) — derived from Job 104:
+    //   frame reinf 1394 = frameInt 1404 − 10;  sash reinf 565.5 = sashInt 575.5 − 10
+    //   (verified on every bar across the 1500/2000/2600 jobs). endClearance is a
+    //   per-reinforcement field, so this does NOT affect casement/door math.
+    "reinf-44x12": {
+      code: "REINF-44x12",
+      name: "44 x 12 Steel Reinforcement",
+      faceWidth: 0,
+      endClearance: 5,          // 5mm per end ⇒ length = barInt − 10 (sliding frame)
+      weldAllowanceMm: 0,       // internal steel insert, not welded
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Reinf - (steel)",
+    },
+    "reinf-25x27-u": {
+      code: "REINF-25x27-U",
+      name: "25 x 27 U Steel Reinforcement",
+      faceWidth: 0,
+      endClearance: 5,          // 5mm per end ⇒ length = barInt − 10 (sliding sash)
+      weldAllowanceMm: 0,       // internal steel insert, not welded
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Reinf - (steel)",
+    },
   },
 
   // ---------- WHICH PROFILE GETS WHICH REINFORCEMENT --------------
@@ -225,6 +285,8 @@ export const SUNNYPLAST_70: ProfileSystem = {
     "SPQ-DOOR-Z":      "reinf-28x44.5-u",    // door sash
     "SPQ-005-30252":   "reinf-13x29",        // Z-transom carries top-hung load (Job 85)
     "SPQ-5-30252":     "reinf-26x26-u",      // 78mm mullion when used full-height (Job 90)
+    "SPQ-SL-FRAME":    "reinf-44x12",        // sliding frame: every bar reinforced (Job 104)
+    "SPQ-SL-SASH":     "reinf-25x27-u",      // sliding sash: every bar reinforced (Job 104)
     // Frame (5ch/6ch) and the lighter T-transom (67) are NOT reinforced in these examples.
   },
 
@@ -313,5 +375,21 @@ export const SUNNYPLAST_70: ProfileSystem = {
     // French door — UNCALIBRATED placeholder (M3): passive-leaf meeting-stile
     // shootbolt. Pending a validated French job. French designs gated false.
     "hw-shootbolt":           { code: "FR-SHOOT",    name: "Shootbolt (Meeting Stile)",            cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Door Lock" },
+
+    // Sliding patio — calibrated counts from Job 104 (yogi test 1–4). Per SLIDING
+    // panel: 1 handle, 1 cylinder (reuses hw-cylinder-brass), 1 lock&keep, 2 rollers,
+    // 1 panel stopper, 1 top + 1 bottom brush block. Per FIXED panel: 7 fixed-panel
+    // supports. Codes are PLACEHOLDERS pending authentic part numbers.
+    "hw-patio-handle-white":  { code: "SL-HDL-W",    name: "White Patio Handle",                   cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Handles" },
+    "hw-patio-lock-keep":     { code: "SL-LOCK-KEEP", name: "Patio Lock & Keep Set",               cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Locking" },
+    "hw-patio-roller":        { code: "SL-ROLLER",   name: "Ciilock Patio Roller",                 cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-panel-stopper":       { code: "SL-STOPPER",  name: "Panel Stopper",                        cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-fixed-panel-support": { code: "SL-FIX-SUP",  name: "Fixed Panel Support",                  cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-brush-top":           { code: "SL-BRUSH-T",  name: "Top Brush Block",                      cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-brush-bottom":        { code: "SL-BRUSH-B",  name: "Bottom Brush Block",                   cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    // APPROXIMATE count (like the glazing-bridge-packer rule): Bridge Packer. Job
+    // 104 bridge-packer counts (8/14/14/16) are not cleanly geometry-derived, so
+    // this uses a simple per-panel estimate — flagged, tune with more jobs.
+    "hw-bridge-packer":       { code: "SL-BRDG-PK",  name: "Bridge Packer",                        cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Glazing Accessories" },
   },
 };

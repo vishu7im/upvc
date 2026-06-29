@@ -25,6 +25,8 @@ designsRouter.get(
       quantityOfSquares: d.quantityOfSquares,
       externalId: d.externalId,
       hasTopology: d.topology != null,
+      defaultWidthMm: d.defaultWidthMm,
+      defaultHeightMm: d.defaultHeightMm,
       imageSvg: d.imageSvg ?? d.svgPreview ?? null,
     });
   }),

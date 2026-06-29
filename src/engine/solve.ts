@@ -151,6 +151,10 @@ function fillDefaultGlass(node: CellNode, glassKey: string): CellNode {
   if (node.kind === "leaf") {
     return node.cell.glassKey ? node : { kind: "leaf", cell: { ...node.cell, glassKey } };
   }
+  if (node.kind === "sliding") {
+    // Sliding rows glaze every panel from the node-level glassKey.
+    return node.glassKey ? node : { ...node, glassKey };
+  }
   if (node.kind === "hsplit") {
     return { ...node, top: fillDefaultGlass(node.top, glassKey), bottom: fillDefaultGlass(node.bottom, glassKey) };
   }
@@ -168,6 +172,8 @@ function fillDefaultGlass(node: CellNode, glassKey: string): CellNode {
  */
 function applySplitRatios(node: CellNode, ratios: Record<string, number>, pathId = "root"): CellNode {
   if (node.kind === "leaf") return node;
+  // Sliding rows have no adjustable split line — panels are equal-width.
+  if (node.kind === "sliding") return node;
   const override = ratios[pathId];
   const splitAtRatio = Number.isFinite(override)
     ? Math.min(0.98, Math.max(0.02, override))

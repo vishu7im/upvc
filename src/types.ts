@@ -247,7 +247,13 @@ export type SashKind =
   | "casement-top"
   | "tilt-turn"
   | "door-right"
-  | "door-left";
+  | "door-left"
+  // Sliding patio panels. A patio panel is always a framed sash (cut identically
+  // whether it slides or is fixed); these distinguish behaviour for hardware
+  // allocation and the SVG slide-direction arrow only.
+  | "sliding-fixed"
+  | "sliding-slide-left"
+  | "sliding-slide-right";
 
 /** A cell is a rectangle of the window split tree. */
 export interface CellSpec {
@@ -277,6 +283,21 @@ export type CellNode =
       mullionKey: string;
       left: CellNode;
       right: CellNode;
+    }
+  | {
+      // Sliding patio: a single row of `n` equal-width framed panels (no transom,
+      // no mullion, no interlock profile — see CLAUDE.md "Sliding Patio"). The
+      // solver lays out one SolvedCell per panel; panel width comes from the
+      // calibrated bypass/centre-meeting formula (topology.ts), not daylight
+      // division. Always a root-level node (sliding rows are never nested).
+      kind: "sliding";
+      sashKey: string;                 // the sliding sash profile (e.g. "sash-sliding")
+      glassKey?: string;
+      beadKey?: string;
+      /** Panels left→right; length = panel count n. */
+      panels: { role: "fixed" | "slide"; slideDir?: "left" | "right" }[];
+      /** true only for centre-meeting OXXO (two sliders meet); selects the OXXO width formula. */
+      meeting?: boolean;
     };
 
 /** A design = a frame profile choice + a cell-tree topology + metadata. */
@@ -288,6 +309,15 @@ export interface Design {
   topology: CellNode;
   /** Drawing-only SVG you may have for this design (optional). */
   svgPreview?: string;
+  /**
+   * Per-design default manufacturing size (mm). Used to pre-load the configurator
+   * and to render the gallery preview at a representative size, replacing the old
+   * hardcoded 1200×1200. Optional: absent ⇒ caller falls back to a sensible
+   * default. Derived from the design's reference work order (e.g. sliding-patio
+   * OX = 1500×1750).
+   */
+  defaultWidthMm?: number;
+  defaultHeightMm?: number;
 }
 
 // ---------- Solved geometry: rectangles ready for SVG & cutting -----

@@ -38,6 +38,8 @@ export default async function QuotePage({
       orderId={sp.orderId}
       designSvg={detail?.imageSvg ?? null}
       designFrameKey={detail?.frameKey ?? null}
+      defaultWidthMm={detail?.defaultWidthMm ?? null}
+      defaultHeightMm={detail?.defaultHeightMm ?? null}
     />
   );
 }

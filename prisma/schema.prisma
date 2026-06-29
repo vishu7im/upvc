@@ -232,6 +232,13 @@ model Design {
   listIndex         Int?
   quotable          Boolean  @default(false)
 
+  // Per-design default manufacturing size (mm) — preloads the configurator and
+  // sizes the gallery preview, replacing the old hardcoded 1200×1200. Null ⇒
+  // caller falls back to a sensible default. Derived from the design's reference
+  // work order (e.g. sliding-patio OX = 1500×1750).
+  defaultWidthMm  Int?
+  defaultHeightMm Int?
+
   productId String?
   product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 

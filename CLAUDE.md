@@ -169,7 +169,8 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
       `prisma/seed.ts#applyDerivedTopologies()` applies it (topology + tier-gated `quotable`) by
       `externalId`. **Quotable designs 10 → 371** (345 casement + 16 single-door, all engine-validated).
       Tilt&Turn (123) + French (12) are modelled but **gated `quotable:false`** (uncalibrated/structural);
-      Sliding (7) deferred. 147 validation assertions (135 + 12 extractor) + 12 M3 e2e assertions green.
+      Sliding (7) was deferred at M3 but is **now calibrated & quotable** (see "## Sliding Patio").
+      147 validation assertions (135 + 12 extractor) + 12 M3 e2e assertions green.
       See "M3 extractor & calibration tiers" below.
 - [x] **M4 — PDF export + branding.** The 7 HTML docs render to **PDF via Puppeteer** (headless
       Chromium), generated **lazily on first request** and **cached in S3-compatible object storage
@@ -273,22 +274,17 @@ layouts are **rejected**, never guessed.
   shootbolt hardware is a **placeholder pending a real French job**.
 - **T3 geometry-OK, gated false** — Tilt&Turn (123): geometry == casement sash (reuses `sash-t`);
   the `tilt-turn` content + T&T gear in `hardware.ts`/catalog are **uncalibrated** (no T&T job).
-- **T4 deferred** — Sliding Patio (7): no track/interlock/sliding-sash profiles or overlap
-  deductions exist → **not** quoted; left as SVG-only previews. The extractor hard-rejects the
-  family before parsing (`extract-topology.ts` `if (family === "sliding") return { ok:false, … }`).
-  **Promotion is golden-rule-blocked**, not a code gap: the master PDF lists sliding *codes*
-  (pp.15–16 `SPQ-GL-2025x` sashes / `SPQ-GL-1025x` frames+tracks / `SPQ-GL-20253` interlock; layouts
-  pp.29–32) but **no calibration** — reinforcement boxes blank (p.44), no sliding glass-deduction
-  table (p.43 TOC omits it; only casement tables pp.46–47), no sliding clear-opening formula (p.40 =
-  doors only); and there's no calibrated sliding job (cf. casement/door jobs 85/88/90). Also, patio
-  SVG `HingePointers` encode **slider-travel direction, not a hinge edge**, so `dirToContent()` would
-  mis-map them. **To promote (needs a real measured sliding job first):** add `sash-sliding` +
-  top/sill `track-*` + interlock profiles (calibrated, to `system-sunnyplast.ts`); add sliding
-  hardware (rollers/handle/lock-keeper/bumpers) to the catalog + a `hardware.ts` sliding branch; add
-  `sliding-left|sliding-right` cell content in `topology.ts`/`bars.ts` (track-engagement deduction,
-  not casement rebate overlap); in `extract-topology.ts` flip `FAMILY_RULES.sliding.eligible`, set
-  its profile keys, and special-case `dirToContent()` (apex = travel direction); add a calibrated
-  sliding assertion to `validation/jobs.ts`, then flip the gate.
+- **T1 quotable (NEW)** — Sliding Patio (7): **now calibrated and quotable** from 4 real work
+  orders + cutting lists (`patio-docs/`, "Job 104" — yogi test 1/2/3/4, height 1750). See the
+  dedicated **"## Sliding Patio"** section below for the full derivation. The 7 designs (OX, XO,
+  OXO×2, OOX, XOO, OXXO) are **hand-authored** (`src/catalog/sliding-designs.ts`, applied by
+  `prisma/seed.ts#applySlidingTopologies()` by `externalId`), NOT extracted — the extractor still
+  hard-rejects sliding (its `HingePointers` encode travel direction, not a hinge edge, so the
+  extractor would mis-map them; hand-authoring sidesteps that). A sliding patio is a **frame + n
+  framed panels + beads + 2 reinforcements** — no transom/mullion/interlock profile in the cut list
+  — so it needed **only** a new `kind:"sliding"` topology node + SashKind/hardware/SVG cases;
+  `bars.ts`/`cutting.ts`/`pricing.ts`/`documents.ts`/`solve.ts` were untouched. 3 new validation
+  jobs (OX/OXO/OXXO) reproduce the cutting lists to ≤0.6mm (Gasket 02 exact).
 
 Casement/door **engine designs** (the 10 hand-authored `win-*`/`door-*` in `src/catalog/designs.ts`)
 have a topology but no source image; `prisma/seed.ts` now renders a deterministic gallery `imageSvg`
@@ -360,6 +356,61 @@ M5 instead builds the **editing surface** so the owner fills real prices, plus a
 **Caveat:** quotes read **zero prices until the owner enters them** via the CRUD/CSV; only White (0%)
 ships seeded. Colour upcharge is a flat % on profiles — per-metre/per-component pricing is a future
 refinement.
+
+## Sliding Patio
+
+The third quotable family (after Casement + Single Door), calibrated from **4 real work orders +
+matching cutting lists** in `patio-docs/` ("Job 104" — yogi test 1/2/3/4, all height 1750):
+OX 1500×1750 (2-panel), OXO 2000×1750 (3-panel, slide left & right), OXXO 2600×1750 (4-panel,
+centre-meeting). The 7 DB designs (product `73679b0a-…`) are **OX, XO, OXO Slide Left/Right, OOX,
+XOO, OXXO** — all now `quotable=true`.
+
+**Structure.** A sliding patio is the *simplest* family: an outer frame (4 mitred bars) + **n
+equal-width framed panels** (each a 4-bar mitred rectangle — fixed and sliding panels are cut
+**identically**, only hardware differs) + beads + 2 reinforcements + glass. **No transom, no
+mullion, no Z-break, and no separate interlock profile in the cut list.** The cutting list has
+exactly 5 sections: 28mm Bead, Sliding Frame, 44×12 Steel Reinforcement, Sliding Sash, 25×27 U Steel
+Reinforcement.
+
+**Calibrated constants (verified exact across all 4 jobs):**
+- Sliding Frame face **48** (1500 Ext − 1404 Int = 96). Sliding Sash face **85** (745.5 − 575.5 =
+  170). Bead face 20 (reused `bead-28`). Glass rebate **15** (glass = beadInt + 30).
+- Frame: Hor Ext=W Int=W−96; Vert Ext=H Int=H−96; mitred `\ - /`, continuous jambs.
+- **Panel width Ext:** bypass (OX/XO/OXO/OOX/XOO) = `(W+3)/n − 6` *(exact for n=2,3)*;
+  centre-meeting (OXXO) = `(W+79)/4 − 6` *(n=4, **single data point** — reproduces the 2600 job
+  exactly but W-scaling unverified; needs a 2nd OXXO job)*. Panel height Ext = **H − 79**.
+- Sash Int = Ext − 170; Bead Int = sash Int, Ext = Int+40, square `[ - ]`.
+- **Reinforcement = bar Int − 10** (5mm/end). This is the catalog `Reinforcement.endClearance=5`
+  field on `reinf-44x12`/`reinf-25x27-u` — casement/door keep `endClearance=0`, so their math is
+  byte-identical. Frame→`reinf-44x12`, Sash→`reinf-25x27-u` via `reinforcementMap`.
+- Gasket 02 = Σ glass perimeter (the casement rule) → **exact** (8546/12316/16438).
+- Hardware (calibrated): per **fixed** panel 7× Fixed Panel Support; per **sliding** panel 1×
+  handle, 1× cylinder, 1× lock&keep, **2× roller**, 1× stopper, 1× top + 1× bottom brush.
+  **Approximate/flagged** (not cleanly geometry-derived, like the glazing-bridge-packer rule):
+  Bridge Packer, Glazing Bridge Packer, Woolpile.
+
+**How it's wired (engine stays pure).** New `kind:"sliding"` `CellNode` variant (`src/types.ts`) +
+`buildSlidingPanels()` in `topology.ts` emit one `SolvedCell` per panel (explicit `sashOuter`/
+`sashInner`/`glassRect`/`beadInt`), so **`bars.ts`/`cutting.ts`/`pricing.ts`/`documents.ts`/
+`solve.ts` are unchanged** (they consume the cells generically). Added: `sliding-fixed`/
+`sliding-slide-left`/`sliding-slide-right` SashKinds, a hardware branch (`hardware.ts`), SVG slide
+arrows (`svg.ts`), and catalog parts (`frame-sliding`, `sash-sliding`, two reinforcements, patio
+hardware — codes `SPQ-SL-*` are **placeholders** pending authentic Sunnyplast codes). Topologies are
+hand-authored in `src/catalog/sliding-designs.ts` and applied by `externalId` in
+`prisma/seed.ts#applySlidingTopologies()` (sets topology + `frameKey="frame-sliding"` +
+`quotable=true` + default dims). The extractor (`extract-topology.ts`) still rejects sliding.
+
+**Per-design default dimensions.** New nullable `design.defaultWidthMm/defaultHeightMm` columns
+(migration `…_add_design_default_dimensions`) replace the old hardcoded **1200×1200**. Surfaced by
+the loader, `GET /api/designs/:id`, and the web configurator (preloads W×H, still editable). Sliding
+defaults from the work orders: 2-panel 1500×1750, 3-panel 2000×1750, OXXO 2600×1750. `previewDimsFor()`
+in the seed now honours a design's own defaults for the gallery preview.
+
+**Validation.** 3 sliding jobs (OX/OXO/OXXO) in `src/validation/jobs.ts` assert every cut-list row
+(incl. reinforcement — `validate()` now searches `parts.bars` **and** `parts.reinforcement`),
+glass, and Gasket 02 to ≤0.6mm. Existing casement/door assertions stay green (no shared-path
+change). **OOX/XOO/XO have no dedicated job** — they reuse the verified 2-/3-panel cut math (panels
+are identical width; only slide/handle assignment differs).
 
 ## Phase 2 — UI frontend (stack confirmed: Next.js)
 
