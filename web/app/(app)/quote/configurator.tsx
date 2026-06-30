@@ -266,12 +266,12 @@ export default function Configurator(props: ConfiguratorProps) {
   const status: Status = loading ? "updating" : error ? "invalid" : result ? "valid" : "idle";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <ToastViewport toast={toast} onExpire={expireToast} />
       <PageHeader
+        className="mb-3"
         eyebrow="Quote workstation"
         title={props.designName ?? result?.designName ?? "Configure quote"}
-        description="Tune manufacturing dimensions and options, inspect the live SVG preview, then review the generated price and material breakdown."
         actions={
           <ButtonLink href="/products" variant="secondary" icon="products">
             Design gallery
@@ -286,13 +286,12 @@ export default function Configurator(props: ConfiguratorProps) {
         }
       />
 
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <Card className="h-fit min-w-0 overflow-hidden xl:sticky xl:top-20">
-          <div className="border-b border-slate-200 px-4 py-3">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)]">
+        <Card className="h-fit min-w-0 overflow-hidden xl:sticky xl:top-16">
+          <div className="border-b border-slate-200 px-3 py-2.5">
             <h2 className="text-base font-semibold text-slate-950">Configuration</h2>
-            <p className="mt-1 text-sm text-slate-500">Live quote inputs in millimeters.</p>
           </div>
-          <div className="space-y-4 p-4">
+          <div className="space-y-3 p-3">
             <label className="block">
               <FieldLabel>Profile system</FieldLabel>
               <select value={systemId} onChange={(e) => setSystemId(e.target.value)} className={selectClass}>
@@ -401,7 +400,7 @@ export default function Configurator(props: ConfiguratorProps) {
               )}
             </label>
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-2.5">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-600">Glass</span>
                 <span className="text-right font-semibold text-slate-950">{selectedGlass?.name ?? "Design default"}</span>
@@ -436,9 +435,9 @@ export default function Configurator(props: ConfiguratorProps) {
           </div>
         </Card>
 
-        <div className="min-w-0 space-y-5">
+        <div className="min-w-0 space-y-4">
           <Card className="min-w-0 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-2.5">
               <div>
                 <h2 className="text-base font-semibold text-slate-950">Live design preview</h2>
                 <p className="mt-1 font-mono text-xs text-slate-500">
@@ -482,8 +481,8 @@ export default function Configurator(props: ConfiguratorProps) {
                 <Badge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</Badge>
               </div>
             </div>
-            <div className="industrial-grid flex min-h-[460px] min-w-0 items-center justify-center overflow-hidden p-3 sm:min-h-[620px] sm:p-5">
-              <div className="quote-preview-frame relative flex min-h-0 w-full min-w-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white/[0.84] p-4 shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-6">
+            <div className="industrial-grid flex min-h-[560px] min-w-0 items-center justify-center overflow-hidden p-2 sm:min-h-[720px] xl:min-h-[calc(100vh-150px)]">
+              <div className="quote-preview-frame relative flex min-h-0 w-full min-w-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white/[0.84] p-3 shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-4">
                 {error ? (
                   <Alert tone="red" title="Quote failed">{error}</Alert>
                 ) : viewMode === "3d" && canUseDesigner && result ? (
