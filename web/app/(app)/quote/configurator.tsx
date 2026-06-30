@@ -26,7 +26,6 @@ import {
   Card,
   EmptyState,
   FieldLabel,
-  PageHeader,
   fieldClass,
   selectClass,
 } from "@/components/ui";
@@ -266,26 +265,8 @@ export default function Configurator(props: ConfiguratorProps) {
   const status: Status = loading ? "updating" : error ? "invalid" : result ? "valid" : "idle";
 
   return (
-    <div className="space-y-3">
+    <div className="-mt-5 space-y-2">
       <ToastViewport toast={toast} onExpire={expireToast} />
-      <PageHeader
-        className="mb-3"
-        eyebrow="Quote workstation"
-        title={props.designName ?? result?.designName ?? "Configure quote"}
-        actions={
-          <ButtonLink href="/products" variant="secondary" icon="products">
-            Design gallery
-          </ButtonLink>
-        }
-        meta={
-          <>
-            <Badge tone="purple">{props.designId}</Badge>
-            {selectedSystem && <Badge tone="slate">{selectedSystem.name}</Badge>}
-            {status !== "idle" && <Badge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</Badge>}
-          </>
-        }
-      />
-
       <div className="grid min-w-0 gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)]">
         <Card className="h-fit min-w-0 overflow-hidden xl:sticky xl:top-16">
           <div className="border-b border-slate-200 px-3 py-2.5">
@@ -437,52 +418,59 @@ export default function Configurator(props: ConfiguratorProps) {
 
         <div className="min-w-0 space-y-4">
           <Card className="min-w-0 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-2.5">
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">Live design preview</h2>
-                <p className="mt-1 font-mono text-xs text-slate-500">
-                  {width} x {height} mm / {systemId || "No system"}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {/* 2D / 3D view switch */}
-                <div className="inline-flex overflow-hidden rounded-md border border-slate-300 text-xs font-semibold">
-                  {(["2d", "3d"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setViewMode(m)}
-                      className={
-                        "px-3 py-1.5 transition-colors " +
-                        (viewMode === m ? "bg-[#4442e3] text-white" : "bg-white text-slate-600 hover:bg-slate-50")
-                      }
-                      aria-pressed={viewMode === m}
-                    >
-                      {m === "2d" ? "2D" : "3D"}
-                    </button>
-                  ))}
-                </div>
-                {/* Inner-joint overlay toggle (2D only) */}
-                <label
-                  className={
-                    "inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold " +
-                    (viewMode === "3d" ? "cursor-not-allowed text-slate-300" : "cursor-pointer text-slate-600 hover:bg-slate-50")
-                  }
-                >
-                  <input
-                    type="checkbox"
-                    checked={showJoints}
-                    disabled={viewMode === "3d"}
-                    onChange={(e) => setShowJoints(e.target.checked)}
-                    className="h-3.5 w-3.5"
-                  />
-                  Joints
-                </label>
-                <Badge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</Badge>
-              </div>
-            </div>
-            <div className="industrial-grid flex min-h-[560px] min-w-0 items-center justify-center overflow-hidden p-2 sm:min-h-[720px] xl:min-h-[calc(100vh-150px)]">
+            <div className="industrial-grid flex min-h-[560px] min-w-0 items-center justify-center overflow-hidden p-2 sm:min-h-[720px] xl:min-h-[calc(100vh-104px)]">
               <div className="quote-preview-frame relative flex min-h-0 w-full min-w-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white/[0.84] p-3 shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-4">
+                <div className="pointer-events-none absolute left-3 right-3 top-3 z-20 flex flex-wrap items-start justify-between gap-2">
+                  <div className="max-w-[min(560px,calc(100%-220px))] rounded-md border border-white/70 bg-white/85 px-3 py-2 shadow-[0_10px_28px_rgba(15,23,42,0.12)] backdrop-blur">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="max-w-[360px] truncate text-sm font-bold text-slate-950">
+                        {props.designName ?? result?.designName ?? "Configure quote"}
+                      </p>
+                      <Badge tone="purple" className="bg-white/80">{props.designId}</Badge>
+                      {selectedSystem && <Badge tone="slate" className="bg-white/80">{selectedSystem.name}</Badge>}
+                    </div>
+                    <p className="mt-1 font-mono text-xs font-semibold text-slate-500">
+                      {width} x {height} mm / {systemId || "No system"}
+                    </p>
+                  </div>
+
+                  <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
+                    <div className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white/90 text-xs font-semibold shadow-[0_10px_28px_rgba(15,23,42,0.12)] backdrop-blur">
+                      {(["2d", "3d"] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setViewMode(m)}
+                          className={
+                            "px-3 py-1.5 transition-colors " +
+                            (viewMode === m ? "bg-[#4442e3] text-white" : "text-slate-600 hover:bg-slate-50")
+                          }
+                          aria-pressed={viewMode === m}
+                        >
+                          {m === "2d" ? "2D" : "3D"}
+                        </button>
+                      ))}
+                    </div>
+                    <label
+                      className={
+                        "inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white/90 px-3 py-1.5 text-xs font-semibold shadow-[0_10px_28px_rgba(15,23,42,0.12)] backdrop-blur " +
+                        (viewMode === "3d" ? "cursor-not-allowed text-slate-300" : "cursor-pointer text-slate-600 hover:bg-slate-50")
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        checked={showJoints}
+                        disabled={viewMode === "3d"}
+                        onChange={(e) => setShowJoints(e.target.checked)}
+                        className="h-3.5 w-3.5"
+                      />
+                      Joints
+                    </label>
+                    <ButtonLink href="/products" variant="secondary" icon="products" className="h-8 bg-white/90 px-2.5 text-xs shadow-[0_10px_28px_rgba(15,23,42,0.12)] backdrop-blur">
+                      Gallery
+                    </ButtonLink>
+                  </div>
+                </div>
                 {error ? (
                   <Alert tone="red" title="Quote failed">{error}</Alert>
                 ) : viewMode === "3d" && canUseDesigner && result ? (
@@ -517,7 +505,7 @@ export default function Configurator(props: ConfiguratorProps) {
                 {status !== "idle" && (
                   <div
                     className={
-                      "absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold  tracking-wide text-white shadow-[0_8px_20px_rgba(15,23,42,0.2)] " +
+                      "absolute bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold  tracking-wide text-white shadow-[0_8px_20px_rgba(15,23,42,0.2)] " +
                       (status === "updating"
                         ? "bg-amber-500"
                         : status === "invalid"

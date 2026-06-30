@@ -123,12 +123,12 @@ textarea {
 }
 
 .quote-preview-frame {
-  height: clamp(540px, calc(100vh - 150px), 920px);
+  height: clamp(560px, calc(100vh - 104px), 980px);
 }
 
 @media (max-width: 640px) {
   .quote-preview-frame {
-    height: clamp(400px, calc(100vh - 190px), 680px);
+    height: clamp(430px, calc(100vh - 132px), 720px);
   }
 }
 
