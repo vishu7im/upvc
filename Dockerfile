@@ -13,7 +13,7 @@ RUN apt-get update \
     openssl \
   && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY prisma ./prisma

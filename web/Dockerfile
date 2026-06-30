@@ -2,8 +2,8 @@ FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev
 
 COPY . .
 RUN npm run build
