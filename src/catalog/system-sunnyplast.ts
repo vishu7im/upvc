@@ -22,22 +22,27 @@ export const SUNNYPLAST_70: ProfileSystem = {
   stockBarLengthMm: 6000,
   sawKerfMm: 5,
 
-  // ---------- COLOURS / FINISHES (M5) ------------------------------
-  // Only the base "white" ships in the seed (0% uplift ⇒ default quotes are
-  // byte-identical to pre-M5). Real foiled-colour uplift percentages are
-  // entered by the owner via the admin catalog API — never guessed here
-  // (golden rule). `defaultColourKey` is the colour priced today; per-quote
-  // colour selection arrives with the configurator UI (Phase 2).
+  // ---------- COLOURS / FINISHES (M5 + U7) -------------------------
+  // Base "white" stays the default at 0% uplift ⇒ default quotes are
+  // byte-identical. The rest are a standard foiled palette: they ship with a
+  // display `hex` (cosmetic — tints the preview SVG + 3D view + UI swatch) but
+  // **0% uplift** because real foiled-colour upcharges are owner/supplier
+  // specific and must NOT be guessed (golden rule). The owner sets each colour's
+  // cost/price uplift % via the admin catalog editor. `defaultColourKey` is the
+  // colour priced today; per-quote inside/outside selection lives in the
+  // configurator (U3/U7). Hex values are approximate RAL equivalents for preview.
   defaultColourKey: "white",
   colours: {
-    white: {
-      key: "white",
-      code: "COL-WHITE",
-      name: "White",
-      costUpliftPct: 0,
-      priceUpliftPct: 0,
-      isBase: true,
-    },
+    white:      { key: "white",      code: "COL-WHITE", name: "White",          costUpliftPct: 0, priceUpliftPct: 0, isBase: true,  hex: "#f5f5f5" },
+    cream:      { key: "cream",      code: "COL-9001",  name: "Cream",          costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#e8e0cf" },
+    black:      { key: "black",      code: "COL-9005",  name: "Black",          costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#1a1a1a" },
+    anthracite: { key: "anthracite", code: "COL-7016",  name: "Anthracite Grey",costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#353b3f" },
+    grey:       { key: "grey",       code: "COL-7035",  name: "Light Grey",     costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#c4c9c4" },
+    red:        { key: "red",        code: "COL-3011",  name: "Red",            costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#7c2128" },
+    brown:      { key: "brown",      code: "COL-8017",  name: "Brown",          costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#45322e" },
+    "golden-oak": { key: "golden-oak", code: "COL-OAK", name: "Golden Oak",     costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#8a5a2b" },
+    green:      { key: "green",      code: "COL-6005",  name: "Fir Green",      costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#2f4538" },
+    blue:       { key: "blue",       code: "COL-5010",  name: "Steel Blue",     costUpliftPct: 0, priceUpliftPct: 0, isBase: false, hex: "#1f3a5f" },
   },
 
   // ---------- CILLS (window sills) ---------------------------------

@@ -175,6 +175,7 @@ export async function loadCatalog(): Promise<void> {
         costUpliftPct: num(c.costUpliftPct),
         priceUpliftPct: num(c.priceUpliftPct),
         isBase: c.isBase,
+        ...(c.hex ? { hex: c.hex } : {}),
       };
     }
 

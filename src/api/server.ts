@@ -66,6 +66,7 @@ app.get("/api/systems/:id/options", (req, res) => {
       key: c.key,
       name: c.name,
       priceUpliftPct: c.priceUpliftPct,
+      ...(c.hex ? { hex: c.hex } : {}),
     })),
     cills: Object.values(sys.cills ?? {}).map((c) => ({
       key: c.key,

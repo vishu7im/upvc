@@ -222,6 +222,11 @@ sub-milestone at a time. Full breakdown in "## Phase 2 — UI frontend" below.*
 - [x] **U6 — Polish.** Loading skeleton (`loading.tsx`), error boundary (`error.tsx`), global
       `not-found.tsx`, empty/unreachable states throughout. Deployment is owner-side (needs the engine +
       Postgres). See "Phase 2 — U3/U4/U5" below.
+- [x] **U7 — Visualization & dual-colour.** Three additive, byte-identical-by-default features:
+      **(1) inner-joint overlay** (45° mitre corners + T/Z divider markers on the elevation SVG),
+      **(2) inside/outside colour** (summed uplift, persisted on the order, shown in docs), and
+      **(3) a three.js 3D massing view**. Engine stays pure; pricing.ts untouched. See
+      "## U7 — Visualization & dual-colour" below.
 
 # Phase 2 UI frontend
 
@@ -573,6 +578,43 @@ glass/colour passthrough (anthracite → +15% material, glass/colour echoed in t
 create→add-item→confirm→documents (HTML via BFF); admin pages render; settings PUT, catalog part PUT,
 and **raw `text/csv` import all proxy correctly through the BFF**. `web/` `npm run build` + `npm run
 lint` clean (15 routes). Live run owner-side (engine + Postgres + MinIO for PDF/logo).
+
+## U7 — Visualization & dual-colour
+
+Three additive features. **Default behaviour is byte-identical** (the 3 weld-drift failures in
+`npm run validate` are pre-existing DB drift, not these changes — new totals: 267 passed, 3 failed,
+all new colour/joint/svg assertions green).
+
+**1. Inner-joint overlay (visual).** `renderSvg(geometry, opts?)` gained an optional `opts.joints`
+that emits a `<g id="joints">` layer — 45° mitre diagonals at the four outer-frame corners and at
+every sash ring, plus a T/Z-styled tick marker at each transom/mullion junction (T = one tick, Z =
+offset double tick). **All coordinates derive from rects already on the solved geometry** (no new
+engine math, no new required type fields). Omitting `opts` ⇒ byte-identical SVG. `QuoteInput.showJoints`
+threads it into `solve()` so documents can include it; the configurator also has a live "Joints" toggle.
+
+**2. Inside/outside colour (priced + persisted).** `QuoteInput.colourKeyOutside` is the OUTSIDE
+finish; the existing `colourKey` is the INSIDE/primary. When they differ, `solve.ts` **synthesizes
+ONE combined `ColourOption`** whose uplift is the SUM of the two (`__combined__:in+out`) and points
+`defaultColourKey` at it — so **`pricing.ts` is UNCHANGED** (it still reads a single multiplier).
+Equal keys ⇒ single colour (no double-count); White+White ⇒ no clone ⇒ byte-identical. New optional
+`ColourOption.hex` (cosmetic swatch; null ⇒ grey) tints the preview SVG (outside drives the visible
+fill, a thin inside liner hints the inside colour) and the 3D materials. Persisted on
+`OrderItem.colourKeyInside/colourKeyOutside` (migration `20260630010000_add_inside_outside_colour`,
++ `colour_option.hex`); threaded through `addItemSchema` → `buildQuoteInput` → confirm re-solve
+exactly like `cillKey`. Documents show a `DocColour` header row ("White (in) / Anthracite (out)").
+Admin colour CRUD + `GET /api/systems/:id/options` carry `hex`; the admin catalog editor has a swatch
+picker. **Live-verified:** white(0%)+anthracite(20%) on a priced frame ⇒ materialPrice 530.75 → 636.9.
+
+**3. 3D window view (frontend-only).** `web/components/window-3d.tsx` — plain `three` (+ `OrbitControls`,
+the only new dep; lazy-loaded via `next/dynamic({ssr:false})` so it never enters the server bundle).
+Extrudes the **same `QuoteGeometry` rects** the 2D view uses into a massing model (constant catalog-ish
+depths for v1 — no engine change); box front faces carry the outside colour, back faces the inside.
+A 2D/3D tab switch lives in the configurator preview card; WebGL-absent ⇒ graceful 2D fallback.
+Future: expose per-profile `depthMm` via the options API for dimensionally-accurate extrusion.
+
+**Tests:** `src/engine/svg.test.ts#validateSvg` (render-option byte-identity + joints/tint markers),
+`pricing.test.ts` (+ summed dual-colour uplift), and `jobs.ts#validateColourAndJoints` (solve-level
+White+White == default, joints additive, joints don't change pricing) — all wired into `npm run validate`.
 
 ## Conventions
 

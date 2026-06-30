@@ -7,7 +7,7 @@
 //
 // =====================================================================
 
-import type { CellNode, DocCill, QuoteInput, QuoteOutput, Settings } from "../types.ts";
+import type { CellNode, ColourOption, DocCill, DocColour, QuoteInput, QuoteOutput, Settings } from "../types.ts";
 import { getSystem, getDesign, DEFAULT_SETTINGS } from "../catalog/index.ts";
 import { solveTopology } from "./topology.ts";
 import { computeParts } from "./bars.ts";
@@ -34,11 +34,33 @@ export function solve(input: QuoteInput): QuoteOutput {
       ? applyOverrides(baseSystem, input.overrides)
       : baseSystem;
 
-  // Per-quote colour selection (U3). Clone the system with the chosen colour so
-  // computePricing applies its uplift. Omitted (or == default) ⇒ no clone, so
-  // the quote stays byte-identical to pre-U3 (and the 157 assertions hold).
-  if (input.colourKey && input.colourKey !== system.defaultColourKey) {
-    if (!system.colours?.[input.colourKey]) throw new Error(`Unknown colour: ${input.colourKey}`);
+  // Per-quote colour selection (U3 + inside/outside finish). `colourKey` is the
+  // INSIDE / primary colour; an optional `colourKeyOutside` adds a second finish
+  // whose uplift is SUMMED on top (dual-colour). We synthesize ONE combined
+  // colour option and point defaultColourKey at it, so computePricing stays
+  // unchanged (it reads a single multiplier). Omitted / White+White ⇒ no clone,
+  // so the quote stays byte-identical to pre-existing quotes (157 assertions hold).
+  if (input.colourKey && !system.colours?.[input.colourKey]) throw new Error(`Unknown colour: ${input.colourKey}`);
+  if (input.colourKeyOutside && !system.colours?.[input.colourKeyOutside]) throw new Error(`Unknown colour: ${input.colourKeyOutside}`);
+  const insideKey = input.colourKey ?? system.defaultColourKey;
+  const insideColour = insideKey ? system.colours?.[insideKey] : undefined;
+  // A dual-colour finish only when an explicit, DIFFERENT outside colour is given.
+  const dualColour = Boolean(input.colourKeyOutside && input.colourKeyOutside !== insideKey);
+  const outsideColour = dualColour ? system.colours?.[input.colourKeyOutside!] : insideColour;
+
+  if (dualColour && insideColour && outsideColour) {
+    const combinedKey = `__combined__:${insideColour.key}+${outsideColour.key}`;
+    const combined: ColourOption = {
+      key: combinedKey,
+      code: `${insideColour.code}/${outsideColour.code}`,
+      name: `${insideColour.name} / ${outsideColour.name}`,
+      costUpliftPct: insideColour.costUpliftPct + outsideColour.costUpliftPct,
+      priceUpliftPct: insideColour.priceUpliftPct + outsideColour.priceUpliftPct,
+      isBase: false,
+      hex: outsideColour.hex ?? insideColour.hex,
+    };
+    system = { ...system, colours: { ...system.colours, [combinedKey]: combined }, defaultColourKey: combinedKey };
+  } else if (input.colourKey && input.colourKey !== system.defaultColourKey) {
     system = { ...system, defaultColourKey: input.colourKey };
   }
 
@@ -102,8 +124,25 @@ export function solve(input: QuoteInput): QuoteOutput {
   // 5. Pricing
   const pricing = computePricing(parts, cuttingPlan, geometry, system, settings);
 
-  // 6. SVG preview
-  const svg = renderSvg(geometry);
+  // 6. SVG preview. Joint overlay + colour tint are purely visual and opt-in;
+  // a default quote (no joints, base/no-hex colour) passes no opts ⇒ the SVG is
+  // byte-identical to before these features existed.
+  const tintInsideHex = insideColour && !insideColour.isBase ? insideColour.hex : undefined;
+  const tintOutsideHex = outsideColour && !outsideColour.isBase ? outsideColour.hex : undefined;
+  const colourOpts =
+    tintInsideHex || tintOutsideHex ? { insideHex: tintInsideHex, outsideHex: tintOutsideHex } : undefined;
+  const svgOpts =
+    input.showJoints || colourOpts ? { joints: input.showJoints, colour: colourOpts } : undefined;
+  const svg = renderSvg(geometry, svgOpts);
+
+  // Colour display for document headers. Only when a non-default finish is in
+  // play; absent ⇒ no colour row (byte-identical header for default White).
+  const docColour: DocColour | undefined =
+    dualColour
+      ? { inside: insideColour?.name ?? "—", outside: outsideColour?.name }
+      : insideColour && !insideColour.isBase
+        ? { inside: insideColour.name }
+        : undefined;
 
   // 7. Documents — every doc carries the design preview at the *modified*
   // (chosen W×H) dimensions, so the paperwork shows what was actually quoted.
@@ -116,10 +155,10 @@ export function solve(input: QuoteInput): QuoteOutput {
     ? { name: cill.name, manufacturingHeightMm: mfgHeightMm }
     : undefined;
   const documents = {
-    workOrder:    renderWorkOrder(input, system.name, design.name, parts, settings.branding, images, "normal", docCill),
-    cuttingList:  renderCuttingList(input, system.name, design.name, parts, settings.branding, images, "normal", docCill),
-    bom:          renderBom(input, system.name, design.name, pricing, settings.branding, images, docCill),
-    priceSummary: renderPriceSummary(input, system.name, design.name, pricing, settings.branding, images, docCill),
+    workOrder:    renderWorkOrder(input, system.name, design.name, parts, settings.branding, images, "normal", docCill, docColour),
+    cuttingList:  renderCuttingList(input, system.name, design.name, parts, settings.branding, images, "normal", docCill, docColour),
+    bom:          renderBom(input, system.name, design.name, pricing, settings.branding, images, docCill, docColour),
+    priceSummary: renderPriceSummary(input, system.name, design.name, pricing, settings.branding, images, docCill, docColour),
   };
 
   return {

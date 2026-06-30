@@ -201,6 +201,7 @@ const newColourSchema = z.object({
   costUpliftPct: z.number().min(0).optional(),
   priceUpliftPct: z.number().min(0).optional(),
   isBase: z.boolean().optional(),
+  hex: z.string().regex(/^#[0-9a-fA-F]{6}$/, "hex must be like #353b3f").optional(),
 });
 
 catalogRouter.post(
@@ -221,6 +222,7 @@ catalogRouter.post(
         costUpliftPct: b.costUpliftPct ?? 0,
         priceUpliftPct: b.priceUpliftPct ?? 0,
         isBase: b.isBase ?? false,
+        hex: b.hex ?? null,
       },
     });
     await loadCatalog();
@@ -235,6 +237,7 @@ const editColourSchema = z
     costUpliftPct: z.number().min(0),
     priceUpliftPct: z.number().min(0),
     isBase: z.boolean(),
+    hex: z.string().regex(/^#[0-9a-fA-F]{6}$/, "hex must be like #353b3f"),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, "Provide at least one field to update");

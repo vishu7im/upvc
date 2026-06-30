@@ -2,10 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { apiGet, quote, createOrder, addOrderItem, ApiError } from "@/lib/api";
 import type { QuoteResult, SystemOptions, SystemSummary } from "@/lib/types";
 import { normalizeSvgForPreview } from "@/lib/svg-preview";
 import WindowDesigner from "@/components/window-designer";
+
+// 3D massing view: lazy + client-only (three.js never enters the server bundle
+// and the heavy chunk loads only when the user opens the 3D tab).
+const Window3D = dynamic(() => import("@/components/window-3d"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full min-h-[360px] w-full items-center justify-center text-sm text-slate-500">
+      Loading 3D view…
+    </div>
+  ),
+});
 import {
   Alert,
   Badge,
@@ -61,6 +73,11 @@ export default function Configurator(props: ConfiguratorProps) {
   const [height, setHeight] = useState(props.defaultHeightMm ?? FALLBACK_HEIGHT_MM);
   const [glassKey, setGlassKey] = useState("");
   const [colourKey, setColourKey] = useState("");
+  // Outside colour for a dual-colour finish. "" ⇒ same as inside (single colour).
+  const [colourKeyOutside, setColourKeyOutside] = useState("");
+  // Inner-joint overlay toggle + 2D/3D preview switch (purely visual).
+  const [showJoints, setShowJoints] = useState(false);
+  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   // Per-quote chamber selection. Defaults to the design's baked frame; switching
   // it swaps the frame profile (e.g. 5ch→6ch faceWidth) for the whole quote.
   const [chamberKey, setChamberKey] = useState(props.designFrameKey ?? "");
@@ -106,6 +123,7 @@ export default function Configurator(props: ConfiguratorProps) {
       .then((o) => {
         setOptions(o);
         setColourKey(o.defaultColourKey ?? "");
+        setColourKeyOutside("");
         setGlassKey("");
         setCillKey("");
       })
@@ -134,8 +152,10 @@ export default function Configurator(props: ConfiguratorProps) {
       frameKey: chamberKey || undefined,
       glassKey: glassKey || undefined,
       colourKey: colourKey || undefined,
+      colourKeyOutside: colourKeyOutside || undefined,
       cillKey: cillKey || undefined,
       splitRatios: Object.keys(splitRatios).length ? splitRatios : undefined,
+      showJoints: showJoints || undefined,
     })
       .then((r) => {
         setResult(r);
@@ -147,7 +167,7 @@ export default function Configurator(props: ConfiguratorProps) {
         showToast("invalid");
       })
       .finally(() => setLoading(false));
-  }, [props.designId, systemId, width, height, chamberKey, glassKey, colourKey, cillKey, splitRatios, showToast]);
+  }, [props.designId, systemId, width, height, chamberKey, glassKey, colourKey, colourKeyOutside, cillKey, splitRatios, showJoints, showToast]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -173,6 +193,12 @@ export default function Configurator(props: ConfiguratorProps) {
       frameKey: chamberKey && chamberKey !== props.designFrameKey ? chamberKey : undefined,
       cillKey: cillKey || undefined,
       splitRatios: Object.keys(splitRatios).length ? splitRatios : undefined,
+      // Persist colour only when a non-default finish is chosen (omit when it
+      // equals the system default ⇒ the saved item re-solves byte-identically).
+      colourKeyInside:
+        colourKey && colourKey !== options?.defaultColourKey ? colourKey : undefined,
+      colourKeyOutside:
+        colourKeyOutside && colourKeyOutside !== colourKey ? colourKeyOutside : undefined,
     };
     try {
       let orderId = props.orderId;
@@ -219,6 +245,11 @@ export default function Configurator(props: ConfiguratorProps) {
   const canAdd = Boolean(props.productId);
   const selectedSystem = systems.find((s) => s.systemId === systemId);
   const selectedColour = options?.colours.find((c) => c.key === colourKey);
+  const selectedColourOutside = options?.colours.find((c) => c.key === colourKeyOutside);
+  const isDualColour = Boolean(colourKeyOutside && colourKeyOutside !== colourKey);
+  const finishLabel = isDualColour
+    ? `${selectedColour?.name ?? "Default"} / ${selectedColourOutside?.name ?? ""} (out)`
+    : selectedColour?.name ?? "Default";
   const selectedGlass = options?.glass.find((g) => g.key === glassKey);
   const selectedCill = options?.cills?.find((c) => c.key === cillKey);
   const lines = result?.pricing.lines ?? [];
@@ -327,17 +358,31 @@ export default function Configurator(props: ConfiguratorProps) {
               </select>
             </label>
 
-            <label className="block">
-              <FieldLabel>Colour / finish</FieldLabel>
-              <select value={colourKey} onChange={(e) => setColourKey(e.target.value)} className={selectClass}>
-                {options?.colours.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.name}
-                    {c.priceUpliftPct ? ` (+${c.priceUpliftPct}%)` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <FieldLabel>Colour — inside</FieldLabel>
+                <select value={colourKey} onChange={(e) => setColourKey(e.target.value)} className={selectClass}>
+                  {options?.colours.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.name}
+                      {c.priceUpliftPct ? ` (+${c.priceUpliftPct}%)` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <FieldLabel>Colour — outside</FieldLabel>
+                <select value={colourKeyOutside} onChange={(e) => setColourKeyOutside(e.target.value)} className={selectClass}>
+                  <option value="">Same as inside</option>
+                  {options?.colours.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.name}
+                      {c.priceUpliftPct ? ` (+${c.priceUpliftPct}%)` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
             <label className="block">
               <FieldLabel>Cill</FieldLabel>
@@ -363,20 +408,29 @@ export default function Configurator(props: ConfiguratorProps) {
               </div>
               <div className="mt-3 flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-600">Finish</span>
-                <span className="text-right font-semibold text-slate-950">{selectedColour?.name ?? "Default"}</span>
+                <span className="text-right font-semibold text-slate-950">{finishLabel}</span>
               </div>
               <div className="mt-3 flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-600">Cill</span>
                 <span className="text-right font-semibold text-slate-950">{selectedCill?.name ?? "None"}</span>
               </div>
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {["#ffffff", "#353b3f", "#9a672f", "#4d2b22"].map((color, index) => (
+              {/* Live swatches: inside / outside finish (falls back to grey when a
+                  colour carries no display hex). */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-slate-500">Inside</p>
                   <span
-                    key={color}
-                    className={index === 0 ? "h-8 rounded-md border-2 border-[#4442e3]" : "h-8 rounded-md border border-slate-300"}
-                    style={{ background: color }}
+                    className="block h-8 rounded-md border border-slate-300"
+                    style={{ background: selectedColour?.hex ?? "#e6e6e6" }}
                   />
-                ))}
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-slate-500">Outside</p>
+                  <span
+                    className="block h-8 rounded-md border border-slate-300"
+                    style={{ background: (isDualColour ? selectedColourOutside?.hex : selectedColour?.hex) ?? "#e6e6e6" }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -391,8 +445,40 @@ export default function Configurator(props: ConfiguratorProps) {
                   {width} x {height} mm / {systemId || "No system"}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge tone="blue">Preview</Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* 2D / 3D view switch */}
+                <div className="inline-flex overflow-hidden rounded-md border border-slate-300 text-xs font-semibold">
+                  {(["2d", "3d"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setViewMode(m)}
+                      className={
+                        "px-3 py-1.5 transition-colors " +
+                        (viewMode === m ? "bg-[#4442e3] text-white" : "bg-white text-slate-600 hover:bg-slate-50")
+                      }
+                      aria-pressed={viewMode === m}
+                    >
+                      {m === "2d" ? "2D" : "3D"}
+                    </button>
+                  ))}
+                </div>
+                {/* Inner-joint overlay toggle (2D only) */}
+                <label
+                  className={
+                    "inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold " +
+                    (viewMode === "3d" ? "cursor-not-allowed text-slate-300" : "cursor-pointer text-slate-600 hover:bg-slate-50")
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={showJoints}
+                    disabled={viewMode === "3d"}
+                    onChange={(e) => setShowJoints(e.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  Joints
+                </label>
                 <Badge tone={STATUS_META[status].tone}>{STATUS_META[status].label}</Badge>
               </div>
             </div>
@@ -400,6 +486,12 @@ export default function Configurator(props: ConfiguratorProps) {
               <div className="quote-preview-frame relative flex min-h-0 w-full min-w-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white/[0.84] p-4 shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-6">
                 {error ? (
                   <Alert tone="red" title="Quote failed">{error}</Alert>
+                ) : viewMode === "3d" && canUseDesigner && result ? (
+                  <Window3D
+                    geometry={result.geometry}
+                    insideHex={selectedColour?.hex}
+                    outsideHex={(isDualColour ? selectedColourOutside?.hex : selectedColour?.hex)}
+                  />
                 ) : canUseDesigner && result ? (
                   <WindowDesigner
                     geometry={result.geometry}
@@ -510,7 +602,7 @@ export default function Configurator(props: ConfiguratorProps) {
                     {props.orderId ? "Add to this order" : "Create order from quote"}
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-slate-500">
-                    The selected cill is saved with the item; glass and colour use the order defaults.
+                    The selected cill and colour (inside/outside) are saved with the item; glass uses the order default.
                   </p>
                 </div>
                 <Icon name="orders" className="mt-1 h-5 w-5 text-slate-400" />

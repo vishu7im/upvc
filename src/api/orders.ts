@@ -173,6 +173,8 @@ const addItemSchema = z.object({
   splitRatios: z.record(z.string(), z.number()).optional(),
   frameKey: z.string().optional(),
   cillKey: z.string().optional(),
+  colourKeyInside: z.string().optional(),
+  colourKeyOutside: z.string().optional(),
 });
 
 ordersRouter.post(
@@ -209,6 +211,8 @@ ordersRouter.post(
           splitRatios: body.splitRatios,
           frameKey: body.frameKey,
           cillKey: body.cillKey,
+          colourKeyInside: body.colourKeyInside,
+          colourKeyOutside: body.colourKeyOutside,
         }),
       );
     } catch (e: any) {
@@ -236,6 +240,8 @@ ordersRouter.post(
           | undefined,
         frameKey: body.frameKey ?? null,
         cillKey: body.cillKey ?? null,
+        colourKeyInside: body.colourKeyInside ?? null,
+        colourKeyOutside: body.colourKeyOutside ?? null,
       },
     });
     res.status(201).json(item);
@@ -298,6 +304,8 @@ ordersRouter.post(
             | undefined,
           frameKey: item.frameKey,
           cillKey: item.cillKey,
+          colourKeyInside: item.colourKeyInside,
+          colourKeyOutside: item.colourKeyOutside,
         }),
       );
       solved.push({ output, qty: item.qty });
@@ -317,7 +325,7 @@ ordersRouter.post(
         // real W×H); the catalog preview reflects neither. Items with neither keep
         // the catalog preview to match the gallery.
         svg:
-          item.cillKey || item.splitRatios
+          item.cillKey || item.splitRatios || item.colourKeyInside || item.colourKeyOutside
             ? output.geometry.svg
             : item.design.imageSvg ?? item.design.svgPreview ?? output.geometry.svg,
         caption: `${i + 1}. ${output.designName} — ${item.widthMm} × ${item.heightMm} mm${item.qty > 1 ? ` ×${item.qty}` : ""}`,
@@ -596,13 +604,19 @@ async function hydrateDocumentPreviews(orderId: string, html: string): Promise<s
     orderBy: { id: "asc" },
     select: {
       cillKey: true,
+      splitRatios: true,
+      colourKeyInside: true,
+      colourKeyOutside: true,
       design: { select: { imageSvg: true, svgPreview: true } },
     },
   });
-  // Items with a cill keep their baked engine SVG (it has the cill drawn);
-  // null ⇒ leave the original block untouched. Others get the catalog preview.
+  // Items whose baked engine SVG carries info the catalog preview lacks — a cill,
+  // dragged spans, or a colour/joint tint — keep that baked SVG (null ⇒ leave the
+  // original block untouched). Plain items fall back to the catalog preview.
   const svgs = previews.map((item) =>
-    item.cillKey ? null : item.design.imageSvg ?? item.design.svgPreview ?? null,
+    item.cillKey || item.splitRatios || item.colourKeyInside || item.colourKeyOutside
+      ? null
+      : item.design.imageSvg ?? item.design.svgPreview ?? null,
   );
   let index = 0;
 
@@ -626,6 +640,8 @@ function buildQuoteInput(
     splitRatios?: Record<string, number> | null;
     frameKey?: string | null;
     cillKey?: string | null;
+    colourKeyInside?: string | null;
+    colourKeyOutside?: string | null;
   },
 ): QuoteInput {
   return {
@@ -641,5 +657,7 @@ function buildQuoteInput(
     splitRatios: rest.splitRatios ?? undefined,
     frameKey: rest.frameKey ?? undefined,
     cillKey: rest.cillKey ?? undefined,
+    colourKey: rest.colourKeyInside ?? undefined,
+    colourKeyOutside: rest.colourKeyOutside ?? undefined,
   };
 }

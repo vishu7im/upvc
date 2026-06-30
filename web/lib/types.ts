@@ -68,7 +68,7 @@ export interface SystemOptions {
   /** Selectable frame profiles (chambers, e.g. 5ch / 6ch). */
   chambers?: { key: string; name: string }[];
   glass: { key: string; name: string }[];
-  colours: { key: string; name: string; priceUpliftPct: number }[];
+  colours: { key: string; name: string; priceUpliftPct: number; hex?: string }[];
   cills?: { key: string; name: string; projectionMm: number }[];
   defaultColourKey: string | null;
 }
@@ -218,6 +218,8 @@ export interface CatalogColour {
   costUpliftPct: number;
   priceUpliftPct: number;
   isBase: boolean;
+  /** Display swatch hex (e.g. "#353b3f"); null/absent ⇒ grey preview. */
+  hex?: string | null;
 }
 export interface CatalogCill {
   key: string;

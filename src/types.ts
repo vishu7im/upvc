@@ -120,6 +120,12 @@ export interface ColourOption {
   priceUpliftPct: number;
   /** Marks the base/no-uplift colour for the system. */
   isBase: boolean;
+  /**
+   * Optional display swatch (CSS hex, e.g. "#353b3f"). Cosmetic only — used to
+   * tint the preview SVG / 3D view and the UI swatch. Absent ⇒ the historical
+   * grey profile fill (so base/unsetted colours render byte-identically).
+   */
+  hex?: string;
 }
 
 /**
@@ -213,6 +219,18 @@ export interface DocImage {
 export interface DocCill {
   name: string;
   manufacturingHeightMm: number;
+}
+
+/**
+ * Colour/finish display info for document headers. When present, the header
+ * shows the selected inside colour and (if different) the outside colour.
+ * Omitted ⇒ no colour row (byte-identical header for default White quotes).
+ */
+export interface DocColour {
+  /** Inside / primary colour name (e.g. "White"). */
+  inside: string;
+  /** Outside colour name when a dual-colour finish was chosen (absent ⇒ single colour). */
+  outside?: string;
 }
 
 /** Project-level financial & display settings (Phase 1: GBP, 20% tax, 75% markup, 10% wastage). */
@@ -569,6 +587,14 @@ export interface QuoteInput {
    */
   colourKey?: string;
   /**
+   * Per-quote OUTSIDE colour/finish selection. When supplied and different from
+   * `colourKey` (the inside/primary colour), the engine SUMS the two colours'
+   * uplifts onto the visible profiles (dual-colour finish). Omitted (or equal to
+   * `colourKey`) ⇒ single-colour behaviour, so a quote without it is byte-identical
+   * to pre-existing single-colour quotes (and the 157 assertions hold).
+   */
+  colourKeyOutside?: string;
+  /**
    * Per-quote cill selection. Cill `key` whose nominal size picks the physical
    * cill profile; selecting any cill reduces the manufacturing height by a fixed
    * 30 mm (the customer-entered height is unchanged for display). Omitted ⇒ no
@@ -583,6 +609,12 @@ export interface QuoteInput {
    * so a quote without it is byte-identical to pre-existing quotes.
    */
   splitRatios?: Record<string, number>;
+  /**
+   * Draw the inner-joint overlay (45° mitre corners + T/Z divider markers) on
+   * the rendered preview SVG embedded in documents. Purely visual; omitted/false
+   * ⇒ no overlay, so a quote without it is byte-identical to pre-existing quotes.
+   */
+  showJoints?: boolean;
 }
 
 export interface QuoteOutput {

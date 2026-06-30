@@ -170,6 +170,7 @@ model ColourOption {
   costUpliftPct  Decimal @default(0) @db.Decimal(6, 3)
   priceUpliftPct Decimal @default(0) @db.Decimal(6, 3)
   isBase         Boolean @default(false)
+  hex            String? // optional display swatch (CSS hex), e.g. "#353b3f"; null ⇒ grey preview
 
   @@unique([systemId, key])
   @@map("colour_option")
@@ -330,6 +331,8 @@ model OrderItem {
   splitRatios Json? // per-quote span-drag overrides (Record<pathId, ratio>); null ⇒ default geometry
   frameKey  String? // per-quote chamber override (frame partKey, e.g. "frame-6ch"); null ⇒ design's baked frame
   cillKey   String? // selected cill Record key (null ⇒ no cill). Drives the 30mm deduction + cill render in confirmed docs.
+  colourKeyInside  String? // per-quote inside/primary colour key; null ⇒ system default (byte-identical)
+  colourKeyOutside String? // per-quote outside colour key (dual-colour finish); null ⇒ same as inside
   pricingSnapshot Json? // totals captured at confirm
 
   @@index([orderId])

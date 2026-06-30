@@ -363,14 +363,14 @@ function Colours({
   colours: Record<string, CatalogColour>;
   onChanged: () => void;
 }) {
-  const [nf, setNf] = useState({ key: "", code: "", name: "", costUpliftPct: 0, priceUpliftPct: 0 });
+  const [nf, setNf] = useState({ key: "", code: "", name: "", costUpliftPct: 0, priceUpliftPct: 0, hex: "#353b3f" });
   const [msg, setMsg] = useState<string | null>(null);
 
   async function add() {
     setMsg(null);
     try {
       await addColour(systemId, nf);
-      setNf({ key: "", code: "", name: "", costUpliftPct: 0, priceUpliftPct: 0 });
+      setNf({ key: "", code: "", name: "", costUpliftPct: 0, priceUpliftPct: 0, hex: "#353b3f" });
       onChanged();
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : "Failed");
@@ -389,6 +389,7 @@ function Colours({
             <tr>
               <th className={thClass}>Key</th>
               <th className={thClass}>Name</th>
+              <th className={thClass + " w-20"}>Swatch</th>
               <th className={thClass + " w-36 text-right"}>Cost uplift %</th>
               <th className={thClass + " w-36 text-right"}>Price uplift %</th>
               <th className={thClass + " w-24"} />
@@ -403,10 +404,11 @@ function Colours({
       </div>
       <div className="m-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
         <h3 className="mb-3 text-sm font-semibold text-slate-950">Add colour</h3>
-        <div className="grid gap-3 md:grid-cols-5 lg:grid-cols-[1fr_1fr_2fr_120px_120px_auto]">
+        <div className="grid items-center gap-3 md:grid-cols-6 lg:grid-cols-[1fr_1fr_2fr_56px_120px_120px_auto]">
         <input placeholder="key" value={nf.key} onChange={(e) => setNf({ ...nf, key: e.target.value })} className={fieldClass} />
         <input placeholder="code" value={nf.code} onChange={(e) => setNf({ ...nf, code: e.target.value })} className={fieldClass} />
         <input placeholder="name" value={nf.name} onChange={(e) => setNf({ ...nf, name: e.target.value })} className={fieldClass} />
+        <input type="color" value={nf.hex} onChange={(e) => setNf({ ...nf, hex: e.target.value })} className="h-9 w-full cursor-pointer rounded-md border border-slate-300" title="Display swatch" />
         <input type="number" placeholder="cost %" value={nf.costUpliftPct} onChange={(e) => setNf({ ...nf, costUpliftPct: +e.target.value })} className={fieldClass} />
         <input type="number" placeholder="price %" value={nf.priceUpliftPct} onChange={(e) => setNf({ ...nf, priceUpliftPct: +e.target.value })} className={fieldClass} />
         <Button onClick={add} disabled={!nf.key || !nf.code || !nf.name} variant="success">
@@ -430,14 +432,18 @@ function ColourRow({
 }) {
   const [costPct, setCostPct] = useState(colour.costUpliftPct);
   const [pricePct, setPricePct] = useState(colour.priceUpliftPct);
+  const [hex, setHex] = useState(colour.hex ?? "#e6e6e6");
   const [busy, setBusy] = useState(false);
-  const dirty = costPct !== colour.costUpliftPct || pricePct !== colour.priceUpliftPct;
+  const dirty =
+    costPct !== colour.costUpliftPct ||
+    pricePct !== colour.priceUpliftPct ||
+    hex !== (colour.hex ?? "#e6e6e6");
   const inp = "h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-right text-sm focus:border-[#4442e3] focus:ring-4 focus:ring-[#4442e3]/10";
 
   async function save() {
     setBusy(true);
     try {
-      await updateColour(systemId, colour.key, { costUpliftPct: costPct, priceUpliftPct: pricePct });
+      await updateColour(systemId, colour.key, { costUpliftPct: costPct, priceUpliftPct: pricePct, hex });
       onSaved();
     } finally {
       setBusy(false);
@@ -451,6 +457,9 @@ function ColourRow({
         {colour.isBase && <span className="ml-1 text-slate-400">(base)</span>}
       </td>
       <td className={tdClass + " font-semibold text-slate-900"}>{colour.name}</td>
+      <td className={tdClass}>
+        <input type="color" value={hex} onChange={(e) => setHex(e.target.value)} className="h-8 w-12 cursor-pointer rounded border border-slate-300" title="Display swatch" />
+      </td>
       <td className={tdClass}>
         <input type="number" step="0.1" value={costPct} onChange={(e) => setCostPct(+e.target.value)} className={inp} />
       </td>

@@ -185,7 +185,10 @@ async function seedSystem(
     });
   }
 
-  // 6. Colours / finishes (M5) — base white ships at 0% uplift.
+  // 6. Colours / finishes (M5 + U7) — base white at 0% uplift; the rest ship a
+  // display hex but 0% uplift (owner sets real upcharges via the admin editor).
+  // update = structural fields only (uplift %s preserved across re-seed); create
+  // seeds the full row incl. hex.
   for (const [key, c] of Object.entries(sys.colours)) {
     const {
       costUpliftPct: _costUpliftPct,
@@ -203,6 +206,7 @@ async function seedSystem(
         costUpliftPct: c.costUpliftPct,
         priceUpliftPct: c.priceUpliftPct,
         isBase: c.isBase,
+        hex: c.hex ?? null,
       },
     });
   }

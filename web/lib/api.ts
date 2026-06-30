@@ -86,11 +86,16 @@ export interface QuoteRequest {
   /** Selected chamber (frame partKey, e.g. "frame-6ch"); omitted ⇒ design default. */
   frameKey?: string;
   glassKey?: string;
+  /** Inside / primary colour key. */
   colourKey?: string;
+  /** Outside colour key for a dual-colour finish; omitted ⇒ same as inside. */
+  colourKeyOutside?: string;
   /** Selected cill key (omitted ⇒ no cill, no 30mm deduction). */
   cillKey?: string;
   /** Internal split overrides keyed by split-node pathId; full-window fraction 0..1. */
   splitRatios?: Record<string, number>;
+  /** Draw the inner-joint overlay (45° mitres + T/Z markers) on the preview SVG. */
+  showJoints?: boolean;
 }
 
 /** Run the engine for a live preview (public endpoint; no order persisted). */
@@ -109,7 +114,7 @@ export function createOrder(body: {
 
 export function addOrderItem(
   orderId: string,
-  item: { productId: string; designId: string; widthMm: number; heightMm: number; qty?: number; frameKey?: string; cillKey?: string; splitRatios?: Record<string, number> },
+  item: { productId: string; designId: string; widthMm: number; heightMm: number; qty?: number; frameKey?: string; cillKey?: string; splitRatios?: Record<string, number>; colourKeyInside?: string; colourKeyOutside?: string },
 ): Promise<unknown> {
   return apiSend(`/api/orders/${orderId}/items`, "POST", item);
 }

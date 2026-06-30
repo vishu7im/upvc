@@ -6,7 +6,7 @@
 // Puppeteer or Playwright — the HTML is already print-ready.
 // =====================================================================
 
-import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, BarPiece } from "../types.ts";
+import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, DocColour, BarPiece } from "../types.ts";
 
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #28323c; margin: 32px; }
@@ -129,7 +129,21 @@ function cillRows(cill?: DocCill): string {
       <b>Mfg. Height:</b><span>${cill.manufacturingHeightMm} mm</span>`;
 }
 
-function header(input: QuoteInput, title: string, systemName: string, designName: string, branding?: DocBranding, images?: DocImage[], cill?: DocCill): string {
+/**
+ * Colour header row. Only rendered when a non-default colour is selected: shows
+ * the inside colour and, for a dual-colour finish, the outside colour. Absent ⇒
+ * "" (byte-identical header for default White quotes).
+ */
+function colourRows(colour?: DocColour): string {
+  if (!colour) return "";
+  const value = colour.outside
+    ? `${esc(colour.inside)} (in) / ${esc(colour.outside)} (out)`
+    : esc(colour.inside);
+  return `
+      <b>Colour:</b><span>${value}</span>`;
+}
+
+function header(input: QuoteInput, title: string, systemName: string, designName: string, branding?: DocBranding, images?: DocImage[], cill?: DocCill, colour?: DocColour): string {
   const today = new Date().toLocaleDateString("en-GB");
   return `
     ${brandBar(branding)}
@@ -142,7 +156,7 @@ function header(input: QuoteInput, title: string, systemName: string, designName
       <b>System:</b><span>${esc(systemName)}</span>
       <b>Design:</b><span>${esc(designName)}</span>
       <b>Width × Height:</b><span>${input.widthMm > 0 && input.heightMm > 0 ? `${input.widthMm} × ${input.heightMm} mm` : "—"}</span>
-      <b>Quote#:</b><span>${esc(input.orderNo)}</span>${cillRows(cill)}
+      <b>Quote#:</b><span>${esc(input.orderNo)}</span>${cillRows(cill)}${colourRows(colour)}
     </div>
     ${previewBand(images)}
   `;
@@ -158,6 +172,7 @@ export function renderWorkOrder(
   images?: DocImage[],
   variant: DocVariant = "normal",
   cill?: DocCill,
+  colour?: DocColour,
 ): string {
   // Club identical pieces into qty rows (e.g. a frame's 4 bars → 2 rows × qty 2).
   const len = (b: BarPiece) => barLen(b, variant);
@@ -212,7 +227,7 @@ export function renderWorkOrder(
   `).join("");
 
   return wrap("Work Order" + variantSuffix(variant), `
-    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill)}
+    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill, colour)}
     ${weldNote(variant)}
 
     <div class="section-title">Sections Required</div>
@@ -247,6 +262,7 @@ export function renderCuttingList(
   images?: DocImage[],
   variant: DocVariant = "normal",
   cill?: DocCill,
+  colour?: DocColour,
 ): string {
   // Group by section description (matches Quotila — one table per profile).
   const all = [...parts.bars, ...parts.reinforcement];
@@ -282,7 +298,7 @@ export function renderCuttingList(
   }).join("");
 
   return wrap("Cutting List" + variantSuffix(variant), `
-    ${header(input, "CUTTING LIST" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill)}
+    ${header(input, "CUTTING LIST" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill, colour)}
     ${weldNote(variant)}
     ${sections}
   `, branding);
@@ -297,6 +313,7 @@ export function renderBom(
   branding?: DocBranding,
   images?: DocImage[],
   cill?: DocCill,
+  colour?: DocColour,
 ): string {
   // Group by financial category to mirror your spec.
   const byCat = new Map<string, typeof pricing.lines>();
@@ -328,7 +345,7 @@ export function renderBom(
   }).join("");
 
   return wrap("Bill of Materials", `
-    ${header(input, "BILL OF MATERIALS", systemName, designName, branding, images, cill)}
+    ${header(input, "BILL OF MATERIALS", systemName, designName, branding, images, cill, colour)}
     ${sections}
   `, branding);
 }
@@ -342,11 +359,12 @@ export function renderPriceSummary(
   branding?: DocBranding,
   images?: DocImage[],
   cill?: DocCill,
+  colour?: DocColour,
 ): string {
   const T = pricing.totals;
   const c = pricing.currency === "GBP" ? "£" : pricing.currency + " ";
   return wrap("Price Summary", `
-    ${header(input, "PRICE SUMMARY", systemName, designName, branding, images, cill)}
+    ${header(input, "PRICE SUMMARY", systemName, designName, branding, images, cill, colour)}
 
     <table class="totals">
       <tbody>

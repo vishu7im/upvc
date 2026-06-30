@@ -10,6 +10,7 @@ import { loadCatalog } from "../catalog/index.ts";
 import type { QuoteOutput } from "../types.ts";
 import { validateExtractor } from "../tools/extract-topology.test.ts";
 import { validatePricing } from "../engine/pricing.test.ts";
+import { validateSvg } from "../engine/svg.test.ts";
 
 interface ExpectedBar {
   code: string;
@@ -496,6 +497,33 @@ function validateWeldMath(): void {
   expect("default weld unchanged after custom (welded = 1205)", def2Top?.weldedExtMm ?? -1, 1205);
 }
 
+// Inside/outside colour + joint overlay are additive: a default quote, a
+// White+White quote, and the same quote are all byte-identical (geometry +
+// pricing + SVG). The joints flag only ADDS overlay markup and never changes
+// pricing. Uses the real catalog (only White seeded), so this proves the
+// no-op/byte-identical guarantee end-to-end through solve().
+function validateColourAndJoints(): void {
+  console.log("\n==================================================");
+  console.log("Inside/outside colour + joint overlay (additive)");
+  console.log("==================================================");
+
+  const baseInput = {
+    orderNo: "TEST", customer: "Validation",
+    designId: "win-th-over-fixed-z", widthMm: 1200, heightMm: 1200,
+    systemId: "sunnyplast-70",
+  } as const;
+
+  const plain = solve({ ...baseInput });
+  const whiteWhite = solve({ ...baseInput, colourKey: "white", colourKeyOutside: "white" });
+  expect("White+White grandTotal == default", whiteWhite.pricing.totals.grandTotal, plain.pricing.totals.grandTotal);
+  expect("White+White SVG byte-identical", whiteWhite.geometry.svg, plain.geometry.svg);
+
+  const joints = solve({ ...baseInput, showJoints: true });
+  expect("showJoints adds joint layer", joints.geometry.svg.includes('id="joints"'), true);
+  expect("default SVG has no joint layer", plain.geometry.svg.includes('id="joints"'), false);
+  expect("showJoints does NOT change pricing", joints.pricing.totals.grandTotal, plain.pricing.totals.grandTotal);
+}
+
 // Load the catalog from PostgreSQL before solving, then run all jobs.
 (async () => {
   await loadCatalog();
@@ -504,8 +532,10 @@ function validateWeldMath(): void {
   validateSlidingSpans();
   validateCustomMode();
   validateWeldMath();
+  validateColourAndJoints();
   validateExtractor(expect);
   validatePricing(expect);
+  validateSvg(expect);
 
   console.log("\n==================================================");
   console.log(`RESULTS:  ${passCount} passed,  ${failCount} failed`);

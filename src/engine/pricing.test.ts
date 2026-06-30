@@ -107,4 +107,21 @@ export function validatePricing(expect: Expect): void {
   // oak material price = frame 52 + reinf 8 = 60.
   const oakTotals = computePricing(PARTS, PLAN, GEOMETRY, oakSys, SETTINGS).totals;
   expect("oak grandTotal = 60", oakTotals.grandTotal, 60);
+
+  // Inside/outside (dual-colour): solve.ts synthesizes ONE combined colour whose
+  // uplift is the SUM of the two finishes. Here white(0)+oak(20/30) ⇒ a combined
+  // 20/30 (single non-zero finish), and oak(20/30)+oak ⇒ 40/60. We replicate the
+  // synthesized colour and assert computePricing applies the summed percentages.
+  const dualSys = makeSystem();
+  dualSys.colours["__combined__:oak+oak"] = {
+    key: "__combined__:oak+oak", code: "COL-OAK/COL-OAK", name: "Golden Oak / Golden Oak",
+    costUpliftPct: 40, priceUpliftPct: 60, isBase: false,
+  };
+  dualSys.defaultColourKey = "__combined__:oak+oak";
+  const dualFrame = lineFor(dualSys, "F1");
+  expect("dual oak+oak frame unitCost = 14", dualFrame?.unitCost ?? -1, 14);   // 10 * 1.40
+  expect("dual oak+oak frame unitPrice = 32", dualFrame?.unitPrice ?? -1, 32); // 20 * 1.60
+  // Internal steel still never upcharged, even with a dual finish.
+  const dualReinf = lineFor(dualSys, "R1");
+  expect("dual reinforcement unitPrice unchanged = 8", dualReinf?.unitPrice ?? -1, 8);
 }
