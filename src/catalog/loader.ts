@@ -14,6 +14,7 @@
 // validation run) before any `solve()`.
 // =====================================================================
 
+import type { Prisma } from "@prisma/client";
 import type {
   ProfileSystem,
   Design,
@@ -41,6 +42,20 @@ const num = (d: Decimalish): number =>
 const optNum = (d: Decimalish): number | undefined =>
   d == null ? undefined : typeof d === "number" ? d : d.toNumber();
 
+const systemCatalogInclude = {
+  parts: true,
+  glass: true,
+  gaskets: true,
+  hardware: true,
+  colours: true,
+  cills: true,
+  reinforcementMap: true,
+} satisfies Prisma.ProfileSystemInclude;
+
+type DbSystemWithCatalog = Prisma.ProfileSystemGetPayload<{
+  include: typeof systemCatalogInclude;
+}>;
+
 // ---- In-memory caches (populated by loadCatalog) --------------------
 let systemsCache: Record<string, ProfileSystem> = {};
 let designsCache: Design[] = [];
@@ -62,162 +77,13 @@ let loaded = false;
 /** Load the entire catalog from Postgres into memory. Idempotent. */
 export async function loadCatalog(): Promise<void> {
   const dbSystems = await prisma.profileSystem.findMany({
-    include: {
-      parts: true,
-      glass: true,
-      gaskets: true,
-      hardware: true,
-      colours: true,
-      cills: true,
-      reinforcementMap: true,
-    },
+    include: systemCatalogInclude,
   });
 
   const nextSystems: Record<string, ProfileSystem> = {};
 
   for (const s of dbSystems) {
-    const frames: Record<string, FrameSection> = {};
-    const sashes: Record<string, SashSection> = {};
-    const transoms: Record<string, TransomSection> = {};
-    const beads: Record<string, BeadSection> = {};
-    const reinforcement: Record<string, Reinforcement> = {};
-
-    for (const p of s.parts) {
-      const base = {
-        code: p.code,
-        name: p.name,
-        faceWidth: num(p.faceWidth),
-        weldAllowanceMm: num(p.weldAllowanceMm),
-        cost: num(p.cost),
-        price: num(p.price),
-        per: p.per as "m" | "pc" | "m2" | "set",
-        weight: num(p.weight),
-        financialCategory: p.financialCategory,
-      };
-      switch (p.kind) {
-        case "FRAME":
-          frames[p.partKey] = { ...base, glassRebate: num(p.glassRebate) };
-          break;
-        case "SASH":
-          sashes[p.partKey] = {
-            ...base,
-            overlap: num(p.overlap),
-            glassRebate: num(p.glassRebate),
-          };
-          break;
-        case "TRANSOM":
-          transoms[p.partKey] = {
-            ...base,
-            jointType: (p.jointType as "T" | "Z") ?? "T",
-          };
-          break;
-        case "BEAD":
-          beads[p.partKey] = { ...base, stickOut: num(p.stickOut) };
-          break;
-        case "REINFORCEMENT":
-          reinforcement[p.partKey] = {
-            ...base,
-            endClearance: num(p.endClearance),
-          };
-          break;
-      }
-    }
-
-    const glass: Record<string, GlassSection> = {};
-    for (const g of s.glass) {
-      glass[g.partKey] = {
-        code: g.code,
-        name: g.name,
-        rebatePerSide: num(g.rebatePerSide),
-        cost: num(g.cost),
-        price: num(g.price),
-        per: "m2",
-        weight: num(g.weight),
-        financialCategory: g.financialCategory,
-      };
-    }
-
-    const gaskets: Record<string, Gasket> = {};
-    for (const g of s.gaskets) {
-      gaskets[g.partKey] = {
-        code: g.code,
-        name: g.name,
-        cost: num(g.cost),
-        price: num(g.price),
-        per: "m",
-        weight: num(g.weight),
-        financialCategory: g.financialCategory,
-      };
-    }
-
-    const hardware: Record<string, HardwareItem> = {};
-    for (const h of s.hardware) {
-      hardware[h.partKey] = {
-        code: h.code,
-        name: h.name,
-        cost: num(h.cost),
-        price: num(h.price),
-        per: "pc",
-        weight: num(h.weight),
-        financialCategory: h.financialCategory,
-        ...(optNum(h.lengthMm) !== undefined
-          ? { lengthMm: optNum(h.lengthMm) }
-          : {}),
-      };
-    }
-
-    const colours: Record<string, ColourOption> = {};
-    for (const c of s.colours) {
-      colours[c.key] = {
-        key: c.key,
-        code: c.code,
-        name: c.name,
-        costUpliftPct: num(c.costUpliftPct),
-        priceUpliftPct: num(c.priceUpliftPct),
-        isBase: c.isBase,
-        ...(c.hex ? { hex: c.hex } : {}),
-      };
-    }
-
-    const cills: Record<string, CillOption> = {};
-    for (const c of s.cills) {
-      cills[c.partKey] = {
-        key: c.partKey,
-        code: c.code,
-        name: c.name,
-        projectionMm: c.projectionMm,
-        cost: num(c.cost),
-        price: num(c.price),
-        per: "m",
-        weight: num(c.weight),
-        financialCategory: c.financialCategory,
-      };
-    }
-
-    const reinforcementMap: Record<string, string> = {};
-    for (const r of s.reinforcementMap) {
-      reinforcementMap[r.profileCode] = r.reinforcementKey;
-    }
-
-    nextSystems[s.id] = {
-      systemId: s.id,
-      name: s.name,
-      currency: s.currency,
-      stockBarLengthMm: s.stockBarLengthMm,
-      sawKerfMm: s.sawKerfMm,
-      frames,
-      sashes,
-      transoms,
-      beads,
-      reinforcement,
-      gaskets,
-      glass,
-      hardware,
-      colours,
-      ...(s.defaultColourKey ? { defaultColourKey: s.defaultColourKey } : {}),
-      cills,
-      reinforcementMap,
-    };
+    nextSystems[s.id] = buildProfileSystem(s);
   }
 
   const dbDesigns = await prisma.design.findMany({ orderBy: { designId: "asc" } });
@@ -253,6 +119,169 @@ export async function loadCatalog(): Promise<void> {
   systemsCache = nextSystems;
   designsCache = nextDesigns;
   loaded = true;
+}
+
+/** Refresh one profile system from Postgres without reloading every design/SVG. */
+export async function refreshSystemCatalog(systemId: string): Promise<ProfileSystem | undefined> {
+  const dbSystem = await prisma.profileSystem.findUnique({
+    where: { id: systemId },
+    include: systemCatalogInclude,
+  });
+  if (!dbSystem) {
+    if (loaded) {
+      const { [systemId]: _removed, ...rest } = systemsCache;
+      systemsCache = rest;
+    }
+    return undefined;
+  }
+  const system = buildProfileSystem(dbSystem);
+  systemsCache = { ...systemsCache, [systemId]: system };
+  return system;
+}
+
+function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
+  const frames: Record<string, FrameSection> = {};
+  const sashes: Record<string, SashSection> = {};
+  const transoms: Record<string, TransomSection> = {};
+  const beads: Record<string, BeadSection> = {};
+  const reinforcement: Record<string, Reinforcement> = {};
+
+  for (const p of s.parts) {
+    const base = {
+      code: p.code,
+      name: p.name,
+      faceWidth: num(p.faceWidth),
+      weldAllowanceMm: num(p.weldAllowanceMm),
+      cost: num(p.cost),
+      price: num(p.price),
+      per: p.per as "m" | "pc" | "m2" | "set",
+      weight: num(p.weight),
+      financialCategory: p.financialCategory,
+    };
+    switch (p.kind) {
+      case "FRAME":
+        frames[p.partKey] = { ...base, glassRebate: num(p.glassRebate) };
+        break;
+      case "SASH":
+        sashes[p.partKey] = {
+          ...base,
+          overlap: num(p.overlap),
+          glassRebate: num(p.glassRebate),
+        };
+        break;
+      case "TRANSOM":
+        transoms[p.partKey] = {
+          ...base,
+          jointType: (p.jointType as "T" | "Z") ?? "T",
+        };
+        break;
+      case "BEAD":
+        beads[p.partKey] = { ...base, stickOut: num(p.stickOut) };
+        break;
+      case "REINFORCEMENT":
+        reinforcement[p.partKey] = {
+          ...base,
+          endClearance: num(p.endClearance),
+        };
+        break;
+    }
+  }
+
+  const glass: Record<string, GlassSection> = {};
+  for (const g of s.glass) {
+    glass[g.partKey] = {
+      code: g.code,
+      name: g.name,
+      rebatePerSide: num(g.rebatePerSide),
+      cost: num(g.cost),
+      price: num(g.price),
+      per: "m2",
+      weight: num(g.weight),
+      financialCategory: g.financialCategory,
+    };
+  }
+
+  const gaskets: Record<string, Gasket> = {};
+  for (const g of s.gaskets) {
+    gaskets[g.partKey] = {
+      code: g.code,
+      name: g.name,
+      cost: num(g.cost),
+      price: num(g.price),
+      per: "m",
+      weight: num(g.weight),
+      financialCategory: g.financialCategory,
+    };
+  }
+
+  const hardware: Record<string, HardwareItem> = {};
+  for (const h of s.hardware) {
+    hardware[h.partKey] = {
+      code: h.code,
+      name: h.name,
+      cost: num(h.cost),
+      price: num(h.price),
+      per: "pc",
+      weight: num(h.weight),
+      financialCategory: h.financialCategory,
+      ...(optNum(h.lengthMm) !== undefined
+        ? { lengthMm: optNum(h.lengthMm) }
+        : {}),
+    };
+  }
+
+  const colours: Record<string, ColourOption> = {};
+  for (const c of s.colours) {
+    colours[c.key] = {
+      key: c.key,
+      code: c.code,
+      name: c.name,
+      costUpliftPct: num(c.costUpliftPct),
+      priceUpliftPct: num(c.priceUpliftPct),
+      isBase: c.isBase,
+      ...(c.hex ? { hex: c.hex } : {}),
+    };
+  }
+
+  const cills: Record<string, CillOption> = {};
+  for (const c of s.cills) {
+    cills[c.partKey] = {
+      key: c.partKey,
+      code: c.code,
+      name: c.name,
+      projectionMm: c.projectionMm,
+      cost: num(c.cost),
+      price: num(c.price),
+      per: "m",
+      weight: num(c.weight),
+      financialCategory: c.financialCategory,
+    };
+  }
+
+  const reinforcementMap: Record<string, string> = {};
+  for (const r of s.reinforcementMap) {
+    reinforcementMap[r.profileCode] = r.reinforcementKey;
+  }
+
+  return {
+    systemId: s.id,
+    name: s.name,
+    currency: s.currency,
+    stockBarLengthMm: s.stockBarLengthMm,
+    sawKerfMm: s.sawKerfMm,
+    frames,
+    sashes,
+    transoms,
+    beads,
+    reinforcement,
+    gaskets,
+    glass,
+    hardware,
+    colours,
+    ...(s.defaultColourKey ? { defaultColourKey: s.defaultColourKey } : {}),
+    cills,
+    reinforcementMap,
+  };
 }
 
 /**

@@ -12,6 +12,7 @@
 
 export {
   loadCatalog,
+  refreshSystemCatalog,
   getSystem,
   getDesign,
   listSystems,

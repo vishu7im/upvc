@@ -19,7 +19,7 @@ import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { solve } from "../engine/solve.ts";
-import { loadCatalog, listSystems, listDesigns, getSystem } from "../catalog/index.ts";
+import { loadCatalog, refreshSystemCatalog, listSystems, listDesigns, getSystem } from "../catalog/index.ts";
 import { prisma } from "../db/client.ts";
 import { authRouter } from "./auth.ts";
 import { productsRouter } from "./products.ts";
@@ -55,9 +55,9 @@ app.get("/api/systems", (_req, res) => {
 // Read-only and free of supplier costs (only key/name + customer-facing colour
 // uplift %), so it's public alongside /api/systems — unlike the admin catalog
 // dump (/api/catalog/:id) which carries cost/price.
-app.get("/api/systems/:id/options", (req, res) => {
-  const sys = getSystem(req.params.id);
-  if (!sys) return res.status(404).json({ error: `Unknown system: ${req.params.id}` });
+app.get("/api/systems/:id/options", asyncHandler(async (req, res) => {
+  const sys = await refreshSystemCatalog(req.params.id);
+  if (!sys) throw new HttpError(404, `Unknown system: ${req.params.id}`);
   res.json({
     // Chamber options = the system's frame profiles (e.g. 5ch / 6ch).
     chambers: Object.entries(sys.frames).map(([key, f]) => ({ key, name: f.name })),
@@ -75,7 +75,7 @@ app.get("/api/systems/:id/options", (req, res) => {
     })),
     defaultColourKey: sys.defaultColourKey ?? null,
   });
-});
+}));
 
 // Quick list of the quotable (engine) designs for the driver UI.
 app.get("/api/designs", (_req, res) => {

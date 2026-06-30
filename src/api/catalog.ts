@@ -26,7 +26,7 @@ import { z } from "zod";
 import { prisma } from "../db/client.ts";
 import { asyncHandler, HttpError, validate } from "./http.ts";
 import { requireAuth, requireAdmin } from "./middleware/auth.ts";
-import { loadCatalog, getSystem } from "../catalog/index.ts";
+import { loadCatalog, refreshSystemCatalog } from "../catalog/index.ts";
 
 export const catalogRouter = Router();
 
@@ -43,7 +43,7 @@ async function assertSystem(systemId: string) {
 catalogRouter.get(
   "/:systemId",
   asyncHandler(async (req, res) => {
-    const sys = getSystem(req.params.systemId);
+    const sys = await refreshSystemCatalog(req.params.systemId);
     if (!sys) throw new HttpError(404, `Unknown system: ${req.params.systemId}`);
     res.json(sys);
   }),
