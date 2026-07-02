@@ -288,6 +288,21 @@ function addHardwareForCell(group: THREE.Group, cell: SolvedCell): void {
     const x = side === "left" ? face.x + 34 : face.x + face.w - 54;
     addPatioPull(group, { x, y: face.y + face.h * 0.38, w: 20, h: face.h * 0.24 }, z);
     addRollers(group, face, z);
+    return;
+  }
+
+  // French door pair: master (left leaf, by convention) carries the handle +
+  // lock at the meeting stile; slave only hinges. Midrail glazing panes carry
+  // the same content but no sashOuter — no hardware on those.
+  if (content === "french-door-master" || content === "french-door-slave") {
+    if (!cell.sashOuter) return;
+    if (content === "french-door-master") {
+      addHandle(group, latchHandleRect(face, "right", true), z, "lever-right");
+      addVerticalHinges(group, face, "left", 3, z);
+      addDoorLock(group, face, "right", z);
+    } else {
+      addVerticalHinges(group, face, "right", 3, z);
+    }
   }
 }
 

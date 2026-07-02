@@ -23,6 +23,8 @@ interface ExpectedJob {
   designId: string;
   widthMm: number;
   heightMm: number;
+  /** Optional per-quote split overrides (French unequal-leaf job). */
+  splitRatios?: Record<string, number>;
   bars: ExpectedBar[];
   glass: { width: number; height: number }[];
   gaskets: { code: string; lengthMm: number }[];
@@ -270,6 +272,124 @@ const JOB_104_OXXO: ExpectedJob = {
   ],
 };
 
+// ---------- FRENCH DOOR jobs (Job 00000264 — docs/french-door/) ------
+// Calibrated from 5 Windowmaker production docs (Design 408, all 1700×2100,
+// "PR01 70mm Casement Series"). Printed saw sizes carry a 3 mm/end weld
+// allowance on mitred/horned cuts; the assertions below use FINISHED (ext)
+// sizes — the welded (printed) sizes are asserted in validateFrenchWeld().
+// Constants: frame-french face 48 (KASA 70-48), door sash face 105 / overlap 20
+// (both the 105mm T sash SPQ-5-47252 and the 85mm Z sash SPQ-5-45252 cut
+// identically), STULP french-mullion face 48 square-cut, bead face 20, glass
+// rebate 15, midrail T/M SM 67.
+
+const JOB_264_T: ExpectedJob = {
+  name: "Job 00000264 (doc 0): 1700×2100 French door, T sash, full-height glass",
+  designId: "door-french-t",
+  widthMm: 1700,
+  heightMm: 2100,
+  bars: [
+    // Frame (printed 1706/2106 = +2×3 weld)
+    { code: "SPQ-6-11252", ext: 1700, int: 1604, orientation: "H" },
+    { code: "SPQ-6-11252", ext: 2100, int: 2004, orientation: "V" },
+    // French mullion — square cut, Ext == Int == daylight H (printed 2004 [ ])
+    { code: "SPQ-1-46252", ext: 2004, int: 2004, orientation: "V" },
+    // T door sash (printed 824/2050 = +2×3 weld)
+    { code: "SPQ-5-47252", ext: 818,  int: 608,  orientation: "H" },
+    { code: "SPQ-5-47252", ext: 2044, int: 1834, orientation: "V" },
+    // Beads (printed exactly — square cut, no weld)
+    { code: "SPQ-1-52253", ext: 648,  int: 608,  orientation: "H" },
+    { code: "SPQ-1-52253", ext: 1874, int: 1834, orientation: "V" },
+  ],
+  glass: [
+    { width: 638, height: 1864 },
+    { width: 638, height: 1864 },
+  ],
+  gaskets: [
+    { code: "SP_GSKFM", lengthMm: 2004 },  // French mullion gasket = mullion length
+    { code: "SP_S001",  lengthMm: 22576 }, // Σ per leaf: sash perim + daylight perim
+  ],
+  hardware: [
+    { code: "SPQ-2-91252", qty: 2 },  // inverter caps (2 per French mullion)
+    { code: "SP_CBLOCK01", qty: 8 },  // cavity locking blocks (4 per leaf)
+    { code: "SP_GBRIDGE",  qty: 16 }, // glazing bridges (8 per glass pane × 2)
+  ],
+};
+
+const JOB_264_MIDRAIL: ExpectedJob = {
+  name: "Job 00000264 (docs 1/4): 1700×2100 French door, Z sash, midrail per leaf",
+  designId: "door-french-midrail",
+  widthMm: 1700,
+  heightMm: 2100,
+  bars: [
+    { code: "SPQ-6-11252", ext: 1700, int: 1604, orientation: "H" },
+    { code: "SPQ-6-11252", ext: 2100, int: 2004, orientation: "V" },
+    { code: "SPQ-1-46252", ext: 2004, int: 2004, orientation: "V" },
+    // Z door sash — SAME cut sizes as the T sash (both face 105)
+    { code: "SPQ-5-45252", ext: 818,  int: 608,  orientation: "H" },
+    { code: "SPQ-5-45252", ext: 2044, int: 1834, orientation: "V" },
+    // Midrail T/M SM inside each sash ring (printed 748 <> = +2×3 weld)
+    { code: "SPQ-005-30252", ext: 742, int: 608, orientation: "H" },
+    // Beads: 2 panes per leaf (printed 648w / 924h; engine 923.5 within 0.5)
+    { code: "SPQ-1-52253", ext: 648,   int: 608,   orientation: "H" },
+    { code: "SPQ-1-52253", ext: 923.5, int: 883.5, orientation: "V" },
+  ],
+  glass: [
+    // Printed 638 × 914 (engine 913.5, within Quotila-style 0.5 rounding)
+    { width: 638, height: 913.5 },
+    { width: 638, height: 913.5 },
+    { width: 638, height: 913.5 },
+    { width: 638, height: 913.5 },
+  ],
+  gaskets: [
+    { code: "SP_GSKFM", lengthMm: 2004 },
+    { code: "SP_S001",  lengthMm: 22576 }, // invariant vs doc 0 — midrails don't change it
+  ],
+  hardware: [
+    { code: "SPQ-2-91252", qty: 2 },
+    { code: "SP_CBLOCK01", qty: 8 },
+    { code: "SP_GBRIDGE",  qty: 32 }, // 8 per pane × 4 panes
+  ],
+};
+
+// Docs 2/3: unequal leaves (printed sashes 724/924 = finished 718/918). Same
+// 1700×2100 window; the stulp centreline moves to x = 48 + 678 + 24 = 750.
+// Uses the COLLECTION design (externalId aee13358…, the pure Z-sash pair) +
+// the generic splitRatios override — proving the derived topology AND the
+// drag-to-resize path reproduce the docs.
+const JOB_264_UNEQUAL: ExpectedJob = {
+  name: "Job 00000264 (docs 2/3): 1700×2100 French door, unequal leaves 718/918",
+  designId: "aee13358-f0ec-4be5-992a-d3abad4642f9",
+  widthMm: 1700,
+  heightMm: 2100,
+  splitRatios: { root: 750 / 1700 },
+  bars: [
+    { code: "SPQ-6-11252", ext: 1700, int: 1604, orientation: "H" },
+    { code: "SPQ-6-11252", ext: 2100, int: 2004, orientation: "V" },
+    { code: "SPQ-1-46252", ext: 2004, int: 2004, orientation: "V" },
+    // Narrow leaf (printed 724 → 718), wide leaf (printed 924 → 918)
+    { code: "SPQ-5-45252", ext: 718,  int: 508,  orientation: "H" },
+    { code: "SPQ-5-45252", ext: 918,  int: 708,  orientation: "H" },
+    { code: "SPQ-5-45252", ext: 2044, int: 1834, orientation: "V" },
+    // Beads (printed 548 / 748 / 1874)
+    { code: "SPQ-1-52253", ext: 548,  int: 508,  orientation: "H" },
+    { code: "SPQ-1-52253", ext: 748,  int: 708,  orientation: "H" },
+    { code: "SPQ-1-52253", ext: 1874, int: 1834, orientation: "V" },
+  ],
+  glass: [
+    { width: 538, height: 1864 },
+    { width: 738, height: 1864 },
+  ],
+  gaskets: [
+    { code: "SP_GSKFM", lengthMm: 2004 },
+    { code: "SP_S001",  lengthMm: 22576 }, // invariant across the split (docs agree)
+  ],
+  hardware: [
+    { code: "SPQ-2-91252", qty: 2 },
+    { code: "SP_CBLOCK01", qty: 8 },
+    { code: "SP_GBRIDGE",  qty: 16 },
+  ],
+};
+
 // ---------- runner ---------------------------------------------------
 
 let passCount = 0, failCount = 0;
@@ -301,6 +421,7 @@ function validate(job: ExpectedJob): void {
     widthMm: job.widthMm,
     heightMm: job.heightMm,
     systemId: "sunnyplast-70",
+    ...(job.splitRatios ? { splitRatios: job.splitRatios } : {}),
   });
 
   // --- Bars: each expected bar must exist (by code + Ext + orientation).
@@ -497,6 +618,49 @@ function validateWeldMath(): void {
   expect("default weld unchanged after custom (welded = 1205)", def2Top?.weldedExtMm ?? -1, 1205);
 }
 
+// ---------- French door welded (printed) saw sizes -------------------
+// Job 00000264 prints SAW sizes = finished + 3 mm/end on mitred/horned cuts
+// (per-profile weldAllowanceMm = 3 on the French parts, so these hold even if
+// the GLOBAL weld default drifts in the DB). Square cuts print unchanged.
+// Also proves the equal-split default of the collection pair design (no
+// splitRatios ⇒ sashes 818, the docs' 824 printed).
+function validateFrenchDoor(): void {
+  console.log("\n==================================================");
+  console.log("French door — welded saw sizes + equal default");
+  console.log("==================================================");
+
+  const out: QuoteOutput = solve({
+    orderNo: "TEST", customer: "Validation",
+    designId: "door-french-midrail", widthMm: 1700, heightMm: 2100,
+    systemId: "sunnyplast-70",
+  });
+  const find = (code: string, ext: number) =>
+    out.parts.bars.find((b) => b.code === code && Math.abs(b.extMm - ext) <= 0.6);
+
+  expect("frame welded 1706 (printed)", find("SPQ-6-11252", 1700)?.weldedExtMm ?? -1, 1706);
+  expect("frame welded 2106 (printed)", out.parts.bars.find((b) => b.code === "SPQ-6-11252" && b.extMm === 2100)?.weldedExtMm ?? -1, 2106);
+  expect("sash welded 824 (printed)", find("SPQ-5-45252", 818)?.weldedExtMm ?? -1, 824);
+  expect("sash welded 2050 (printed)", find("SPQ-5-45252", 2044)?.weldedExtMm ?? -1, 2050);
+  expect("midrail welded 748 (printed)", find("SPQ-005-30252", 742)?.weldedExtMm ?? -1, 748);
+  expect("French mullion square-cut — welded == 2004", find("SPQ-1-46252", 2004)?.weldedExtMm ?? -1, 2004);
+  expect("French mullion end prep [ - ]", find("SPQ-1-46252", 2004)?.endPrep ?? "?", "[ - ]");
+
+  // Collection pair design, no overrides ⇒ equal leaves (818 each, docs 0/1/4).
+  const eq: QuoteOutput = solve({
+    orderNo: "TEST", customer: "Validation",
+    designId: "aee13358-f0ec-4be5-992a-d3abad4642f9", widthMm: 1700, heightMm: 2100,
+    systemId: "sunnyplast-70",
+  });
+  const sashH = eq.parts.bars.filter((b) => b.code === "SPQ-5-45252" && b.orientation === "H");
+  expect("equal default: 4 horizontal sash bars", sashH.length, 4);
+  expect("equal default: every sash 818", sashH.every((b) => Math.abs(b.extMm - 818) <= 0.6), true);
+  // French leaves are excluded from the casement gaskets (docs list neither).
+  const g1 = eq.parts.gaskets.find((g) => g.code === "GKT-01");
+  const g2 = eq.parts.gaskets.find((g) => g.code === "GKT-02");
+  expect("French quote: Gasket 01 empty", g1?.lengthMm ?? 0, 0);
+  expect("French quote: Gasket 02 empty", g2?.lengthMm ?? 0, 0);
+}
+
 // Inside/outside colour + joint overlay are additive: a default quote, a
 // White+White quote, and the same quote are all byte-identical (geometry +
 // pricing + SVG). The joints flag only ADDS overlay markup and never changes
@@ -528,8 +692,13 @@ function validateColourAndJoints(): void {
 (async () => {
   await loadCatalog();
 
-  [JOB_85, JOB_88, JOB_90, JOB_104_OX, JOB_104_OXO, JOB_104_OXXO].forEach(validate);
+  [
+    JOB_85, JOB_88, JOB_90,
+    JOB_104_OX, JOB_104_OXO, JOB_104_OXXO,
+    JOB_264_T, JOB_264_MIDRAIL, JOB_264_UNEQUAL,
+  ].forEach(validate);
   validateSlidingSpans();
+  validateFrenchDoor();
   validateCustomMode();
   validateWeldMath();
   validateColourAndJoints();

@@ -643,12 +643,13 @@ export const DERIVED: Record<string, DerivedEntry> = {
     "topology": {
       "kind": "vsplit",
       "splitAtRatio": 0.35,
-      "mullionKey": "mullion-78",
+      "mullionKey": "french-mullion",
       "left": {
         "kind": "leaf",
         "cell": {
-          "content": "door-left",
-          "sashKey": "sash-door-z"
+          "content": "french-door-master",
+          "sashKey": "sash-door-z-fr",
+          "beadKey": "bead-32"
         }
       },
       "right": {
@@ -658,8 +659,9 @@ export const DERIVED: Record<string, DerivedEntry> = {
         "left": {
           "kind": "leaf",
           "cell": {
-            "content": "door-right",
-            "sashKey": "sash-door-z"
+            "content": "french-door-slave",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         },
         "right": {
@@ -670,11 +672,11 @@ export const DERIVED: Record<string, DerivedEntry> = {
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 3,
       "leaves": 3,
@@ -1185,12 +1187,13 @@ export const DERIVED: Record<string, DerivedEntry> = {
       "bottom": {
         "kind": "vsplit",
         "splitAtRatio": 0.35,
-        "mullionKey": "mullion-78",
+        "mullionKey": "french-mullion",
         "left": {
           "kind": "leaf",
           "cell": {
-            "content": "door-left",
-            "sashKey": "sash-door-z"
+            "content": "french-door-master",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         },
         "right": {
@@ -1200,8 +1203,9 @@ export const DERIVED: Record<string, DerivedEntry> = {
           "left": {
             "kind": "leaf",
             "cell": {
-              "content": "door-right",
-              "sashKey": "sash-door-z"
+              "content": "french-door-slave",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           },
           "right": {
@@ -1213,11 +1217,11 @@ export const DERIVED: Record<string, DerivedEntry> = {
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 5,
       "leaves": 5,
@@ -1717,12 +1721,13 @@ export const DERIVED: Record<string, DerivedEntry> = {
         "right": {
           "kind": "vsplit",
           "splitAtRatio": 0.5,
-          "mullionKey": "mullion-78",
+          "mullionKey": "french-mullion",
           "left": {
             "kind": "leaf",
             "cell": {
-              "content": "door-left",
-              "sashKey": "sash-door-z"
+              "content": "french-door-master",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           },
           "right": {
@@ -1732,8 +1737,9 @@ export const DERIVED: Record<string, DerivedEntry> = {
             "left": {
               "kind": "leaf",
               "cell": {
-                "content": "door-right",
-                "sashKey": "sash-door-z"
+                "content": "french-door-slave",
+                "sashKey": "sash-door-z-fr",
+                "beadKey": "bead-32"
               }
             },
             "right": {
@@ -1746,11 +1752,11 @@ export const DERIVED: Record<string, DerivedEntry> = {
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 7,
       "leaves": 7,
@@ -5013,29 +5019,31 @@ export const DERIVED: Record<string, DerivedEntry> = {
         "right": {
           "kind": "vsplit",
           "splitAtRatio": 0.65,
-          "mullionKey": "meeting-stile",
+          "mullionKey": "french-mullion",
           "left": {
             "kind": "leaf",
             "cell": {
-              "content": "door-left",
-              "sashKey": "sash-door-z"
+              "content": "french-door-master",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           },
           "right": {
             "kind": "leaf",
             "cell": {
-              "content": "door-right",
-              "sashKey": "sash-door-z"
+              "content": "french-door-slave",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           }
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 6,
       "leaves": 6,
@@ -10471,28 +10479,30 @@ export const DERIVED: Record<string, DerivedEntry> = {
       "bottom": {
         "kind": "vsplit",
         "splitAtRatio": 0.5,
-        "mullionKey": "meeting-stile",
+        "mullionKey": "french-mullion",
         "left": {
           "kind": "leaf",
           "cell": {
-            "content": "door-left",
-            "sashKey": "sash-door-z"
+            "content": "french-door-master",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         },
         "right": {
           "kind": "leaf",
           "cell": {
-            "content": "door-right",
-            "sashKey": "sash-door-z"
+            "content": "french-door-slave",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 4,
       "leaves": 4,
@@ -11936,12 +11946,13 @@ export const DERIVED: Record<string, DerivedEntry> = {
       "bottom": {
         "kind": "vsplit",
         "splitAtRatio": 0.35,
-        "mullionKey": "mullion-78",
+        "mullionKey": "french-mullion",
         "left": {
           "kind": "leaf",
           "cell": {
-            "content": "door-left",
-            "sashKey": "sash-door-z"
+            "content": "french-door-master",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         },
         "right": {
@@ -11951,8 +11962,9 @@ export const DERIVED: Record<string, DerivedEntry> = {
           "left": {
             "kind": "leaf",
             "cell": {
-              "content": "door-right",
-              "sashKey": "sash-door-z"
+              "content": "french-door-slave",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           },
           "right": {
@@ -11964,11 +11976,11 @@ export const DERIVED: Record<string, DerivedEntry> = {
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 6,
       "leaves": 6,
@@ -22108,29 +22120,31 @@ export const DERIVED: Record<string, DerivedEntry> = {
         "right": {
           "kind": "vsplit",
           "splitAtRatio": 0.65,
-          "mullionKey": "meeting-stile",
+          "mullionKey": "french-mullion",
           "left": {
             "kind": "leaf",
             "cell": {
-              "content": "door-left",
-              "sashKey": "sash-door-z"
+              "content": "french-door-master",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           },
           "right": {
             "kind": "leaf",
             "cell": {
-              "content": "door-right",
-              "sashKey": "sash-door-z"
+              "content": "french-door-slave",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           }
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 5,
       "leaves": 5,
@@ -22195,27 +22209,29 @@ export const DERIVED: Record<string, DerivedEntry> = {
     "topology": {
       "kind": "vsplit",
       "splitAtRatio": 0.5,
-      "mullionKey": "meeting-stile",
+      "mullionKey": "french-mullion",
       "left": {
         "kind": "leaf",
         "cell": {
-          "content": "door-left",
-          "sashKey": "sash-door-z"
+          "content": "french-door-master",
+          "sashKey": "sash-door-z-fr",
+          "beadKey": "bead-32"
         }
       },
       "right": {
         "kind": "leaf",
         "cell": {
-          "content": "door-right",
-          "sashKey": "sash-door-z"
+          "content": "french-door-slave",
+          "sashKey": "sash-door-z-fr",
+          "beadKey": "bead-32"
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 2,
       "leaves": 2,
@@ -23109,12 +23125,13 @@ export const DERIVED: Record<string, DerivedEntry> = {
         "right": {
           "kind": "vsplit",
           "splitAtRatio": 0.5,
-          "mullionKey": "mullion-78",
+          "mullionKey": "french-mullion",
           "left": {
             "kind": "leaf",
             "cell": {
-              "content": "door-left",
-              "sashKey": "sash-door-z"
+              "content": "french-door-master",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           },
           "right": {
@@ -23124,8 +23141,9 @@ export const DERIVED: Record<string, DerivedEntry> = {
             "left": {
               "kind": "leaf",
               "cell": {
-                "content": "door-right",
-                "sashKey": "sash-door-z"
+                "content": "french-door-slave",
+                "sashKey": "sash-door-z-fr",
+                "beadKey": "bead-32"
               }
             },
             "right": {
@@ -23138,11 +23156,11 @@ export const DERIVED: Record<string, DerivedEntry> = {
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 8,
       "leaves": 8,
@@ -27584,12 +27602,13 @@ export const DERIVED: Record<string, DerivedEntry> = {
       "right": {
         "kind": "vsplit",
         "splitAtRatio": 0.5,
-        "mullionKey": "mullion-78",
+        "mullionKey": "french-mullion",
         "left": {
           "kind": "leaf",
           "cell": {
-            "content": "door-left",
-            "sashKey": "sash-door-z"
+            "content": "french-door-master",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         },
         "right": {
@@ -27599,8 +27618,9 @@ export const DERIVED: Record<string, DerivedEntry> = {
           "left": {
             "kind": "leaf",
             "cell": {
-              "content": "door-right",
-              "sashKey": "sash-door-z"
+              "content": "french-door-slave",
+              "sashKey": "sash-door-z-fr",
+              "beadKey": "bead-32"
             }
           },
           "right": {
@@ -27612,11 +27632,11 @@ export const DERIVED: Record<string, DerivedEntry> = {
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 4,
       "leaves": 4,
@@ -28524,28 +28544,30 @@ export const DERIVED: Record<string, DerivedEntry> = {
       "bottom": {
         "kind": "vsplit",
         "splitAtRatio": 0.5,
-        "mullionKey": "meeting-stile",
+        "mullionKey": "french-mullion",
         "left": {
           "kind": "leaf",
           "cell": {
-            "content": "door-left",
-            "sashKey": "sash-door-z"
+            "content": "french-door-master",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         },
         "right": {
           "kind": "leaf",
           "cell": {
-            "content": "door-right",
-            "sashKey": "sash-door-z"
+            "content": "french-door-slave",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 3,
       "leaves": 3,
@@ -28934,28 +28956,30 @@ export const DERIVED: Record<string, DerivedEntry> = {
       "right": {
         "kind": "vsplit",
         "splitAtRatio": 0.65,
-        "mullionKey": "meeting-stile",
+        "mullionKey": "french-mullion",
         "left": {
           "kind": "leaf",
           "cell": {
-            "content": "door-left",
-            "sashKey": "sash-door-z"
+            "content": "french-door-master",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         },
         "right": {
           "kind": "leaf",
           "cell": {
-            "content": "door-right",
-            "sashKey": "sash-door-z"
+            "content": "french-door-slave",
+            "sashKey": "sash-door-z-fr",
+            "beadKey": "bead-32"
           }
         }
       }
     },
-    "frameKey": "frame-6ch",
-    "quotable": false,
+    "frameKey": "frame-french",
+    "quotable": true,
     "meta": {
       "family": "french",
-      "calibration": "structural",
+      "calibration": "calibrated",
       "source": "svg-extractor",
       "squares": 3,
       "leaves": 3,

@@ -1006,6 +1006,8 @@ function openingLabel(content: string): string {
     "sliding-fixed": "Fixed panel",
     "sliding-slide-left": "Sliding ←",
     "sliding-slide-right": "Sliding →",
+    "french-door-master": "French door (master)",
+    "french-door-slave": "French door (slave)",
   };
   return labels[content] ?? content;
 }

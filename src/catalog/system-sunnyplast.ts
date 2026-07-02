@@ -104,6 +104,28 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Frame – (Standard)",
     },
+    // French door outer frame — calibrated from Job 00000264 (docs/french-door/,
+    // Windowmaker production docs, 1700×2100, profile "70mm/KASA 70-48+R1").
+    // Face 48 ("KASA 70-48" names it; same 48 the sliding frame derived):
+    //   French mullion length 2004 = 2100 − 2×48 = daylight H exactly, and the
+    //   sash gasket 22576 = Σ(sash perim + daylight perim) only fits face 48.
+    // SAME physical profile code as frame-6ch (SPQ-6-11252, printed on the doc)
+    // but Job 90 (Quotila, single door) calibrated that entry at face 68 — the
+    // two doc sources disagree, so the French family gets its OWN entry (cut
+    // lists for the door pair are identical under either face; the face only
+    // moves the drawn daylight + any uncalibrated fixed-sidelight glass).
+    // Weld 3 mm/end: printed frame 1706 = 1700 + 2×3 (all 5 docs).
+    "frame-french": {
+      code: "SPQ-6-11252",
+      name: "Frame 6 Chamber",
+      faceWidth: 48,
+      glassRebate: 15,
+      weldAllowanceMm: 3,       // Job 00000264: saw sizes print finished + 3/end
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Frame – (Standard)",
+    },
   },
 
   // ---------- SASHES ------------------------------------------------
@@ -138,6 +160,36 @@ export const SUNNYPLAST_70: ProfileSystem = {
     //   matches 606/522/524 × 1531 within the engine's ≤0.6mm tolerance). The
     //   sliding solver computes the panel envelope directly, so `overlap` is unused
     //   here (set 0). Code is a PLACEHOLDER (cf. SPQ-T-SASH).
+    // French door leaves — calibrated from Job 00000264 (docs/french-door/).
+    // BOTH the Z sash (85mm KAPI 70-85, SPQ-5-45252) and the T sash (105mm
+    // SPQ-5-47252) cut with engine face 105: printed sash 824/2050 → finished
+    // 818/2044 (−2×3 weld) → bead Int 608/1834 = sash − 2×105 on every doc.
+    // Overlap 20: sash H 2044 = daylight 2004 + 2×20 (with frame-french face 48).
+    // Glass rebate 15: glass 638×1864 = bead Int + 30 (all docs). Weld 3 mm/end.
+    "sash-door-z-fr": {
+      code: "SPQ-5-45252",
+      name: "Z Door Sash",
+      faceWidth: 105,
+      overlap: 20,
+      glassRebate: 15,
+      weldAllowanceMm: 3,       // Job 00000264: printed 824 = 818 + 2×3
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Sash – (Standard)",
+    },
+    "sash-door-t-fr": {
+      code: "SPQ-5-47252",
+      name: "T Door Sash",
+      faceWidth: 105,
+      overlap: 20,
+      glassRebate: 15,
+      weldAllowanceMm: 3,       // Job 00000264 doc 0 (105mm/SPQ-5-47+R1)
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Sash – (Standard)",
+    },
     "sash-sliding": {
       code: "SPQ-SL-SASH",
       name: "Sliding Sash",
@@ -190,9 +242,44 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Structural T/Z – (Standard)",
     },
+    // French mullion (STULP 70) — calibrated Job 00000264. jointType "S" =
+    // square-cut, NO welded horns: Ext == Int == the daylight height it spans
+    // (printed 2004 [ ] = 2100 − 2×48 on every doc; no weld addition). Face 48
+    // for cell layout: leaf daylight (1604 − 48)/2 = 778 → sash 818 = 778 + 2×20.
+    // Mounted on the slave leaf; carries the French Mullion Gasket (SP_GSKFM,
+    // length = mullion length — bars.ts).
+    "french-mullion": {
+      code: "SPQ-1-46252",
+      name: "French Mullion 70mm",
+      faceWidth: 48,
+      jointType: "S",
+      weldAllowanceMm: 0,       // square-cut: 0 welded ends, never welded
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Structural T/Z – (Standard)",
+    },
+    // French leaf midrail ("67mm/T/M small+R1") — the SAME physical profile as
+    // transom-z-67 (SPQ-005-30252) but used INSIDE a door-leaf sash via
+    // CellSpec.midrails (T-joint into the sash uprights, never breaks a jamb).
+    // Job 00000264 docs 1/4: printed 748 <> = Int 608 (sash Int) + 2×67 + 2×3 weld.
+    "midrail-67": {
+      code: "SPQ-005-30252",
+      name: "T Transom Mullion SM",
+      faceWidth: 67,
+      jointType: "T",
+      weldAllowanceMm: 3,       // Job 00000264: printed 748 = 742 + 2×3
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Structural T/Z – (Standard)",
+    },
   },
 
   // ---------- BEADS -------------------------------------------------
+  // NB: bead-28 must stay the FIRST entry — cells without an explicit beadKey
+  // default to the first bead (topology.ts), and the calibrated casement /
+  // door / sliding jobs all assert BEAD-28.
   beads: {
     "bead-28": {
       code: "BEAD-28",
@@ -200,6 +287,20 @@ export const SUNNYPLAST_70: ProfileSystem = {
       faceWidth: 20,            // bead face contribution per side (Ext-Int = 40 = 2x20)
       stickOut: 28,
       weldAllowanceMm: 0,       // beads are square-cut & snapped in, never welded
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Beads",
+    },
+    // French door bead ("BEAD 32 mm", authentic code) — calibrated Job 00000264:
+    // printed bead 648 = bead Int 608 + 2×20 (same Ext−Int=40 rule as bead-28).
+    // French leaves pin beadKey: "bead-32" explicitly.
+    "bead-32": {
+      code: "SPQ-1-52253",
+      name: "BEAD 32 mm",
+      faceWidth: 20,
+      stickOut: 32,
+      weldAllowanceMm: 0,       // square-cut, never welded (printed sizes have no weld add)
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -292,7 +393,15 @@ export const SUNNYPLAST_70: ProfileSystem = {
     "SPQ-5-30252":     "reinf-26x26-u",      // 78mm mullion when used full-height (Job 90)
     "SPQ-SL-FRAME":    "reinf-44x12",        // sliding frame: every bar reinforced (Job 104)
     "SPQ-SL-SASH":     "reinf-25x27-u",      // sliding sash: every bar reinforced (Job 104)
+    // French door sashes — ASSUMED same steel as the single-door sash (the
+    // Job 00000264 production docs carry "+R1" (reinforced) on every profile but
+    // don't itemise a steel section; not asserted in validation — reconcile
+    // against a French CUTTING LIST when one is available).
+    "SPQ-5-45252":     "reinf-28x44.5-u",    // French Z door sash (assumed, see above)
+    "SPQ-5-47252":     "reinf-28x44.5-u",    // French T door sash (assumed, see above)
     // Frame (5ch/6ch) and the lighter T-transom (67) are NOT reinforced in these examples.
+    // The French mullion (SPQ-1-46252, "STULP 70+R1") likely carries steel too —
+    // left unmapped pending an itemised French cutting list (golden rule).
   },
 
   // ---------- GASKETS ----------------------------------------------
@@ -310,6 +419,27 @@ export const SUNNYPLAST_70: ProfileSystem = {
     "gasket-02": {
       code: "GKT-02",
       name: "Gasket 02",
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Gasket/Woolpile",
+    },
+    // French door gaskets — calibrated Job 00000264 (all 5 docs, exact):
+    //   gasket-fm   = Σ French-mullion lengths            (printed 2004)
+    //   gasket-sash = Σ per leaf: sash outer perimeter + leaf daylight perimeter
+    //                 (printed 22576 = 2×(5724 + 5564); invariant across equal /
+    //                 unequal leaves and midrails, as the docs show)
+    "gasket-fm": {
+      code: "SP_GSKFM",
+      name: "French Mullion Gasket",
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Gasket/Woolpile",
+    },
+    "gasket-sash": {
+      code: "SP_S001",
+      name: "Sash Gasket",
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -377,8 +507,17 @@ export const SUNNYPLAST_70: ProfileSystem = {
     "hw-tt-hinge-set":        { code: "TT-HINGE",    name: "Tilt & Turn Hinge Set",                cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Tilt & Turn Gear" },
     "hw-tt-restrictor":       { code: "TT-RESTR",    name: "Tilt & Turn Restrictor",               cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Tilt & Turn Gear" },
 
-    // French door — UNCALIBRATED placeholder (M3): passive-leaf meeting-stile
-    // shootbolt. Pending a validated French job. French designs gated false.
+    // French door — accessories CALIBRATED from Job 00000264 (authentic codes,
+    // exact across all 5 docs): 2 inverter caps per French mullion, 4 cavity
+    // locking blocks per leaf, 8 glazing bridges per glass pane.
+    "hw-inverter-cap":        { code: "SPQ-2-91252", name: "Inverter Caps",                        cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Door Lock" },
+    "hw-cavity-lock-block":   { code: "SP_CBLOCK01", name: "Cavity Locking Block",                 cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Door Lock" },
+    "hw-glazing-bridge":      { code: "SP_GBRIDGE",  name: "Glazing Bridge",                       cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Glazing Accessories" },
+    // French door operating gear — APPROXIMATE (flagged): the production docs
+    // name "Door Handle w Key-A" + "Standard(both side key)" cylinder in the
+    // header but don't itemise handles/hinges/locks in the cut table. Master
+    // leaf reuses the single-door set (handle/lock/cylinder + 3 flag hinges);
+    // slave leaf gets the shootbolt + 3 flag hinges. Tune with an itemised job.
     "hw-shootbolt":           { code: "FR-SHOOT",    name: "Shootbolt (Meeting Stile)",            cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Door Lock" },
 
     // Sliding patio — calibrated counts from Job 104 (yogi test 1–4). Per SLIDING

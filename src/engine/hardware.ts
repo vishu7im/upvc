@@ -49,6 +49,13 @@ export function computeHardware(
   };
 
   for (const cell of geom.cells) {
+    // FRENCH DOOR glazing bridges — calibrated Job 00000264: 8 per glass PANE
+    // (doc 0: 2 panes → 16; docs 1/4: 4 panes → 32). Every french-door cell is
+    // exactly one pane (midrail panes are extra cells without a sashOuter), so
+    // this counts BEFORE the sashOuter guard below.
+    if (cell.content.startsWith("french-door")) {
+      add("hw-glazing-bridge", 8, "8 glazing bridges per French pane");
+    }
     if (!cell.sashOuter) continue;
     const sashW = cell.sashOuter.w;
     const sashH = cell.sashOuter.h;
@@ -101,6 +108,22 @@ export function computeHardware(
       add("hw-cylinder-brass", 1, "cylinder");
       add("hw-keep-lh", 1, "L/H keep set");
       add("hw-runup-block", 1, "door run-up block");
+    } else if (c === "french-door-master" || c === "french-door-slave") {
+      // FRENCH DOOR (Job 00000264). CALIBRATED: 4 cavity locking blocks per
+      // leaf (docs list 8 for 2 leaves, every configuration). APPROXIMATE
+      // (flagged): the docs' cut tables don't itemise operating gear — the
+      // master leaf reuses the single-door set per the doc header ("Door Handle
+      // w Key-A" + cylinder), the slave gets the meeting-stile shootbolt;
+      // 3 flag hinges per leaf mirrors the calibrated single door.
+      add("hw-cavity-lock-block", 4, "4 cavity locking blocks per French leaf");
+      add("hw-flag-hinge-white", 3, "3 flag hinges per French leaf (approx)");
+      if (c === "french-door-master") {
+        add("hw-door-handle", 1, "French master-leaf handle (doc header)");
+        add("hw-door-lock", 1, "French master-leaf lock (approx)");
+        add("hw-cylinder-brass", 1, "French cylinder (doc header)");
+      } else {
+        add("hw-shootbolt", 1, "French slave-leaf shootbolt (approx)");
+      }
     } else if (c.startsWith("sliding-")) {
       // SLIDING PATIO — calibrated from Job 104 (yogi test 1–4).
       // Bridge packers per panel: APPROXIMATE (~4/panel; not cleanly
@@ -128,6 +151,13 @@ export function computeHardware(
   // are gated quotable=false, so this only completes the family structurally.
   if (geom.meetingStiles) {
     add("hw-shootbolt", geom.meetingStiles, `passive-leaf shootbolt per meeting stile (${geom.meetingStiles})`);
+  }
+
+  // FRENCH MULLION inverter caps — calibrated Job 00000264: 2 per STULP
+  // (S-jointType) mullion, every configuration.
+  const stulps = geom.mullions.filter((m) => m.jointType === "S").length;
+  if (stulps > 0) {
+    add("hw-inverter-cap", 2 * stulps, `2 inverter caps per French mullion (${stulps})`);
   }
 
   // Glazing bridge packer — placeholder rule (tune as you gather more data).

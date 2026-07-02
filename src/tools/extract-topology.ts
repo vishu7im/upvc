@@ -54,7 +54,11 @@ interface FamilyRule {
 const FAMILY_RULES: Record<Family, FamilyRule> = {
   casement: { family: "casement", frameKey: "frame-5ch", sashKey: "sash-t", calibration: "calibrated", eligible: true },
   door: { family: "door", frameKey: "frame-6ch", sashKey: "sash-door-z", calibration: "calibrated", eligible: true },
-  french: { family: "french", frameKey: "frame-6ch", sashKey: "sash-door-z", calibration: "structural", eligible: false },
+  // French: CALIBRATED from Job 00000264 (docs/french-door/) — frame-french
+  // (SPQ-6-11252 @ face 48), Z door sash SPQ-5-45252 (face 105 / overlap 20),
+  // STULP french-mullion between the meeting leaves, bead-32. See CLAUDE.md
+  // "## French Door".
+  french: { family: "french", frameKey: "frame-french", sashKey: "sash-door-z-fr", calibration: "calibrated", eligible: true },
   "tilt-turn": { family: "tilt-turn", frameKey: "frame-5ch", sashKey: "sash-t", calibration: "uncalibrated", eligible: false },
   sliding: { family: "sliding", frameKey: "frame-5ch", sashKey: "sash-t", calibration: "deferred", eligible: false },
 };
@@ -242,19 +246,41 @@ function buildTree(cells: ClassifiedCell[], ctx: BuildCtx): CellNode {
   }
   const vCut = findCut(cells, "x");
   if (vCut) {
-    const bothDoors =
-      vCut.a.length === 1 && vCut.b.length === 1 &&
-      vCut.a[0].content.startsWith("door-") && vCut.b[0].content.startsWith("door-");
-    const mullionKey = ctx.family === "french" && bothDoors ? "meeting-stile" : "mullion-78";
+    const left = buildTree(vCut.a, ctx);
+    const right = buildTree(vCut.b, ctx);
+    let mullionKey = "mullion-78";
+    // FRENCH pairing (calibrated Job 00000264): wherever two door leaves MEET
+    // across a vertical cut (directly, or at the touching edge of nested
+    // vsplits — e.g. door|door|fixed), the divider is the STULP French mullion
+    // and the leaves become the master (left, handle side per the docs'
+    // "L.RDoSlv") and slave (right, stulp + shootbolt) with the French sash/bead.
+    // An already-rewritten leaf no longer starts with "door-", so a leaf can
+    // never join two pairs.
+    if (ctx.family === "french") {
+      const l = edgeLeaf(left, "right");
+      const r = edgeLeaf(right, "left");
+      if (l && r && l.cell.content.startsWith("door-") && r.cell.content.startsWith("door-")) {
+        mullionKey = "french-mullion";
+        l.cell = { ...l.cell, content: "french-door-master", beadKey: "bead-32" };
+        r.cell = { ...r.cell, content: "french-door-slave", beadKey: "bead-32" };
+      }
+    }
     return {
       kind: "vsplit",
       splitAtRatio: round4(vCut.pos / ctx.canvas.w),
       mullionKey,
-      left: buildTree(vCut.a, ctx),
-      right: buildTree(vCut.b, ctx),
+      left,
+      right,
     };
   }
   throw new NonGuillotineError("layout is not guillotine-partitionable");
+}
+
+/** The single leaf touching a subtree's left/right edge (descends vsplits only). */
+function edgeLeaf(n: CellNode, side: "left" | "right"): Extract<CellNode, { kind: "leaf" }> | null {
+  if (n.kind === "leaf") return n;
+  if (n.kind === "vsplit") return edgeLeaf(side === "left" ? n.left : n.right, side);
+  return null; // hsplit/sliding: no single adjacent leaf on a vertical edge
 }
 
 function round4(n: number): number { return Math.round(n * 10000) / 10000; }

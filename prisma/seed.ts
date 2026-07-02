@@ -447,9 +447,14 @@ async function importCollectionsDesigns() {
 async function linkEngineDesigns() {
   const casement = await prisma.product.findFirst({ where: { typeId: 101 }, orderBy: { listIndex: "asc" } });
   const singleDoor = await prisma.product.findFirst({ where: { typeId: 152 } });
+  const frenchDoor = await prisma.product.findFirst({ where: { typeId: 153 } });
 
   for (const d of DESIGNS) {
-    const productId = d.productType === "door" ? singleDoor?.id : casement?.id;
+    const productId = d.designId.startsWith("door-french")
+      ? frenchDoor?.id ?? singleDoor?.id
+      : d.productType === "door"
+        ? singleDoor?.id
+        : casement?.id;
     await prisma.design.update({
       where: { designId: d.designId },
       data: { quotable: true, productId: productId ?? null },
@@ -480,6 +485,11 @@ async function applyDerivedTopologies() {
             topology: { ...(e.topology as object), _meta: e.meta } as unknown as Prisma.InputJsonValue,
             frameKey: e.frameKey,
             quotable: e.quotable,
+            // French pure pair: default to the Job 00000264 reference size
+            // (1700×2100). Wider French combos keep their generic fallback.
+            ...(e.meta.family === "french" && e.meta.leaves === 2
+              ? { defaultWidthMm: 1700, defaultHeightMm: 2100 }
+              : {}),
           },
         }),
       ),

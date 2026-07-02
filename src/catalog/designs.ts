@@ -180,6 +180,79 @@ export const DESIGNS: Design[] = [
       cell: { content: "door-left", sashKey: "sash-door-z" },
     },
   },
+
+  // -----------------------------------------------------------------
+  // FRENCH DOORS — calibrated Job 00000264 (docs/french-door/, 1700×2100).
+  //   Two door leaves meeting on a STULP French mullion (SPQ-1-46252,
+  //   square-cut, face 48). Master leaf = handle side (left, per the docs'
+  //   "L.RDoSlv"); slave leaf carries the stulp + shootbolt. Leaves hinge on
+  //   their outer jambs. Frame = frame-french (SPQ-6-11252 @ face 48),
+  //   bead-32 (SPQ-1-52253), sash face 105 / overlap 20 / rebate 15.
+  // -----------------------------------------------------------------
+  {
+    designId: "door-french",
+    name: "French Door (Z Sash)",
+    productType: "door",
+    frameKey: "frame-french",
+    defaultWidthMm: 1700,
+    defaultHeightMm: 2100,
+    topology: {
+      kind: "vsplit",
+      splitAtRatio: 0.5,
+      mullionKey: "french-mullion",
+      left: { kind: "leaf", cell: { content: "french-door-master", sashKey: "sash-door-z-fr", beadKey: "bead-32" } },
+      right: { kind: "leaf", cell: { content: "french-door-slave", sashKey: "sash-door-z-fr", beadKey: "bead-32" } },
+    },
+  },
+  {
+    designId: "door-french-t",
+    name: "French Door (T Sash)",
+    productType: "door",
+    frameKey: "frame-french",
+    defaultWidthMm: 1700,
+    defaultHeightMm: 2100,
+    topology: {
+      kind: "vsplit",
+      splitAtRatio: 0.5,
+      mullionKey: "french-mullion",
+      left: { kind: "leaf", cell: { content: "french-door-master", sashKey: "sash-door-t-fr", beadKey: "bead-32" } },
+      right: { kind: "leaf", cell: { content: "french-door-slave", sashKey: "sash-door-t-fr", beadKey: "bead-32" } },
+    },
+  },
+  // Job 00000264 docs 1/4: each leaf has a horizontal midrail (T/M small 67mm)
+  // at mid-height splitting the glazing into two panes — the midrail is INSIDE
+  // the welded sash ring (CellSpec.midrails), not a cell split.
+  {
+    designId: "door-french-midrail",
+    name: "French Door (Z Sash, Midrail)",
+    productType: "door",
+    frameKey: "frame-french",
+    defaultWidthMm: 1700,
+    defaultHeightMm: 2100,
+    topology: {
+      kind: "vsplit",
+      splitAtRatio: 0.5,
+      mullionKey: "french-mullion",
+      left: {
+        kind: "leaf",
+        cell: {
+          content: "french-door-master",
+          sashKey: "sash-door-z-fr",
+          beadKey: "bead-32",
+          midrails: [{ transomKey: "midrail-67", atRatio: 0.5 }],
+        },
+      },
+      right: {
+        kind: "leaf",
+        cell: {
+          content: "french-door-slave",
+          sashKey: "sash-door-z-fr",
+          beadKey: "bead-32",
+          midrails: [{ transomKey: "midrail-67", atRatio: 0.5 }],
+        },
+      },
+    },
+  },
 ];
 
 /** Lookup helper. */

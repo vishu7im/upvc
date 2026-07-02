@@ -9,8 +9,10 @@ Core flow: pick a **design**, enter **width × height**, the engine computes geo
 cut pieces → BOM → cutting plan → pricing → printable documents (Work Order, Cutting List,
 BOM, Price Summary).
 
-The fabrication engine is **already calibrated** against three real Quotila jobs (85/88/90).
-`npm run validate` runs **147 assertions** that must always stay green.
+The fabrication engine is **already calibrated** against real reference jobs: Quotila 85/88/90
+(casement + single door), Job 104 (sliding patio) and Job 00000264 (French door).
+`npm run validate` runs **353 assertions** (350 green + 3 pre-existing DB weld-drift failures —
+see memory/validate-weld-drift.md; they are not a regression signal).
 
 ## Tech stack (confirmed with the owner)
 
@@ -168,8 +170,9 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
       the real `solveTopology`/`computeHardware`, and emits `src/catalog/derived-topologies.generated.ts`.
       `prisma/seed.ts#applyDerivedTopologies()` applies it (topology + tier-gated `quotable`) by
       `externalId`. **Quotable designs 10 → 371** (345 casement + 16 single-door, all engine-validated).
-      Tilt&Turn (123) + French (12) are modelled but **gated `quotable:false`** (uncalibrated/structural);
-      Sliding (7) was deferred at M3 but is **now calibrated & quotable** (see "## Sliding Patio").
+      Tilt&Turn (123) is modelled but **gated `quotable:false`** (uncalibrated); French (12) was T2-gated
+      at M3 but is **now calibrated & quotable** (see "## French Door"); Sliding (7) was deferred at M3
+      but is **now calibrated & quotable** (see "## Sliding Patio").
       147 validation assertions (135 + 12 extractor) + 12 M3 e2e assertions green.
       See "M3 extractor & calibration tiers" below.
 - [x] **M4 — PDF export + branding.** The 7 HTML docs render to **PDF via Puppeteer** (headless
@@ -274,9 +277,10 @@ layouts are **rejected**, never guessed.
 
 - **T1 quotable** — Casement (345) + Single Door (16): use existing calibrated profiles; each is
   validated through the real engine + leaf-count == `quantityOfSquares` before `quotable=true`.
-- **T2 structural, gated false** — French Door (12): modelled via a zero-profile **`meeting-stile`**
-  vsplit (two `sash-door-z` leaves abut, no mullion; `SolvedGeometry.meetingStiles`); meeting-stile
-  shootbolt hardware is a **placeholder pending a real French job**.
+- **T1 quotable (NEW)** — French Door (12): **now calibrated & quotable** from 5 real Windowmaker
+  production docs ("Job 00000264", `docs/french-door/`). The old T2 zero-profile `meeting-stile`
+  model is replaced by the real **STULP French mullion** (`french-mullion`, jointType "S") +
+  `french-door-master`/`-slave` leaves. See the dedicated "## French Door" section.
 - **T3 geometry-OK, gated false** — Tilt&Turn (123): geometry == casement sash (reuses `sash-t`);
   the `tilt-turn` content + T&T gear in `hardware.ts`/catalog are **uncalibrated** (no T&T job).
 - **T1 quotable (NEW)** — Sliding Patio (7): **now calibrated and quotable** from 4 real work
@@ -429,6 +433,75 @@ Unequal widths are an **interpolation, flagged uncalibrated** (no unequal-panel 
 UI is `web/components/window-designer.tsx` (a sliding branch: per-panel labels + n−1 boundary
 handles); the rest of the `splitRatios` pipeline (live quote → `order_item.splitRatios` → confirm
 re-solve → docs) was already wired, so the dragged spans flow into the work order / cutting list.
+
+## French Door
+
+The fourth quotable family (after Casement, Single Door, Sliding Patio), calibrated from **5 real
+Windowmaker production docs** in `docs/french-door/` ("Job 00000264", Design 408, all **1700×2100**,
+"PR01 70mm Casement Series"): T-sash full-glass, Z-sash with a midrail per leaf (×2 mirrored), and a
+mirrored unequal-leaf pair (724/924 printed). All **12 collection French designs are now
+`quotable=true`** (extractor-derived, tier promoted), plus 3 hand-authored engine designs
+(`door-french`, `door-french-t`, `door-french-midrail` in `src/catalog/designs.ts`).
+
+**Structure.** Two door leaves meet on a **STULP French mullion** (`SPQ-1-46252`, "French Mullion
+70mm") — a **square-cut** bar (`[ - ]`, no welded horns) spanning the full daylight height, mounted
+on the slave leaf. Each leaf is a normal welded sash ring; optionally a **midrail** ("T/M small" =
+`SPQ-005-30252`, the transom-z-67 profile) is **T-welded INSIDE the sash ring** between the
+uprights, splitting the glazing into stacked panes — a new engine capability (`CellSpec.midrails`).
+
+**Calibrated constants (all 5 docs reproduce exactly; printed saw sizes = finished + 3 mm/end weld
+on mitred/horned cuts — per-profile `weldAllowanceMm: 3` on the French parts):**
+
+- **Frame `frame-french`** = code `SPQ-6-11252`, face **48** ("KASA 70-48" names it; the sliding
+  frame independently derived 48). NB Job 90 (Quotila) calibrated the same physical code at face 68
+  (`frame-6ch`) — the two doc sources disagree, so French has its **own frame entry**; the door-pair
+  cut list is identical under either face (the face only moves drawn daylight + uncalibrated
+  fixed-sidelight glass). Printed frame 1706/2106 = W/H + 6.
+- **Door sashes** both cut identically with engine face **105**, overlap **20**, glass rebate 15:
+  `sash-door-z-fr` (= `SPQ-5-45252`, "85mm KAPI 70-85") and `sash-door-t-fr` (= `SPQ-5-47252`,
+  "105mm"). Printed 824/2050 → finished 818/2044 = leafDaylight + 2×20; bead Int = sash − 210.
+- **French mullion** face 48, `jointType: "S"` (new): topology lays cells out around it like any
+  vsplit mullion, but `Ext == Int == bounds.h` and end prep `[ - ]` (printed 2004 = 2100 − 96, no
+  weld add). Leaf daylight = (1604 − 48)/2 = 778 each; unequal docs 2/3 = the same design with the
+  stulp centreline at x=750 (verified via `splitRatios`).
+- **Midrail `midrail-67`** (own catalog entry, same code `SPQ-005-30252`, face 67, weld 3): Int =
+  sash Int (608), Ext = Int + 134 = 742 (printed 748 `<>`). Panes 883.5 high → printed beads 924,
+  glass 638×914 (engine 923.5/913.5, ≤0.5 rounding).
+- **Bead `bead-32`** (= `SPQ-1-52253`, "BEAD 32 mm"): Ext = Int + 40, same rule as bead-28. French
+  leaves pin it via `beadKey`. (bead-28 must stay FIRST in the catalog Record — default-bead pick.)
+- **Gaskets** (docs list ONLY these two; French cells are excluded from Gasket 01/02):
+  `gasket-fm` (`SP_GSKFM`) = Σ stulp lengths (2004); `gasket-sash` (`SP_S001`) = Σ per leaf of
+  (sash outer perim + leaf daylight perim) = 22576 — invariant across equal/unequal/midrail docs,
+  and it **only fits with frame face 48** (further evidence for 48).
+- **Hardware calibrated:** 2× Inverter Caps (`SPQ-2-91252`) per stulp; 4× Cavity Locking Block
+  (`SP_CBLOCK01`) per leaf; **8× Glazing Bridge (`SP_GBRIDGE`) per glass pane** (16/32 across docs).
+  **Approximate/flagged:** operating gear isn't itemised in the docs' cut tables — master leaf
+  reuses the single-door set (handle/lock/cylinder per the "Door Handle w Key-A" header), slave gets
+  the shootbolt; 3 flag hinges per leaf mirror the single door. **Reinforcement:** docs carry "+R1"
+  on every profile but no steel section — French sashes are mapped to the door steel
+  (`reinf-28x44.5-u`, **assumed**, not asserted); the stulp is left unmapped. Reconcile both against
+  an itemised French cutting list.
+
+**How it's wired (engine stays pure).** New `SashKind`s `french-door-master` / `french-door-slave`
+(master = handle side, left by convention; hinge side is positional — each leaf hinges on its outer
+jamb). New `TransomSection.jointType: "S"` (topology/bars emit square-cut, no horns; SVG marker like
+T). `CellSpec.midrails` → `applyMidrails()` in `topology.ts`: the PRIMARY SolvedCell keeps
+`sashOuter` (hardware/gaskets/labour key off it) and is narrowed to pane 1; panes 2..n are emitted
+as glazing-only cells (no sash rects) with the leaf's content — `bars/cutting/documents/solve.ts`
+untouched. `pricing.ts`: French leaves count as doors for labour (pane cells don't); gasket wastage
+exclusion is now catalog-lookup based (covers SP_GSKFM/SP_S001). The **extractor** promotes french
+to `calibrated/eligible` and, wherever two door leaves meet across a vertical cut (directly or at
+nested-vsplit edges — fixes designs 5/7/9–12 which previously got a `mullion-78` between the pair,
+and replaces the old zero-profile `meeting-stile`), sets `french-mullion` + rewrites the pair to
+master (left) / slave (right) with `bead-32`. The legacy `meeting-stile` machinery still exists but
+no design uses it. Pure-pair collection design + the 3 engine designs default to **1700×2100**.
+
+**Validation.** 3 jobs (`JOB_264_T`, `JOB_264_MIDRAIL`, `JOB_264_UNEQUAL` — the unequal one drives
+the collection design through `splitRatios: {root: 750/1700}`) assert every doc line (finished
+sizes), and `validateFrenchDoor()` asserts the PRINTED welded saw sizes (1706/2106/824/2050/748;
+stulp stays 2004), the `[ - ]` stulp end prep, the equal-split default (818), and that Gasket 01/02
+stay empty on French quotes. The extractor test now asserts french quotable = 12 with exactly one
+stulp + master/slave pair each.
 
 ## Phase 2 — UI frontend (stack confirmed: Next.js)
 

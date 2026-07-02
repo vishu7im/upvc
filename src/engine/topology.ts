@@ -85,7 +85,14 @@ function walk(
   windowH: number,
 ): void {
   if (node.kind === "leaf") {
-    out.cells.push(buildLeafCell(node, pathId, bounds, system));
+    const cell = buildLeafCell(node, pathId, bounds, system);
+    out.cells.push(cell);
+    // Midrails INSIDE the sash (French doors, Job 00000264): the sash stays one
+    // welded ring; each midrail is a horn-cut transom between the sash uprights
+    // splitting the glazing into stacked panes (own beads/glass per pane).
+    if (node.cell.midrails?.length && cell.sashInner && cell.sashKey) {
+      applyMidrails(cell, node.cell.midrails, system, out, windowH);
+    }
     return;
   }
 
@@ -161,7 +168,9 @@ function walk(
         h: bounds.h,
       };
       const intLen = bounds.h;
-      const extLen = intLen + 2 * mFace;
+      // S-type (STULP / French mullion, Job 00000264): square-cut bar, NO
+      // welded horns — Ext == Int == the daylight span (printed 2004 [ ]).
+      const extLen = mullion.jointType === "S" ? intLen : intLen + 2 * mFace;
       out.mullions.push({
         rect: mullionRect,
         parentPathId: pathId,
@@ -203,7 +212,8 @@ function buildLeafCell(
 ): SolvedCell {
   // Defaults
   const beadKey = node.cell.beadKey ?? Object.keys(system.beads)[0];
-  const isDoor = node.cell.content?.startsWith("door-");
+  const isDoor =
+    node.cell.content?.startsWith("door-") || node.cell.content?.startsWith("french-door");
   const glassKey =
     node.cell.glassKey ??
     (isDoor ? "glass-4-20-4-tuff-lowe" : "glass-4-20-4-lowe");
@@ -273,6 +283,83 @@ function buildLeafCell(
     beadIntW,
     beadIntH,
   };
+}
+
+// ---------------------------------------------------------------------
+// MIDRAILS-IN-SASH (French doors — calibrated Job 00000264, docs 1/4).
+//
+// A door leaf with midrails keeps its ONE welded sash ring (818 × 2044 at
+// 1700×2100); each midrail is a transom bar T-welded between the sash uprights:
+//   Int = sash Int width (608)   Ext = Int + 2 × face (742 for the 67mm T/M SM)
+// The glazing splits into stacked panes; each pane gets its own beads + glass
+// (pane bead Int 608 × 883.5 → glass 638 × 913.5 = Int + 2×15 rebate — matches
+// the printed 648/924 beads and 638×914 glass exactly).
+//
+// The PRIMARY SolvedCell (the one carrying sashOuter — hardware/gasket/labour
+// still key off it) is narrowed to pane 1; panes 2..n are emitted as extra
+// cells with the same content but NO sash rects, so bars/glass/SVG treat them
+// as pure glazing and no hardware/gasket double-counts.
+// ---------------------------------------------------------------------
+function applyMidrails(
+  primary: SolvedCell,
+  midrails: { transomKey: string; atRatio: number }[],
+  system: ProfileSystem,
+  out: SolvedGeometry,
+  windowH: number,
+): void {
+  const inner = primary.sashInner!;
+  const sash = system.sashes[primary.sashKey!];
+  const rebate = sash.glassRebate;
+
+  const sorted = [...midrails].sort((a, b) => a.atRatio - b.atRatio);
+
+  // Pane boundaries top→bottom; each midrail is centred on atRatio × windowH.
+  const panes: Rect[] = [];
+  let cursorY = inner.y;
+  for (const m of sorted) {
+    const profile = system.transoms[m.transomKey];
+    if (!profile) throw new Error(`Unknown midrail transom: ${m.transomKey}`);
+    const face = profile.faceWidth;
+    const centreY = m.atRatio * windowH;
+    panes.push({ x: inner.x, y: cursorY, w: inner.w, h: centreY - face / 2 - cursorY });
+    out.transoms.push({
+      rect: { x: inner.x, y: centreY - face / 2, w: inner.w, h: face },
+      parentPathId: primary.pathId,
+      transomKey: m.transomKey,
+      extLengthMm: inner.w + 2 * face,
+      intLengthMm: inner.w,
+      jointType: profile.jointType,
+    });
+    cursorY = centreY + face / 2;
+  }
+  panes.push({ x: inner.x, y: cursorY, w: inner.w, h: inner.y + inner.h - cursorY });
+
+  for (const p of panes) {
+    if (p.h <= 0) throw new Error(`Midrail collapses a pane in ${primary.pathId}`);
+  }
+
+  // Primary cell carries pane 1's glazing; panes 2..n become glazing-only cells.
+  primary.beadIntW = panes[0].w;
+  primary.beadIntH = panes[0].h;
+  primary.glassRect = grow(panes[0], rebate);
+
+  for (let i = 1; i < panes.length; i++) {
+    out.cells.push({
+      pathId: `${primary.pathId}.pane${i + 1}`,
+      outer: panes[i],
+      daylight: panes[i],
+      content: primary.content,
+      beadKey: primary.beadKey,
+      glassKey: primary.glassKey,
+      glassRect: grow(panes[i], rebate),
+      beadIntW: panes[i].w,
+      beadIntH: panes[i].h,
+    });
+  }
+}
+
+function grow(r: Rect, by: number): Rect {
+  return { x: r.x - by, y: r.y - by, w: r.w + 2 * by, h: r.h + 2 * by };
 }
 
 // ---------------------------------------------------------------------

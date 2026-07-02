@@ -18,6 +18,7 @@ import type { CellNode, Design, SashKind } from "../types.ts";
 const VALID_CONTENT = new Set<SashKind>([
   "fixed", "casement-top", "casement-side-left", "casement-side-right",
   "tilt-turn", "door-left", "door-right",
+  "french-door-master", "french-door-slave",
 ]);
 
 function eachLeaf(n: CellNode, fn: (cell: { content: SashKind; sashKey?: string }) => void): void {
@@ -51,7 +52,31 @@ export function validateExtractor(expect: ExpectFn): void {
   expect("casement quotable ≥ 340", q("casement") >= 340, true);
   expect("door quotable = 16", q("door"), 16);
   expect("tilt-turn present, all gated false", fam("tilt-turn").length >= 120 && q("tilt-turn") === 0, true);
-  expect("french present, all gated false", fam("french").length >= 10 && q("french") === 0, true);
+  // French: calibrated (Job 00000264) — all 12 collection designs quotable, and
+  // every design's door pair meets on the STULP french-mullion (never mullion-78
+  // between two leaves, never the legacy zero-profile meeting-stile).
+  expect("french quotable = 12", q("french"), 12);
+  const frenchPaired = fam("french").filter((e) => {
+    let stulps = 0, masters = 0, slaves = 0, meetingStiles = 0;
+    const walk = (n: CellNode): void => {
+      if (n.kind === "leaf") {
+        if (n.cell.content === "french-door-master") masters++;
+        if (n.cell.content === "french-door-slave") slaves++;
+        return;
+      }
+      if (n.kind === "sliding") return;
+      if (n.kind === "vsplit") {
+        if (n.mullionKey === "french-mullion") stulps++;
+        if (n.mullionKey === "meeting-stile") meetingStiles++;
+        walk(n.left); walk(n.right);
+        return;
+      }
+      walk(n.top); walk(n.bottom);
+    };
+    walk(e.topology);
+    return stulps === 1 && masters === 1 && slaves === 1 && meetingStiles === 0;
+  }).length;
+  expect("french designs each have 1 stulp + master/slave pair", frenchPaired, 12);
   expect("sliding excluded from DERIVED (deferred)", fam("sliding").length, 0);
 
   // 3. Hinge apex → direction mapping (captured from real SVGs).

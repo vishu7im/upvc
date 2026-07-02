@@ -43,7 +43,10 @@ const optNum = (d: Decimalish): number | undefined =>
   d == null ? undefined : typeof d === "number" ? d : d.toNumber();
 
 const systemCatalogInclude = {
-  parts: true,
+  // Deterministic part order: cells without an explicit beadKey default to the
+  // FIRST bead in the Record (topology.ts), which must stay "bead-28" now that
+  // "bead-32" (French) exists — partKey order guarantees it.
+  parts: { orderBy: { partKey: "asc" as const } },
   glass: true,
   gaskets: true,
   hardware: true,
@@ -172,7 +175,7 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
       case "TRANSOM":
         transoms[p.partKey] = {
           ...base,
-          jointType: (p.jointType as "T" | "Z") ?? "T",
+          jointType: (p.jointType as "T" | "Z" | "S") ?? "T",
         };
         break;
       case "BEAD":

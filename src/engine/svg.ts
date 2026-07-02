@@ -72,7 +72,7 @@ export function renderSvg(geometry: SolvedGeometry, opts?: RenderSvgOpts): strin
 
   // Cells — sash outline (if any) + glazed area + opening-direction chevron.
   for (const c of geometry.cells) {
-    drawCell(c, shapes, profileFill);
+    drawCell(c, shapes, profileFill, geometry.outer);
   }
 
   // Inner-joint overlay (opt-in) — drawn above profiles, below the cill.
@@ -106,18 +106,21 @@ export function renderSvg(geometry: SolvedGeometry, opts?: RenderSvgOpts): strin
 </svg>`;
 }
 
-function drawCell(c: SolvedCell, shapes: string[], profileFill: string): void {
+function drawCell(c: SolvedCell, shapes: string[], profileFill: string, outer: Rect): void {
   if (c.sashOuter && c.sashInner) {
-    // Opening cell: grey sash profile ring with a clear glazed centre.
+    // Opening cell: grey sash profile ring with a clear glazed centre. The
+    // glazed rect is the cell's bead-Int area — identical to sashInner for
+    // ordinary cells, but only PANE 1 for a midrail leaf (French doors), so
+    // the midrail bar drawn earlier stays visible.
     shapes.push(rect(c.sashOuter, profileFill, STROKE, 1));
-    shapes.push(rect(c.sashInner, GLASS_FILL, STROKE, 1));
+    shapes.push(rect({ x: c.sashInner.x, y: c.sashInner.y, w: c.beadIntW, h: c.beadIntH }, GLASS_FILL, STROKE, 1));
   } else {
-    // Fixed cell: clear glazed pane with a bead outline.
+    // Fixed cell (or a midrail glazing pane): clear pane with a bead outline.
     shapes.push(rect(c.glassRect, GLASS_FILL, STROKE, 1));
   }
 
   // Opening-direction chevron — visual indicator only.
-  const symbol = openingSymbol(c);
+  const symbol = openingSymbol(c, outer);
   if (symbol) shapes.push(symbol);
 }
 
@@ -177,7 +180,8 @@ function mitreCorners(r: Rect, f: number): string[] {
  * ends), `"v"` = mullion (ticks at top/bottom ends). T = one tick centred on the
  * divider; Z = two offset ticks (the jamb breaks, so the joint reads doubled).
  */
-function dividerMarker(r: Rect, axis: "h" | "v", joint: "T" | "Z"): string {
+function dividerMarker(r: Rect, axis: "h" | "v", joint: "T" | "Z" | "S"): string {
+  // S (STULP / French mullion) butts square into the frame — reads like a T tick.
   const tick = 8; // mm, drawing only
   const segs: string[] = [];
   if (axis === "h") {
@@ -213,7 +217,9 @@ type Chevron = { c1: Pt; apex: Pt; c2: Pt };
  * matching the collection artwork. Tilt&turn draws two (turn "<" + tilt "v").
  * Returns null for fixed cells / unknown content.
  */
-function openingSymbol(c: SolvedCell): string | null {
+function openingSymbol(c: SolvedCell, outer: Rect): string | null {
+  // French midrail panes (no sashOuter) never draw a symbol — the leaf cell does.
+  if (c.content.startsWith("french-door") && !c.sashOuter) return null;
   // Bound the symbol to the glazed area so it never overlaps the frame.
   const b = c.sashInner ?? c.glassRect ?? c.sashOuter ?? c.outer;
   const cx = b.x + b.w / 2;
@@ -260,6 +266,12 @@ function openingSymbol(c: SolvedCell): string | null {
     // sliding panels (sliding-fixed) draw no symbol (fall through to default).
     case "sliding-slide-left":                 chevrons = [hingeLeft()]; break;
     case "sliding-slide-right":                chevrons = [hingeRight()]; break;
+    // French leaves hinge on their OUTER jamb (positional): the left leaf
+    // hinges left, the right leaf hinges right — master/slave doesn't change it.
+    case "french-door-master":
+    case "french-door-slave":
+      chevrons = [cx < outer.x + outer.w / 2 ? hingeLeft() : hingeRight()];
+      break;
     default: return null;
   }
 

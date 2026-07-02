@@ -201,6 +201,8 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
 function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeometry, system: ProfileSystem, weldDefaultMm: number): void {
   for (const m of geom.mullions) {
     const profile = system.transoms[m.mullionKey];
+    // S-type (STULP / French mullion, Job 00000264): square-cut "[ - ]", no
+    // welded horns (0 welded ends ⇒ no weld compensation — printed 2004 exact).
     const piece: BarPiece = withWeld({
       code: profile.code,
       name: profile.name,
@@ -208,7 +210,7 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       orientation: "V",
       extMm: round1(m.extLengthMm),
       intMm: round1(m.intLengthMm),
-      endPrep: "< - >",
+      endPrep: profile.jointType === "S" ? "[ - ]" : "< - >",
     }, effectiveWeld(profile, weldDefaultMm));
     const reinfKey = system.reinforcementMap[profile.code];
     if (reinfKey) {
@@ -313,24 +315,55 @@ function emitGlass(glass: GlassPiece[], cell: SolvedCell, idx: number, system: P
 // GASKETS — verified totals across all three jobs.
 //   Gasket 01 = 2 × Σ sash outer perimeter   (weather seal both sides)
 //   Gasket 02 = Σ glass perimeter            (glazing seal once around)
+//
+// FRENCH DOOR leaves (calibrated Job 00000264) use their OWN gaskets and are
+// EXCLUDED from Gasket 01/02 (the production docs list only these two):
+//   gasket-fm   (SP_GSKFM) = Σ French-mullion lengths          (printed 2004)
+//   gasket-sash (SP_S001)  = Σ per leaf: sash outer perimeter +
+//                            leaf daylight perimeter           (printed 22576)
 // ---------------------------------------------------------------------
 function computeGaskets(geom: SolvedGeometry, system: ProfileSystem): GasketPiece[] {
   let sashPerim = 0;
   let glassPerim = 0;
+  let frenchSashGasket = 0;
+  let frenchMullionGasket = 0;
 
   for (const c of geom.cells) {
+    if (c.content.startsWith("french-door")) {
+      // Leaf-level seals only (pane cells carry no sashOuter → not counted).
+      if (c.sashOuter) {
+        frenchSashGasket +=
+          2 * (c.sashOuter.w + c.sashOuter.h) + 2 * (c.daylight.w + c.daylight.h);
+      }
+      continue;
+    }
     if (c.sashOuter) {
       sashPerim += 2 * (c.sashOuter.w + c.sashOuter.h);
     }
     glassPerim += 2 * (c.glassRect.w + c.glassRect.h);
   }
 
+  for (const m of geom.mullions) {
+    if (m.jointType === "S") frenchMullionGasket += m.intLengthMm;
+  }
+
   const g1 = system.gaskets["gasket-01"];
   const g2 = system.gaskets["gasket-02"];
-  return [
+  const out: GasketPiece[] = [
     { code: g1.code, name: g1.name, lengthMm: round1(2 * sashPerim) },
     { code: g2.code, name: g2.name, lengthMm: round1(glassPerim) },
   ];
+
+  const gfm = system.gaskets["gasket-fm"];
+  if (gfm && frenchMullionGasket > 0) {
+    out.push({ code: gfm.code, name: gfm.name, lengthMm: round1(frenchMullionGasket) });
+  }
+  const gsash = system.gaskets["gasket-sash"];
+  if (gsash && frenchSashGasket > 0) {
+    out.push({ code: gsash.code, name: gsash.name, lengthMm: round1(frenchSashGasket) });
+  }
+
+  return out;
 }
 
 // ---------- Helpers --------------------------------------------------

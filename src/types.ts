@@ -72,9 +72,13 @@ export interface FrameSection extends ProfileSection {
   glassRebate: number;
 }
 
-/** Transom/mullion: T-type (jamb stays continuous) or Z-type (jamb breaks). */
+/**
+ * Transom/mullion: T-type (jamb stays continuous), Z-type (jamb breaks), or
+ * S-type (STULP / French mullion — a SQUARE-CUT bar with no welded horns:
+ * Ext == Int == the daylight span it sits in; calibrated Job 00000264).
+ */
 export interface TransomSection extends ProfileSection {
-  jointType: "T" | "Z";
+  jointType: "T" | "Z" | "S";
 }
 
 export interface Reinforcement extends ProfileSection {
@@ -266,6 +270,12 @@ export type SashKind =
   | "tilt-turn"
   | "door-right"
   | "door-left"
+  // French door pair (calibrated from Job 00000264, docs/french-door/*). The
+  // MASTER leaf carries the handle/lock; the SLAVE leaf carries the STULP
+  // French mullion + shootbolt. Hinge side is positional (each leaf hinges on
+  // its outer jamb), so it is not encoded in the kind.
+  | "french-door-master"
+  | "french-door-slave"
   // Sliding patio panels. A patio panel is always a framed sash (cut identically
   // whether it slides or is fixed); these distinguish behaviour for hardware
   // allocation and the SVG slide-direction arrow only.
@@ -282,6 +292,15 @@ export interface CellSpec {
   /** Which bead/glass to use here (defaults to system default). */
   beadKey?: string;
   glassKey?: string;
+  /**
+   * Horizontal midrails INSIDE this cell's sash (French doors, Job 00000264):
+   * the sash stays ONE welded ring; each midrail is a horn-cut transom bar
+   * welded between the sash uprights (Ext = sash Int + 2 × face), splitting the
+   * glazing into stacked panes with their own beads/glass. `atRatio` is the
+   * midrail centreline as a fraction of the FULL window height (same semantics
+   * as `splitAtRatio`). Only valid on sash-bearing cells; absent ⇒ unchanged.
+   */
+  midrails?: { transomKey: string; atRatio: number }[];
 }
 
 /** Recursive cell tree node — describes a design's split structure. */
@@ -378,7 +397,7 @@ export interface SolvedTransom {
   extLengthMm: number;
   /** Visible Int length. */
   intLengthMm: number;
-  jointType: "T" | "Z";
+  jointType: "T" | "Z" | "S";
 }
 
 export interface SolvedMullion {
@@ -387,7 +406,7 @@ export interface SolvedMullion {
   mullionKey: string;
   extLengthMm: number;
   intLengthMm: number;
-  jointType: "T" | "Z";
+  jointType: "T" | "Z" | "S";
 }
 
 /** Fully solved geometry produced by the topology solver. */

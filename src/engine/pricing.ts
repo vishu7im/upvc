@@ -93,14 +93,21 @@ export function computePricing(
   const materialPriceBeforeWastage = lines.reduce((s, l) => s + l.totalPrice, 0);
 
   // Wastage on profile/bead linear material only (your spec: 10% on cuttable stock).
-  const wastageEligibleLines = lines.filter((l) => l.unit === "m" && l.code !== "GKT-01" && l.code !== "GKT-02");
+  // Gaskets are per-metre but NOT cuttable stock — excluded by catalog lookup
+  // (covers GKT-01/02 and the French SP_GSKFM/SP_S001 alike).
+  const wastageEligibleLines = lines.filter((l) => l.unit === "m" && !findGasketByCode(system, l.code));
   const wastageBase = wastageEligibleLines.reduce((s, l) => s + l.totalPrice, 0);
   const wastageAdd = wastageBase * (settings.wastagePct / 100);
   const materialPrice = materialPriceBeforeWastage + wastageAdd;
 
-  // Labour
-  const sashCount = geometry.cells.filter((c) => c.sashKey && !c.content.startsWith("door-")).length;
-  const doorCount = geometry.cells.filter((c) => c.content.startsWith("door-")).length;
+  // Labour. French leaves (french-door-*) are doors; only the leaf cell (the
+  // one carrying sashOuter) counts — midrail pane cells share its sash.
+  const isDoorContent = (content: string) =>
+    content.startsWith("door-") || content.startsWith("french-door");
+  const sashCount = geometry.cells.filter((c) => c.sashKey && !isDoorContent(c.content)).length;
+  const doorCount = geometry.cells.filter(
+    (c) => isDoorContent(c.content) && (c.content.startsWith("door-") || c.sashOuter),
+  ).length;
   const labour = settings.labour.base + settings.labour.perSash * sashCount + settings.labour.perDoor * doorCount;
 
   const factoryCost = materialPrice + labour;
