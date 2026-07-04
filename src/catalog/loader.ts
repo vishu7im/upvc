@@ -24,6 +24,7 @@ import type {
   TransomSection,
   BeadSection,
   Reinforcement,
+  AuxiliaryProfile,
   GlassSection,
   Gasket,
   HardwareItem,
@@ -148,6 +149,7 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
   const transoms: Record<string, TransomSection> = {};
   const beads: Record<string, BeadSection> = {};
   const reinforcement: Record<string, Reinforcement> = {};
+  const auxiliaries: Record<string, AuxiliaryProfile> = {};
 
   for (const p of s.parts) {
     const base = {
@@ -185,6 +187,17 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
         reinforcement[p.partKey] = {
           ...base,
           endClearance: num(p.endClearance),
+        };
+        break;
+      case "AUXILIARY":
+        auxiliaries[p.partKey] = {
+          code: p.code,
+          name: p.name,
+          cost: num(p.cost),
+          price: num(p.price),
+          per: "m",
+          weight: num(p.weight),
+          financialCategory: p.financialCategory,
         };
         break;
     }
@@ -277,6 +290,7 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
     transoms,
     beads,
     reinforcement,
+    ...(Object.keys(auxiliaries).length ? { auxiliaries } : {}),
     gaskets,
     glass,
     hardware,

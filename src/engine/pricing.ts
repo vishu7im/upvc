@@ -156,7 +156,9 @@ function findProfileByCode(system: ProfileSystem, code: string) {
   // Cills are included so the cill cut line resolves its per-metre cost/price.
   // (NOT added to isColourBearingCode — the cill code already encodes its finish,
   // so the colour uplift must not double-apply.)
-  for (const dict of [system.frames, system.sashes, system.transoms, system.beads, system.reinforcement, system.cills]) {
+  // Auxiliaries (sliding tracks/caps, Jobs 44/48) likewise price per metre but
+  // are NOT colour-bearing (aluminium/caps).
+  for (const dict of [system.frames, system.sashes, system.transoms, system.beads, system.reinforcement, system.cills, system.auxiliaries ?? {}]) {
     for (const v of Object.values(dict)) {
       if ((v as any).code === code) return v as any;
     }

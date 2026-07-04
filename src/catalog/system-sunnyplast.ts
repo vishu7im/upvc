@@ -89,16 +89,17 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Frame – (Standard)",
     },
-    // Sliding patio outer frame. Face 48 derived from Job 104 (yogi test):
-    //   1500 Ext − 1404 Int = 96 = 2×48 (verified across the 1500/2000/2600 jobs).
-    // Code is a PLACEHOLDER pending the authentic Sunnyplast sliding-frame code
-    // (cf. the existing SPQ-T-SASH placeholder); reconcile before going live.
+    // Sliding patio outer frame — authentic code from Jobs 44/48 (patio-docs/,
+    // "Andrei UK", "Rama pentru glisare 48mm"). Face 48 verified on both docs
+    // AND the earlier Job 104: frame Ext = W/H, Int = Ext − 96 = 2×48.
+    // Weld 3 mm/end: printed saw sizes 2106/1906 = finished 2100/1900 + 2×3
+    // (Job 44) and 2316/2216 (Job 48) — same convention as the French docs.
     "frame-sliding": {
-      code: "SPQ-SL-FRAME",
-      name: "Sliding Frame",
+      code: "SPQ-GL-10252",
+      name: "Sliding Frame 48mm",
       faceWidth: 48,
       glassRebate: 15,
-      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
+      weldAllowanceMm: 3,       // Jobs 44/48: printed = finished + 3/end
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -155,11 +156,13 @@ export const SUNNYPLAST_70: ProfileSystem = {
       financialCategory: "Sash – (Standard)",
     },
     // Sliding patio sash/pane (used for BOTH fixed and sliding panels — they are
-    // cut identically; only hardware differs). Face 85 derived from Job 104:
-    //   745.5 Ext − 575.5 Int = 170 = 2×85. Glass rebate 15 (glass = beadInt + 30,
-    //   matches 606/522/524 × 1531 within the engine's ≤0.6mm tolerance). The
-    //   sliding solver computes the panel envelope directly, so `overlap` is unused
-    //   here (set 0). Code is a PLACEHOLDER (cf. SPQ-T-SASH).
+    // cut identically; only hardware differs). Authentic code from Jobs 44/48
+    // ("Canat pentru glisare 85mm capac PVC"). Face 85 verified on both docs
+    // (and Job 104): sash Int = Ext − 170 (949→779, 2014→1844 on Job 44).
+    // Glass rebate 15 (glass = beadInt + 30: 809×1874 / 964×2084 exact). The
+    // sliding solver computes the panel envelope directly, so `overlap` is
+    // unused here (set 0). Weld 3 mm/end: printed 955/2020 = finished 949/2014
+    // + 2×3 (Job 44), 1110/2230 (Job 48).
     // French door leaves — calibrated from Job 00000264 (docs/french-door/).
     // BOTH the Z sash (85mm KAPI 70-85, SPQ-5-45252) and the T sash (105mm
     // SPQ-5-47252) cut with engine face 105: printed sash 824/2050 → finished
@@ -191,12 +194,12 @@ export const SUNNYPLAST_70: ProfileSystem = {
       financialCategory: "Sash – (Standard)",
     },
     "sash-sliding": {
-      code: "SPQ-SL-SASH",
-      name: "Sliding Sash",
+      code: "SPQ-GL-20252",
+      name: "Sliding Sash 85mm",
       faceWidth: 85,
       overlap: 0,               // unused by the sliding solver (panel envelope is explicit)
       glassRebate: 15,
-      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
+      weldAllowanceMm: 3,       // Jobs 44/48: printed = finished + 3/end
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -279,7 +282,9 @@ export const SUNNYPLAST_70: ProfileSystem = {
   // ---------- BEADS -------------------------------------------------
   // NB: bead-28 must stay the FIRST entry — cells without an explicit beadKey
   // default to the first bead (topology.ts), and the calibrated casement /
-  // door / sliding jobs all assert BEAD-28.
+  // door jobs assert BEAD-28. Sliding pins bead-sl-24; French pins bead-32.
+  // The loader orders parts by partKey (asc), so every OTHER bead key must
+  // sort AFTER "bead-28" or it silently becomes the default bead.
   beads: {
     "bead-28": {
       code: "BEAD-28",
@@ -287,6 +292,25 @@ export const SUNNYPLAST_70: ProfileSystem = {
       faceWidth: 20,            // bead face contribution per side (Ext-Int = 40 = 2x20)
       stickOut: 28,
       weldAllowanceMm: 0,       // beads are square-cut & snapped in, never welded
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Beads",
+    },
+    // Sliding patio bead ("Bagheta ptr.24mm", authentic code) — calibrated
+    // Jobs 44/48: length = sash Int + 40 (819/1884 on Job 44, 974/2094 on
+    // Job 48), the same Ext−Int=40 face-20 rule as bead-28. The docs mark a
+    // 45/45 mitre cut but the length carries NO weld add (beads are snapped
+    // in, not welded) — end prep stays the engine's square notation.
+    // Sliding designs pin beadKey: "bead-sl-24" (sliding-designs.ts); the
+    // default first-bead pick (bead-28) is unchanged for casement/door —
+    // NB the key deliberately sorts after "bead-28" (see the note above).
+    "bead-sl-24": {
+      code: "SPQ-1-51252",
+      name: "24mm Glazing Bead",
+      faceWidth: 20,
+      stickOut: 24,
+      weldAllowanceMm: 0,       // square/mitre-cut & snapped in, never welded
       cost: 0, price: 0,
       per: "m",
       weight: 0,
@@ -355,16 +379,18 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Reinf - (steel)",
     },
-    // Sliding patio reinforcement. UNLIKE casement/door (endClearance 0), the
-    // sliding profiles lose 10mm of steel (5mm per end) — derived from Job 104:
-    //   frame reinf 1394 = frameInt 1404 − 10;  sash reinf 565.5 = sashInt 575.5 − 10
-    //   (verified on every bar across the 1500/2000/2600 jobs). endClearance is a
-    //   per-reinforcement field, so this does NOT affect casement/door math.
+    // Sliding patio reinforcement — authentic codes from Jobs 44/48 (Andrei UK;
+    // SUPERSEDES the Job 104 rule of barInt − 10). UNLIKE casement/door
+    // (endClearance 0), the sliding steel runs 15mm PAST the bar Int at each
+    // end (into the mitre zone) ⇒ length = barInt + 30, verified on all 8
+    // steel rows: frame 1834/2034 = Int 1804/2004 + 30 (Job 44), 2144/2244
+    // (Job 48); sash 809/1874 = Int 779/1844 + 30, 964/2084 (Job 48).
+    // endClearance is per-reinforcement, so casement/door math is untouched.
     "reinf-44x12": {
-      code: "REINF-44x12",
+      code: "AO44X12",
       name: "44 x 12 Steel Reinforcement",
       faceWidth: 0,
-      endClearance: 5,          // 5mm per end ⇒ length = barInt − 10 (sliding frame)
+      endClearance: -15,        // −15mm per end ⇒ length = barInt + 30 (sliding frame)
       weldAllowanceMm: 0,       // internal steel insert, not welded
       cost: 0, price: 0,
       per: "m",
@@ -372,15 +398,60 @@ export const SUNNYPLAST_70: ProfileSystem = {
       financialCategory: "Reinf - (steel)",
     },
     "reinf-25x27-u": {
-      code: "REINF-25x27-U",
-      name: "25 x 27 U Steel Reinforcement",
+      code: "AU26X26",
+      name: "26 x 26 U Steel Reinforcement",
       faceWidth: 0,
-      endClearance: 5,          // 5mm per end ⇒ length = barInt − 10 (sliding sash)
+      endClearance: -15,        // −15mm per end ⇒ length = barInt + 30 (sliding sash)
       weldAllowanceMm: 0,       // internal steel insert, not welded
       cost: 0, price: 0,
       per: "m",
       weight: 0,
       financialCategory: "Reinf - (steel)",
+    },
+  },
+
+  // ---------- AUXILIARY PROFILES (tracks / cover caps) ---------------
+  // Sliding-patio-only cut items, calibrated Jobs 44/48 (Andrei UK) — the
+  // length rules live in bars.ts#emitSlidingAuxBars (engine, with per-formula
+  // calibration comments); this Record is the priced part data only. All are
+  // square-cut, never welded. cost/price 0 pending supplier numbers (golden
+  // rule — enter via the admin catalog CRUD / CSV import).
+  auxiliaries: {
+    "aux-track-alu": {
+      code: "AD16014",
+      name: "Sina glisare aluminiu (slide track)",
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-cap-frame-alu": {
+      code: "AD55142",
+      name: "Capac rama mare aluminiu (big frame cap)",
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-cap-fixed-panel": {
+      code: "GLIS16",
+      name: "Capac rama canat fix (fixed-panel cap)",
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-cap-frame-channel": {
+      code: "GLIS17",
+      name: "Capac canal rama (frame channel cap)",
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-cap-frame-slide": {
+      code: "SPQ-GL-10253",
+      name: "Capac rama glisare (frame slide cap)",
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-cap-sash-pvc": {
+      code: "SPQ-GL-20253",
+      name: "Capac PVC cercevea glisare (sash PVC cap)",
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
     },
   },
 
@@ -391,8 +462,8 @@ export const SUNNYPLAST_70: ProfileSystem = {
     "SPQ-DOOR-Z":      "reinf-28x44.5-u",    // door sash
     "SPQ-005-30252":   "reinf-13x29",        // Z-transom carries top-hung load (Job 85)
     "SPQ-5-30252":     "reinf-26x26-u",      // 78mm mullion when used full-height (Job 90)
-    "SPQ-SL-FRAME":    "reinf-44x12",        // sliding frame: every bar reinforced (Job 104)
-    "SPQ-SL-SASH":     "reinf-25x27-u",      // sliding sash: every bar reinforced (Job 104)
+    "SPQ-GL-10252":    "reinf-44x12",        // sliding frame: every bar reinforced (Jobs 44/48)
+    "SPQ-GL-20252":    "reinf-25x27-u",      // sliding sash: every bar reinforced (Jobs 44/48)
     // French door sashes — ASSUMED same steel as the single-door sash (the
     // Job 00000264 production docs carry "+R1" (reinforced) on every profile but
     // don't itemise a steel section; not asserted in validation — reconcile

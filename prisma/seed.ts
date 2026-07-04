@@ -139,6 +139,15 @@ async function seedSystem(
       endClearance: r.endClearance,
     });
   }
+  // Auxiliary profiles (sliding tracks/caps, Jobs 44/48). No face/weld concept —
+  // stored with the base columns only (faceWidth/weld 0, specialised cols NULL).
+  for (const [key, a] of Object.entries(sys.auxiliaries ?? {})) {
+    await upsertPart(key, PartKind.AUXILIARY, {
+      ...a,
+      faceWidth: 0,
+      weldAllowanceMm: 0,
+    });
+  }
 
   // 3. Glass
   for (const [partKey, g] of Object.entries(sys.glass)) {

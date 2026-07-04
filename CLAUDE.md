@@ -10,8 +10,9 @@ cut pieces → BOM → cutting plan → pricing → printable documents (Work Or
 BOM, Price Summary).
 
 The fabrication engine is **already calibrated** against real reference jobs: Quotila 85/88/90
-(casement + single door), Job 104 (sliding patio) and Job 00000264 (French door).
-`npm run validate` runs **353 assertions** (350 green + 3 pre-existing DB weld-drift failures —
+(casement + single door), Jobs 44/48 "Andrei UK" (sliding patio — these superseded the earlier
+Job 104 yogi-test calibration) and Job 00000264 (French door).
+`npm run validate` runs **435 assertions** (432 green + 3 pre-existing DB weld-drift failures —
 see memory/validate-weld-drift.md; they are not a regression signal).
 
 ## Tech stack (confirmed with the owner)
@@ -283,9 +284,10 @@ layouts are **rejected**, never guessed.
   `french-door-master`/`-slave` leaves. See the dedicated "## French Door" section.
 - **T3 geometry-OK, gated false** — Tilt&Turn (123): geometry == casement sash (reuses `sash-t`);
   the `tilt-turn` content + T&T gear in `hardware.ts`/catalog are **uncalibrated** (no T&T job).
-- **T1 quotable (NEW)** — Sliding Patio (7): **now calibrated and quotable** from 4 real work
-  orders + cutting lists (`patio-docs/`, "Job 104" — yogi test 1/2/3/4, height 1750). See the
-  dedicated **"## Sliding Patio"** section below for the full derivation. The 7 designs (OX, XO,
+- **T1 quotable (NEW)** — Sliding Patio (7): **calibrated and quotable**, originally from the
+  Job 104 (yogi test) docs, **re-calibrated 2026-07-04 from Jobs 44/48 "Andrei UK"**
+  (`patio-docs/`, which supersede Job 104). See the dedicated **"## Sliding Patio"** section
+  below for the full derivation. The 7 designs (OX, XO,
   OXO×2, OOX, XOO, OXXO) are **hand-authored** (`src/catalog/sliding-designs.ts`, applied by
   `prisma/seed.ts#applySlidingTopologies()` by `externalId`), NOT extracted — the extractor still
   hard-rejects sliding (its `HingePointers` encode travel direction, not a hinge edge, so the
@@ -368,46 +370,65 @@ refinement.
 
 ## Sliding Patio
 
-The third quotable family (after Casement + Single Door), calibrated from **4 real work orders +
-matching cutting lists** in `patio-docs/` ("Job 104" — yogi test 1/2/3/4, all height 1750):
-OX 1500×1750 (2-panel), OXO 2000×1750 (3-panel, slide left & right), OXXO 2600×1750 (4-panel,
-centre-meeting). The 7 DB designs (product `73679b0a-…`) are **OX, XO, OXO Slide Left/Right, OOX,
-XOO, OXXO** — all now `quotable=true`.
+The third quotable family (after Casement + Single Door). **Re-calibrated 2026-07-04** from
+**2 real production saw-cut docs** in `patio-docs/` — **Job 44 "test uk Andrei londra"
+(1900×2100)** and **Job 48 "Andrei Uk nr 2" (2210×2310)**, both 2-panel (slider left + fixed;
+Windowmaker "Dimensiuni de debitare detaliate"). These **SUPERSEDE the original Job 104
+(yogi test) calibration** (owner confirmed): the yogi docs disagreed on panel envelope
+(H−79 vs H−86; (W+3)/n−6 vs (W+10)/n−6) and steel (Int−10 vs Int+30). The engine now
+reproduces **every row of both Andrei docs exactly** (saw + finished sizes, quantities, steel,
+aux profiles, glass). The 7 DB designs (product `73679b0a-…`) are **OX, XO, OXO Slide
+Left/Right, OOX, XOO, OXXO** — all `quotable=true`.
 
 **Structure.** A sliding patio is the *simplest* family: an outer frame (4 mitred bars) + **n
 equal-width framed panels** (each a 4-bar mitred rectangle — fixed and sliding panels are cut
-**identically**, only hardware differs) + beads + 2 reinforcements + glass. **No transom, no
-mullion, no Z-break, and no separate interlock profile in the cut list.** The cutting list has
-exactly 5 sections: 28mm Bead, Sliding Frame, 44×12 Steel Reinforcement, Sliding Sash, 25×27 U Steel
-Reinforcement.
+**identically**, only hardware differs) + beads + 2 reinforcements + glass + **auxiliary
+profiles** (slide track + cover caps — see below). **No transom, no mullion, no Z-break, and no
+separate interlock profile in the cut list.**
 
-**Calibrated constants (verified exact across all 4 jobs):**
-- Sliding Frame face **48** (1500 Ext − 1404 Int = 96). Sliding Sash face **85** (745.5 − 575.5 =
-  170). Bead face 20 (reused `bead-28`). Glass rebate **15** (glass = beadInt + 30).
-- Frame: Hor Ext=W Int=W−96; Vert Ext=H Int=H−96; mitred `\ - /`, continuous jambs.
-- **Panel width Ext:** bypass (OX/XO/OXO/OOX/XOO) = `(W+3)/n − 6` *(exact for n=2,3)*;
-  centre-meeting (OXXO) = `(W+79)/4 − 6` *(n=4, **single data point** — reproduces the 2600 job
-  exactly but W-scaling unverified; needs a 2nd OXXO job)*. Panel height Ext = **H − 79**.
-- Sash Int = Ext − 170; Bead Int = sash Int, Ext = Int+40, square `[ - ]`.
-- **Reinforcement = bar Int − 10** (5mm/end). This is the catalog `Reinforcement.endClearance=5`
-  field on `reinf-44x12`/`reinf-25x27-u` — casement/door keep `endClearance=0`, so their math is
-  byte-identical. Frame→`reinf-44x12`, Sash→`reinf-25x27-u` via `reinforcementMap`.
-- Gasket 02 = Σ glass perimeter (the casement rule) → **exact** (8546/12316/16438).
-- Hardware (calibrated): per **fixed** panel 7× Fixed Panel Support; per **sliding** panel 1×
-  handle, 1× cylinder, 1× lock&keep, **2× roller**, 1× stopper, 1× top + 1× bottom brush.
-  **Approximate/flagged** (not cleanly geometry-derived, like the glazing-bridge-packer rule):
-  Bridge Packer, Glazing Bridge Packer, Woolpile.
+**Calibrated constants (exact on both Andrei docs; finished sizes — printed saw sizes add
+3 mm/end weld on the mitred frame/sash cuts only, per-profile `weldAllowanceMm: 3`, same
+convention as the French docs):**
+- Frame `SPQ-GL-10252` ("Rama pentru glisare 48mm") face **48**: Hor Ext=W Int=W−96; Vert Ext=H
+  Int=H−96; mitred `\ - /`, continuous jambs. Sash `SPQ-GL-20252` ("Canat pentru glisare 85mm")
+  face **85**. Bead `SPQ-1-51252` ("Bagheta ptr.24mm", `bead-sl-24`) face 20. Glass rebate **15**
+  (glass = beadInt + 30: 809×1874 / 964×2084). All authentic codes (old `SPQ-SL-*` placeholders
+  are gone).
+- **Panel width Ext:** bypass (OX/XO/OXO/OOX/XOO) = `(W+10)/n − 6` *(exact for n=2 — 949/1104;
+  n=3 is the same formula EXTENDED, no 3-panel Andrei doc yet)*; centre-meeting (OXXO) =
+  `(W+79)/4 − 6` *(still the old Job 104 single data point — UNCALIBRATED against the new
+  settings; needs an Andrei-era OXXO doc)*. Panel height Ext = **H − 86** (2014/2224).
+- Sash Int = Ext − 170; Bead Int = sash Int, Ext = Int+40 (the docs mark beads 45/45 mitre but
+  the length carries no weld add; engine prints square `[ - ]`, cosmetic).
+- **Reinforcement = bar Int + 30** (steel runs 15mm past Int per end): catalog
+  `endClearance = −15` on `reinf-44x12` (frame steel, code `AO44X12`) and `reinf-25x27-u`
+  (sash steel, code `AU26X26`) — casement/door keep `endClearance=0`, byte-identical.
+  Verified on all 8 steel rows (1834/2034, 809/1874, 2144/2244, 964/2084).
+- **Auxiliary profiles** (new `AUXILIARY` PartKind + `ProfileSystem.auxiliaries`; lengths in
+  `bars.ts#emitSlidingAuxBars`, all square-cut): track `AD16014` = W−95; channel cap `GLIS17` =
+  H−95; slide cap `SPQ-GL-10253` = H−96 ×1 + (W−45) ×2; sash cap `SPQ-GL-20253` = panelExtH−2
+  per panel; `AD55142`/`GLIS16` = panelExtW−99 **per FIXED panel**. Per-fixed-panel counts and
+  the ×2 W−45 pieces are derived from 2-panel docs only — re-verify on a 3/4-panel doc.
+- Gasket 02 = Σ glass perimeter (the casement rule; the Andrei docs list no gaskets — rule
+  retained from Job 104 where it was exact).
+- Hardware (unchanged from Job 104 — the Andrei docs list no hardware): per **fixed** panel 7×
+  Fixed Panel Support; per **sliding** panel 1× handle, 1× cylinder, 1× lock&keep, **2× roller**,
+  1× stopper, 1× top + 1× bottom brush. **Approximate/flagged**: Bridge Packer, Glazing Bridge
+  Packer, Woolpile.
 
-**How it's wired (engine stays pure).** New `kind:"sliding"` `CellNode` variant (`src/types.ts`) +
+**How it's wired (engine stays pure).** `kind:"sliding"` `CellNode` variant (`src/types.ts`) +
 `buildSlidingPanels()` in `topology.ts` emit one `SolvedCell` per panel (explicit `sashOuter`/
-`sashInner`/`glassRect`/`beadInt`), so **`bars.ts`/`cutting.ts`/`pricing.ts`/`documents.ts`/
-`solve.ts` are unchanged** (they consume the cells generically). Added: `sliding-fixed`/
-`sliding-slide-left`/`sliding-slide-right` SashKinds, a hardware branch (`hardware.ts`), SVG slide
-arrows (`svg.ts`), and catalog parts (`frame-sliding`, `sash-sliding`, two reinforcements, patio
-hardware — codes `SPQ-SL-*` are **placeholders** pending authentic Sunnyplast codes). Topologies are
-hand-authored in `src/catalog/sliding-designs.ts` and applied by `externalId` in
-`prisma/seed.ts#applySlidingTopologies()` (sets topology + `frameKey="frame-sliding"` +
-`quotable=true` + default dims). The extractor (`extract-topology.ts`) still rejects sliding.
+`sashInner`/`glassRect`/`beadInt`); `bars.ts` additionally runs `emitSlidingAuxBars()` (no-op
+unless sliding cells + `system.auxiliaries` exist — other families byte-identical). Aux parts
+price per metre via `pricing.ts#findProfileByCode` but are **not colour-bearing**. SashKinds
+`sliding-fixed`/`sliding-slide-left`/`sliding-slide-right`, a hardware branch (`hardware.ts`),
+SVG slide arrows (`svg.ts`). Topologies are hand-authored in `src/catalog/sliding-designs.ts`
+(pin `beadKey:"bead-sl-24"` — NB the loader orders parts by partKey, so any non-default bead key
+must sort AFTER `bead-28` or it hijacks the default-bead pick) and applied by `externalId` in
+`prisma/seed.ts#applySlidingTopologies()`. The extractor (`extract-topology.ts`) still rejects
+sliding. **Seed caveat:** the seed never overwrites `weldAllowanceMm`/cost/price/weight
+(owner-editable) — pre-existing DBs needed a one-off `weldAllowanceMm=3` fix on
+`frame-sliding`/`sash-sliding` (applied to the current DB 2026-07-04).
 
 **Per-design default dimensions.** New nullable `design.defaultWidthMm/defaultHeightMm` columns
 (migration `…_add_design_default_dimensions`) replace the old hardcoded **1200×1200**. Surfaced by
@@ -415,20 +436,24 @@ the loader, `GET /api/designs/:id`, and the web configurator (preloads W×H, sti
 defaults from the work orders: 2-panel 1500×1750, 3-panel 2000×1750, OXXO 2600×1750. `previewDimsFor()`
 in the seed now honours a design's own defaults for the gallery preview.
 
-**Validation.** 3 sliding jobs (OX/OXO/OXXO) in `src/validation/jobs.ts` assert every cut-list row
-(incl. reinforcement — `validate()` now searches `parts.bars` **and** `parts.reinforcement`),
-glass, and Gasket 02 to ≤0.6mm. Existing casement/door assertions stay green (no shared-path
-change). **OOX/XOO/XO have no dedicated job** — they reuse the verified 2-/3-panel cut math (panels
-are identical width; only slide/handle assignment differs).
+**Validation.** 5 sliding jobs in `src/validation/jobs.ts`: `JOB_44_ANDREI`/`JOB_48_ANDREI`
+(**doc-exact** — every PDF row incl. steel + aux profiles + glass) and `JOB_SL_OX`/`OXO`/`OXXO`
+(the old yogi sizes recomputed as **formula-consistency** jobs under the new constants; OXO also
+covers the multi-panel aux rules). `validateSlidingWeld()` asserts the printed saw sizes
+(1906/2106/955/2020; bead/steel/aux print unwelded), mirroring `validateFrenchWeld`.
+`validate()` searches `parts.bars` **and** `parts.reinforcement`. Existing casement/door/French
+assertions stay green (no shared-path change). **OOX/XOO/XO have no dedicated doc** — they reuse
+the verified 2-/3-panel cut math (panels are identical width; only slide/handle assignment
+differs).
 
 **Drag-to-resize spans (per-panel widths).** Like casement/door transom-drag, the configurator lets
 you drag panel boundaries and read each panel's mm width. Panels carry optional per-quote share
 fractions `fᵢ` (Σ=1, default `1/n`): the sliding `CellNode` gains `boundaries?: number[]` (n−1
 cumulative daylight fractions), written by `solve.ts#applySplitRatios` from `splitRatios` keys
 `root.b{i}` (normalised: strictly increasing, min 5% share). `buildSlidingPanels` lays columns out by
-fraction and sets `panelExtᵢ = fᵢ·(W+K) − 6` (K=3 bypass / 79 OXXO) — which **reduces exactly to the
-equal calibrated formula** when `fᵢ=1/n`, so equal-panel quotes stay byte-identical (validation:
-`validateSlidingSpans()` proves equal=745.5 and a dragged b1=0.40 → 595.2/895.8 summing to 1491).
+fraction and sets `panelExtᵢ = fᵢ·(W+K) − 6` (K=10 bypass / 79 OXXO) — which **reduces exactly to
+the equal calibrated formula** when `fᵢ=1/n`, so equal-panel quotes stay byte-identical (validation:
+`validateSlidingSpans()` proves equal=749 and a dragged b1=0.40 → 598/900 summing to 1498).
 Unequal widths are an **interpolation, flagged uncalibrated** (no unequal-panel reference job). The
 UI is `web/components/window-designer.tsx` (a sliding branch: per-panel labels + n−1 boundary
 handles); the rest of the `splitRatios` pipeline (live quote → `order_item.splitRatios` → confirm

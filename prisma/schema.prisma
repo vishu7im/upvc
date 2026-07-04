@@ -28,6 +28,7 @@ enum PartKind {
   TRANSOM
   BEAD
   REINFORCEMENT
+  AUXILIARY
 }
 
 // ---- A profile system (e.g. "sunnyplast-70") -------------------------

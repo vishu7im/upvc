@@ -4,7 +4,8 @@
 // The 7 Sunny Plast Sliding Patio designs (product 73679b0a-…-b402544a600c).
 // Each is a single row of equal-width framed panels (O = fixed, X = sliding),
 // hand-authored as a `kind:"sliding"` topology node. The engine reproduces the
-// real Job 104 (yogi test 1–4) cutting lists to ≤0.6mm — see CLAUDE.md
+// real Jobs 44/48 (Andrei UK, patio-docs/) saw-cut docs exactly — these
+// superseded the earlier Job 104 (yogi test) calibration. See CLAUDE.md
 // "Sliding Patio" and src/validation/jobs.ts.
 //
 // `prisma/seed.ts#applySlidingTopologies()` patches the 7 collection designs
@@ -37,6 +38,7 @@ const slidingTopology = (
 ): Extract<CellNode, { kind: "sliding" }> => ({
   kind: "sliding",
   sashKey: "sash-sliding",
+  beadKey: "bead-sl-24", // authentic SPQ-1-51252 "Bagheta ptr.24mm" (Jobs 44/48)
   panels,
   meeting,
 });

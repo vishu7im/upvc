@@ -71,9 +71,71 @@ export function computeParts(
     }, 0));
   }
 
+  // Sliding-patio auxiliary profiles (track + cover caps) — no-op unless the
+  // geometry has sliding panels AND the system carries `auxiliaries`.
+  emitSlidingAuxBars(bars, geometry, system, widthMm, heightMm);
+
   const gaskets = computeGaskets(geometry, system);
 
   return { bars, reinforcement, glass, gaskets, hardware: [] /* filled by hardware module */ };
+}
+
+// ---------------------------------------------------------------------
+// SLIDING AUXILIARY PROFILES — slide track + cover caps, calibrated from
+// Jobs 44 + 48 (patio-docs/, Andrei UK, 1900×2100 and 2210×2310; both exact):
+//   AD16014      track (bottom)      = W − 95            ×1  (1805 / 2115)
+//   GLIS17       frame channel cap   = H − 95            ×1  (2005 / 2215)
+//   SPQ-GL-10253 frame slide cap     = H − 96 (=frameInt) ×1 + (W − 45) ×2
+//                                                            (2004+1855×2 / 2214+2165×2)
+//   SPQ-GL-20253 sash PVC cap        = panelExtH − 2     ×1 per panel (2012 / 2222)
+//   AD55142      big frame cap (alu) = panelExtW − 99    ×1 per FIXED panel (850 / 1005)
+//   GLIS16       fixed-panel cap     = panelExtW − 99    ×1 per FIXED panel (850 / 1005)
+// Per-FIXED-panel quantities and the ×2 (W − 45) pieces are derived from
+// 2-panel docs only (1 slider + 1 fixed each) — re-verify against a 3/4-panel
+// doc when one is available. All square-cut, never welded.
+// ---------------------------------------------------------------------
+function emitSlidingAuxBars(
+  bars: BarPiece[],
+  geom: SolvedGeometry,
+  system: ProfileSystem,
+  W: number,
+  H: number,
+): void {
+  const aux = system.auxiliaries;
+  if (!aux) return;
+  const panels = geom.cells.filter(
+    (c) => c.content.startsWith("sliding") && c.sashOuter,
+  );
+  if (panels.length === 0) return;
+
+  const push = (key: string, position: string, orientation: "H" | "V", len: number) => {
+    const a = aux[key];
+    if (!a) return; // part not in the catalog ⇒ skip the row (never guess)
+    bars.push(withWeld({
+      code: a.code,
+      name: a.name,
+      position,
+      orientation,
+      extMm: round1(len),
+      intMm: round1(len),
+      endPrep: "[ - ]",
+    }, 0));
+  };
+
+  push("aux-track-alu",         "Slide track bottom",   "H", W - 95);
+  push("aux-cap-frame-channel", "Frame channel cap",    "V", H - 95);
+  push("aux-cap-frame-slide",   "Frame slide cap jamb", "V", H - 96);
+  push("aux-cap-frame-slide",   "Frame slide cap head", "H", W - 45);
+  push("aux-cap-frame-slide",   "Frame slide cap sill", "H", W - 45);
+
+  panels.forEach((c, i) => {
+    const p = c.sashOuter!;
+    push("aux-cap-sash-pvc", `Sash PVC cap panel ${i + 1}`, "V", p.h - 2);
+    if (c.content === "sliding-fixed") {
+      push("aux-cap-frame-alu",   `Big frame cap (fixed panel ${i + 1})`, "H", p.w - 99);
+      push("aux-cap-fixed-panel", `Fixed-panel cap (panel ${i + 1})`,     "H", p.w - 99);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------

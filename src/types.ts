@@ -82,8 +82,30 @@ export interface TransomSection extends ProfileSection {
 }
 
 export interface Reinforcement extends ProfileSection {
-  /** If the bar must lose some length at each end (most Sunny Plast: 0). */
+  /**
+   * Per-end length adjustment: steel length = bar Int − 2 × endClearance.
+   * 0 = flush with Int (most Sunny Plast). Positive = the steel stops short of
+   * each end; NEGATIVE = the steel runs PAST the Int span into the mitre zone
+   * (sliding patio, Jobs 44/48: −15 ⇒ length = bar Int + 30 on every bar).
+   */
   endClearance: number;
+}
+
+/**
+ * Auxiliary (non-structural) profile cut for a job alongside the PVC/steel
+ * bars — slide tracks, frame/sash cover caps, channel caps. Square-cut, never
+ * welded, no Int/face concept; lengths are derived by family-specific engine
+ * rules (see emitSlidingAuxBars in bars.ts, calibrated Jobs 44/48). Priced per
+ * metre like any profile once the owner enters supplier prices.
+ */
+export interface AuxiliaryProfile {
+  code: string;
+  name: string;
+  cost: number;
+  price: number;
+  per: "m";
+  weight: number;
+  financialCategory: string;
 }
 
 export interface Gasket {
@@ -165,6 +187,12 @@ export interface ProfileSystem {
   transoms: Record<string, TransomSection>;
   beads: Record<string, BeadSection>;
   reinforcement: Record<string, Reinforcement>;
+  /**
+   * Auxiliary profiles (tracks/caps) cut alongside the bars. Optional — only
+   * families with calibrated aux rules (sliding patio) consume them; absent ⇒
+   * no aux rows, byte-identical to pre-aux output.
+   */
+  auxiliaries?: Record<string, AuxiliaryProfile>;
   gaskets: Record<string, Gasket>;
   glass: Record<string, GlassSection>;
   hardware: Record<string, HardwareItem>;

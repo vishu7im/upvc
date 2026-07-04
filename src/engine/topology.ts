@@ -365,15 +365,22 @@ function grow(r: Rect, by: number): Rect {
 // ---------------------------------------------------------------------
 // SLIDING PATIO — a single row of `n` equal-width framed panels.
 //
-// Calibrated against Job 104 (yogi test 1–4), height 1750:
-//   • Frame face 48 (handled by the frame profile in emitFrameBars).
-//   • Panel outer width (Ext):
-//       bypass (OX/XO/OXO/OOX/XOO):  (W + 3)/n − 6     [exact for n=2 and n=3]
-//       centre-meeting (OXXO):       (W + 79)/4 − 6     [n=4 — SINGLE data point;
-//         reproduces the 2600-wide job exactly but its W-scaling is UNVERIFIED.
-//         Needs a 2nd OXXO job at another width before trusting other sizes.]
-//   • Panel outer height (Ext): H − 79  (sash engages frame head/sill 8.5mm/side).
-//   • Sash face 85 ⇒ sash Int = Ext − 170; glass rebate 15 ⇒ glass = beadInt + 30.
+// Calibrated against Jobs 44 + 48 (patio-docs/, "Andrei UK", 1900×2100 and
+// 2210×2310, both 2-panel) — these SUPERSEDE the earlier Job 104 (yogi test)
+// docs, which disagreed on the panel envelope and steel lengths (owner
+// confirmed the Andrei docs are current production settings):
+//   • Frame face 48 (handled by the frame profile in emitFrameBars);
+//     frame Ext = W/H exactly on both docs (finished; printed adds 3mm/end weld).
+//   • Panel outer width (Ext, finished):
+//       bypass (OX/XO/OXO/OOX/XOO):  (W + 10)/n − 6
+//         [exact for n=2: 949 = 1910/2−6 (Job 44), 1104 = 2220/2−6 (Job 48).
+//          n=3 is the same formula EXTENDED — no 3-panel Andrei doc yet.]
+//       centre-meeting (OXXO):       (W + 79)/4 − 6     [K=79 is still the old
+//         Job 104 single data point; only the height/steel corrections carry
+//         over. UNCALIBRATED against the new settings — needs an OXXO doc.]
+//   • Panel outer height (Ext, finished): H − 86  (2014 @ H2100, 2224 @ H2310).
+//   • Sash face 85 ⇒ sash Int = Ext − 170; glass rebate 15 ⇒ glass = beadInt + 30
+//     (both rules unchanged from Job 104 and exact on the Andrei docs).
 // Every panel (fixed or sliding) is cut identically — only hardware (hardware.ts)
 // and the SVG slide arrow (svg.ts) differ, via the cell `content`.
 //
@@ -400,12 +407,13 @@ function buildSlidingPanels(
   const fractions = panelFractions(node.boundaries, n);
 
   // Total panel material span is calibrated: Σ panelExt = (W + K) − 6n
-  // (K = 3 bypass / 79 OXXO). Distribute it per fraction so panelExtᵢ =
-  // fᵢ·(W+K) − 6, which reduces to (W+K)/n − 6 when equal (verified Job 104).
+  // (K = 10 bypass [Jobs 44/48] / 79 OXXO [old Job 104, uncalibrated against
+  // the new settings]). Distribute it per fraction so panelExtᵢ = fᵢ·(W+K) − 6,
+  // which reduces to (W+K)/n − 6 when equal (exact on Jobs 44/48, n=2).
   // For unequal panels this is an interpolation (no unequal reference job) —
   // flagged; equal panels stay byte-identical.
-  const K = node.meeting ? 79 : 3;
-  const panelExtH = windowH - 79;
+  const K = node.meeting ? 79 : 10;
+  const panelExtH = windowH - 86; // Jobs 44/48: 2014 = 2100−86, 2224 = 2310−86
   const fw = sash.faceWidth;        // 85
   const rebate = sash.glassRebate;  // 15
 

@@ -178,66 +178,168 @@ const JOB_90: ExpectedJob = {
   ],
 };
 
-// ---------- SLIDING PATIO jobs (Job 104 — yogi test 1, 2, 4) ---------
-// Calibrated from the supplied patio-docs/ work orders + cutting lists (all
-// height 1750). Frame face 48, sash face 85, bead face 20, glass rebate 15,
-// reinforcement = bar Int − 10 (endClearance 5/end). Panel width:
-//   bypass (W+3)/n − 6  [OX/OXO];  centre-meeting (W+79)/4 − 6  [OXXO].
+// ---------- SLIDING PATIO jobs -----------------------------------------
+// Calibrated from patio-docs/ Jobs 44 ("test uk Andrei londra", 1900×2100)
+// and 48 ("Andrei Uk nr 2", 2210×2310) — Windowmaker saw-cut docs, both
+// 2-panel (Culisant 1C + Ccv fixa). These SUPERSEDE the earlier Job 104
+// (yogi test) docs. Constants (finished sizes; printed = finished + 3mm/end
+// weld on frame & sash only):
+//   frame face 48 (Ext = W/H, Int = Ext − 96); sash face 85 (Int = Ext − 170);
+//   bead SPQ-1-51252 = sashInt + 40; glass = beadInt + 30;
+//   panel Ext: bypass (W+10)/n − 6, height H − 86;
+//   steel = barInt + 30 (endClearance −15/end) — AO44X12 frame, AU26X26 sash;
+//   aux profiles: track W−95, channel cap H−95, slide cap H−96 + (W−45)×2,
+//   sash cap panelExtH−2 per panel, AD55142/GLIS16 panelExtW−99 per FIXED panel.
 // designIds are the collection design UUIDs (the seed attaches the topology by
 // externalId == designId). Reinforcement int == ext (square-cut steel).
 
-const JOB_104_OX: ExpectedJob = {
-  name: "Job 104 OX: 1500×1750 sliding patio (2-panel: 1 fixed + 1 slide)",
+const JOB_44_ANDREI: ExpectedJob = {
+  // Every row below is a printed doc line converted to finished size (−3mm/end
+  // on welded frame/sash cuts; steel/bead/aux print unwelded). XO design: the
+  // doc's panel 1 is the slider (left), panel 2 fixed.
+  name: "Job 44 Andrei: 1900×2100 sliding patio (2-panel: slide left + fixed)",
+  designId: "fbf4592c-ee97-4ac9-ba96-862370213bff",
+  widthMm: 1900,
+  heightMm: 2100,
+  bars: [
+    // Frame (face 48) — printed 1906/2106
+    { code: "SPQ-GL-10252", ext: 1900, int: 1804, orientation: "H" },
+    { code: "SPQ-GL-10252", ext: 2100, int: 2004, orientation: "V" },
+    // Sash (face 85), both panels identical — printed 955/2020
+    { code: "SPQ-GL-20252", ext: 949,  int: 779,  orientation: "H" },
+    { code: "SPQ-GL-20252", ext: 2014, int: 1844, orientation: "V" },
+    // Beads ("Bagheta ptr.24mm") — printed 819/1884 (no weld add)
+    { code: "SPQ-1-51252", ext: 819,  int: 779,  orientation: "H" },
+    { code: "SPQ-1-51252", ext: 1884, int: 1844, orientation: "V" },
+    // Frame steel (= frameInt + 30) — printed 1834/2034
+    { code: "AO44X12", ext: 1834, int: 1834, orientation: "H" },
+    { code: "AO44X12", ext: 2034, int: 2034, orientation: "V" },
+    // Sash steel (= sashInt + 30) — printed 809/1874
+    { code: "AU26X26", ext: 809,  int: 809,  orientation: "H" },
+    { code: "AU26X26", ext: 1874, int: 1874, orientation: "V" },
+    // Auxiliary profiles — every ProfilAuxiliar doc row
+    { code: "AD16014",      ext: 1805, orientation: "H" }, // slide track = W − 95
+    { code: "GLIS17",       ext: 2005, orientation: "V" }, // channel cap = H − 95
+    { code: "SPQ-GL-10253", ext: 2004, orientation: "V" }, // slide cap = H − 96
+    { code: "SPQ-GL-10253", ext: 1855, orientation: "H" }, // slide cap = W − 45 (×2)
+    { code: "SPQ-GL-20253", ext: 2012, orientation: "V" }, // sash cap = panelExtH − 2
+    { code: "AD55142",      ext: 850,  orientation: "H" }, // big frame cap = panelExtW − 99
+    { code: "GLIS16",       ext: 850,  orientation: "H" }, // fixed-panel cap = panelExtW − 99
+  ],
+  glass: [{ width: 809, height: 1874 }], // doc "Gol 24mm 809 × 1874" ×2
+  gaskets: [{ code: "GKT-02", lengthMm: 10732 }], // Σ glass perimeter (formula; not on the doc)
+  hardware: [
+    { code: "SL-FIX-SUP",   qty: 7 },  // 1 fixed panel × 7
+    { code: "SL-HDL-W",     qty: 1 },  // 1 slider
+    { code: "DR-CYL-BR",    qty: 1 },
+    { code: "SL-LOCK-KEEP", qty: 1 },
+    { code: "SL-ROLLER",    qty: 2 },
+  ],
+};
+
+const JOB_48_ANDREI: ExpectedJob = {
+  name: "Job 48 Andrei: 2210×2310 sliding patio (2-panel: slide left + fixed)",
+  designId: "fbf4592c-ee97-4ac9-ba96-862370213bff",
+  widthMm: 2210,
+  heightMm: 2310,
+  bars: [
+    // Frame — printed 2216/2316
+    { code: "SPQ-GL-10252", ext: 2210, int: 2114, orientation: "H" },
+    { code: "SPQ-GL-10252", ext: 2310, int: 2214, orientation: "V" },
+    // Sash — printed 1110/2230
+    { code: "SPQ-GL-20252", ext: 1104, int: 934,  orientation: "H" },
+    { code: "SPQ-GL-20252", ext: 2224, int: 2054, orientation: "V" },
+    // Beads — printed 974/2094
+    { code: "SPQ-1-51252", ext: 974,  int: 934,  orientation: "H" },
+    { code: "SPQ-1-51252", ext: 2094, int: 2054, orientation: "V" },
+    // Steel — printed 2144/2244 (frame), 964/2084 (sash)
+    { code: "AO44X12", ext: 2144, int: 2144, orientation: "H" },
+    { code: "AO44X12", ext: 2244, int: 2244, orientation: "V" },
+    { code: "AU26X26", ext: 964,  int: 964,  orientation: "H" },
+    { code: "AU26X26", ext: 2084, int: 2084, orientation: "V" },
+    // Auxiliary profiles
+    { code: "AD16014",      ext: 2115, orientation: "H" },
+    { code: "GLIS17",       ext: 2215, orientation: "V" },
+    { code: "SPQ-GL-10253", ext: 2214, orientation: "V" },
+    { code: "SPQ-GL-10253", ext: 2165, orientation: "H" },
+    { code: "SPQ-GL-20253", ext: 2222, orientation: "V" },
+    { code: "AD55142",      ext: 1005, orientation: "H" },
+    { code: "GLIS16",       ext: 1005, orientation: "H" },
+  ],
+  glass: [{ width: 964, height: 2084 }], // doc "Gol 24mm 964 × 2084" ×2
+  gaskets: [{ code: "GKT-02", lengthMm: 12192 }],
+  hardware: [
+    { code: "SL-FIX-SUP",   qty: 7 },
+    { code: "SL-HDL-W",     qty: 1 },
+    { code: "DR-CYL-BR",    qty: 1 },
+    { code: "SL-LOCK-KEEP", qty: 1 },
+    { code: "SL-ROLLER",    qty: 2 },
+  ],
+};
+
+// The three old Job 104 (yogi) sizes stay as FORMULA-CONSISTENCY jobs: their
+// expected values are recomputed under the Jobs 44/48 constants (they no
+// longer match the superseded yogi docs). OXO also exercises the multi-panel
+// aux rules; OXXO keeps its centre-meeting K=79 (uncalibrated against the new
+// settings — needs an Andrei-era OXXO doc).
+
+const JOB_SL_OX: ExpectedJob = {
+  name: "Sliding OX 1500×1750 (formula-consistency, Jobs 44/48 constants)",
   designId: "0057bd49-577c-4b61-bf5f-f8d69ca760b3",
   widthMm: 1500,
   heightMm: 1750,
   bars: [
-    // Frame (face 48)
-    { code: "SPQ-SL-FRAME", ext: 1500, int: 1404, orientation: "H" },
-    { code: "SPQ-SL-FRAME", ext: 1750, int: 1654, orientation: "V" },
-    // Sash (face 85) — both panels cut identically
-    { code: "SPQ-SL-SASH", ext: 745.5, int: 575.5, orientation: "H" },
-    { code: "SPQ-SL-SASH", ext: 1671,  int: 1501,  orientation: "V" },
-    // Beads (face 20)
-    { code: "BEAD-28", ext: 615.5, int: 575.5, orientation: "H" },
-    { code: "BEAD-28", ext: 1541,  int: 1501,  orientation: "V" },
-    // Frame reinforcement 44×12 (= frameInt − 10)
-    { code: "REINF-44x12", ext: 1394, int: 1394, orientation: "H" },
-    { code: "REINF-44x12", ext: 1644, int: 1644, orientation: "V" },
-    // Sash reinforcement 25×27 U (= sashInt − 10)
-    { code: "REINF-25x27-U", ext: 565.5, int: 565.5, orientation: "H" },
-    { code: "REINF-25x27-U", ext: 1491,  int: 1491,  orientation: "V" },
+    { code: "SPQ-GL-10252", ext: 1500, int: 1404, orientation: "H" },
+    { code: "SPQ-GL-10252", ext: 1750, int: 1654, orientation: "V" },
+    // Panel: (1500+10)/2 − 6 = 749; height 1750 − 86 = 1664
+    { code: "SPQ-GL-20252", ext: 749,  int: 579,  orientation: "H" },
+    { code: "SPQ-GL-20252", ext: 1664, int: 1494, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 619,  int: 579,  orientation: "H" },
+    { code: "SPQ-1-51252", ext: 1534, int: 1494, orientation: "V" },
+    { code: "AO44X12", ext: 1434, int: 1434, orientation: "H" },
+    { code: "AO44X12", ext: 1684, int: 1684, orientation: "V" },
+    { code: "AU26X26", ext: 609,  int: 609,  orientation: "H" },
+    { code: "AU26X26", ext: 1524, int: 1524, orientation: "V" },
   ],
-  glass: [{ width: 606, height: 1531 }],
-  gaskets: [{ code: "GKT-02", lengthMm: 8546 }], // Σ glass perimeter (exact)
+  glass: [{ width: 609, height: 1524 }],
+  gaskets: [{ code: "GKT-02", lengthMm: 8532 }],
   hardware: [
-    { code: "SL-FIX-SUP",  qty: 7 },  // 1 fixed panel × 7
-    { code: "SL-HDL-W",    qty: 1 },  // 1 slider
-    { code: "DR-CYL-BR",   qty: 1 },
+    { code: "SL-FIX-SUP",   qty: 7 },
+    { code: "SL-HDL-W",     qty: 1 },
+    { code: "DR-CYL-BR",    qty: 1 },
     { code: "SL-LOCK-KEEP", qty: 1 },
-    { code: "SL-ROLLER",   qty: 2 },
+    { code: "SL-ROLLER",    qty: 2 },
   ],
 };
 
-const JOB_104_OXO: ExpectedJob = {
-  name: "Job 104 OXO: 2000×1750 sliding patio (3-panel)",
+const JOB_SL_OXO: ExpectedJob = {
+  name: "Sliding OXO 2000×1750 (formula-consistency, Jobs 44/48 constants)",
   designId: "8a1b8a80-e31a-4f0b-aa62-2771e04ec985",
   widthMm: 2000,
   heightMm: 1750,
   bars: [
-    { code: "SPQ-SL-FRAME", ext: 2000, int: 1904, orientation: "H" },
-    { code: "SPQ-SL-FRAME", ext: 1750, int: 1654, orientation: "V" },
-    { code: "SPQ-SL-SASH", ext: 661.7, int: 491.7, orientation: "H" },
-    { code: "SPQ-SL-SASH", ext: 1671,  int: 1501,  orientation: "V" },
-    { code: "BEAD-28", ext: 531.7, int: 491.7, orientation: "H" },
-    { code: "BEAD-28", ext: 1541,  int: 1501,  orientation: "V" },
-    { code: "REINF-44x12", ext: 1894, int: 1894, orientation: "H" },
-    { code: "REINF-44x12", ext: 1644, int: 1644, orientation: "V" },
-    { code: "REINF-25x27-U", ext: 481.7, int: 481.7, orientation: "H" },
-    { code: "REINF-25x27-U", ext: 1491,  int: 1491,  orientation: "V" },
+    { code: "SPQ-GL-10252", ext: 2000, int: 1904, orientation: "H" },
+    { code: "SPQ-GL-10252", ext: 1750, int: 1654, orientation: "V" },
+    // Panel: (2000+10)/3 − 6 = 664; height 1664
+    { code: "SPQ-GL-20252", ext: 664,  int: 494,  orientation: "H" },
+    { code: "SPQ-GL-20252", ext: 1664, int: 1494, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 534,  int: 494,  orientation: "H" },
+    { code: "SPQ-1-51252", ext: 1534, int: 1494, orientation: "V" },
+    { code: "AO44X12", ext: 1934, int: 1934, orientation: "H" },
+    { code: "AO44X12", ext: 1684, int: 1684, orientation: "V" },
+    { code: "AU26X26", ext: 524,  int: 524,  orientation: "H" },
+    { code: "AU26X26", ext: 1524, int: 1524, orientation: "V" },
+    // Multi-panel aux coverage (per-FIXED-panel caps, 2 fixed panels here)
+    { code: "AD16014",      ext: 1905, orientation: "H" },
+    { code: "GLIS17",       ext: 1655, orientation: "V" },
+    { code: "SPQ-GL-10253", ext: 1654, orientation: "V" },
+    { code: "SPQ-GL-10253", ext: 1955, orientation: "H" },
+    { code: "SPQ-GL-20253", ext: 1662, orientation: "V" },
+    { code: "AD55142",      ext: 565,  orientation: "H" },
+    { code: "GLIS16",       ext: 565,  orientation: "H" },
   ],
-  glass: [{ width: 522, height: 1531 }],
-  gaskets: [{ code: "GKT-02", lengthMm: 12316 }],
+  glass: [{ width: 524, height: 1524 }],
+  gaskets: [{ code: "GKT-02", lengthMm: 12288 }],
   hardware: [
     { code: "SL-FIX-SUP", qty: 14 }, // 2 fixed panels × 7
     { code: "SL-HDL-W",   qty: 1 },  // 1 slider
@@ -245,26 +347,26 @@ const JOB_104_OXO: ExpectedJob = {
   ],
 };
 
-const JOB_104_OXXO: ExpectedJob = {
-  name: "Job 104 OXXO: 2600×1750 sliding patio (4-panel, centre-meeting)",
+const JOB_SL_OXXO: ExpectedJob = {
+  name: "Sliding OXXO 2600×1750 (formula-consistency; centre-meeting K=79 uncalibrated)",
   designId: "bd0ad364-3313-442d-871f-db7fab0502c4",
   widthMm: 2600,
   heightMm: 1750,
   bars: [
-    { code: "SPQ-SL-FRAME", ext: 2600, int: 2504, orientation: "H" },
-    { code: "SPQ-SL-FRAME", ext: 1750, int: 1654, orientation: "V" },
-    // OXXO panel width = (2600+79)/4 − 6 = 663.75 → 663.8 (matches PDF 663.7/663.8)
-    { code: "SPQ-SL-SASH", ext: 663.8, int: 493.8, orientation: "H" },
-    { code: "SPQ-SL-SASH", ext: 1671,  int: 1501,  orientation: "V" },
-    { code: "BEAD-28", ext: 533.8, int: 493.8, orientation: "H" },
-    { code: "BEAD-28", ext: 1541,  int: 1501,  orientation: "V" },
-    { code: "REINF-44x12", ext: 2494, int: 2494, orientation: "H" },
-    { code: "REINF-44x12", ext: 1644, int: 1644, orientation: "V" },
-    { code: "REINF-25x27-U", ext: 483.8, int: 483.8, orientation: "H" },
-    { code: "REINF-25x27-U", ext: 1491,  int: 1491,  orientation: "V" },
+    { code: "SPQ-GL-10252", ext: 2600, int: 2504, orientation: "H" },
+    { code: "SPQ-GL-10252", ext: 1750, int: 1654, orientation: "V" },
+    // OXXO panel width = (2600+79)/4 − 6 = 663.75 → 663.8; height 1664
+    { code: "SPQ-GL-20252", ext: 663.8, int: 493.8, orientation: "H" },
+    { code: "SPQ-GL-20252", ext: 1664,  int: 1494,  orientation: "V" },
+    { code: "SPQ-1-51252", ext: 533.8, int: 493.8, orientation: "H" },
+    { code: "SPQ-1-51252", ext: 1534,  int: 1494,  orientation: "V" },
+    { code: "AO44X12", ext: 2534, int: 2534, orientation: "H" },
+    { code: "AO44X12", ext: 1684, int: 1684, orientation: "V" },
+    { code: "AU26X26", ext: 523.8, int: 523.8, orientation: "H" },
+    { code: "AU26X26", ext: 1524,  int: 1524,  orientation: "V" },
   ],
-  glass: [{ width: 524, height: 1531 }],
-  gaskets: [{ code: "GKT-02", lengthMm: 16438 }],
+  glass: [{ width: 523.8, height: 1524 }],
+  gaskets: [{ code: "GKT-02", lengthMm: 16382 }],
   hardware: [
     { code: "SL-FIX-SUP", qty: 14 }, // 2 fixed panels × 7
     { code: "SL-HDL-W",   qty: 2 },  // 2 sliders
@@ -517,7 +619,7 @@ function validateCustomMode(): void {
 // ---------- Sliding drag-to-resize spans ----------------------------
 // Proves: (a) equal panels (no overrides) reproduce the calibrated cut list
 // byte-identically; (b) a dragged boundary produces unequal panels via
-// panelExtᵢ = fᵢ·(W+3) − 6, whose widths still sum to the equal-case total.
+// panelExtᵢ = fᵢ·(W+10) − 6, whose widths still sum to the equal-case total.
 function validateSlidingSpans(): void {
   console.log("\n==================================================");
   console.log("Sliding patio — drag-to-resize spans (OX 1500×1750)");
@@ -528,19 +630,46 @@ function validateSlidingSpans(): void {
     designId: OX, widthMm: 1500, heightMm: 1750,
   };
   const sashHorWidths = (out: QuoteOutput): number[] =>
-    out.parts.bars.filter((b) => b.name === "Sliding Sash" && b.orientation === "H").map((b) => b.extMm);
+    out.parts.bars.filter((b) => b.code === "SPQ-GL-20252" && b.orientation === "H").map((b) => b.extMm);
 
-  // (a) equal default — byte-identical to the calibrated job.
+  // (a) equal default — byte-identical to the calibrated formula.
   const eq = sashHorWidths(solve({ ...base }));
   expect("equal: 4 sash-H bars (2 panels)", eq.length, 4);
-  expect("equal: every panel 745.5", eq.every((w) => approxEq(w, 745.5)), true);
+  expect("equal: every panel 749", eq.every((w) => approxEq(w, 749)), true);
 
-  // (b) drag boundary b1 → 0.40: panel1 = 0.40·1503−6 = 595.2, panel2 = 895.8.
+  // (b) drag boundary b1 → 0.40: panel1 = 0.40·1510−6 = 598, panel2 = 900.
   const dragged = sashHorWidths(solve({ ...base, splitRatios: { "root.b1": 0.4 } }));
-  expect("dragged: panel 595.2 present", dragged.some((w) => approxEq(w, 595.2)), true);
-  expect("dragged: panel 895.8 present", dragged.some((w) => approxEq(w, 895.8)), true);
+  expect("dragged: panel 598 present", dragged.some((w) => approxEq(w, 598)), true);
+  expect("dragged: panel 900 present", dragged.some((w) => approxEq(w, 900)), true);
   const distinct = Array.from(new Set(dragged.map((w) => Math.round(w * 10) / 10)));
-  expect("dragged: spans sum to equal-case total 1491", distinct.reduce((a, b) => a + b, 0), 1491);
+  expect("dragged: spans sum to equal-case total 1498", distinct.reduce((a, b) => a + b, 0), 1498);
+}
+
+// ---------- Sliding welded (printed) saw sizes -----------------------
+// Jobs 44/48 print SAW sizes = finished + 3 mm/end on the mitred frame/sash
+// cuts (per-profile weldAllowanceMm = 3, so these hold even if the GLOBAL weld
+// default drifts in the DB). Beads/steel/aux are square-cut ⇒ print unchanged.
+function validateSlidingWeld(): void {
+  console.log("\n==================================================");
+  console.log("Sliding patio — welded saw sizes (Job 44, 1900×2100)");
+  console.log("==================================================");
+
+  const out: QuoteOutput = solve({
+    orderNo: "TEST", customer: "Validation",
+    designId: "fbf4592c-ee97-4ac9-ba96-862370213bff", widthMm: 1900, heightMm: 2100,
+    systemId: "sunnyplast-70",
+  });
+  const find = (code: string, ext: number) =>
+    out.parts.bars.find((b) => b.code === code && Math.abs(b.extMm - ext) <= 0.6);
+
+  expect("frame welded 1906 (printed)", find("SPQ-GL-10252", 1900)?.weldedExtMm ?? -1, 1906);
+  expect("frame welded 2106 (printed)", find("SPQ-GL-10252", 2100)?.weldedExtMm ?? -1, 2106);
+  expect("sash welded 955 (printed)",  find("SPQ-GL-20252", 949)?.weldedExtMm ?? -1, 955);
+  expect("sash welded 2020 (printed)", find("SPQ-GL-20252", 2014)?.weldedExtMm ?? -1, 2020);
+  expect("bead prints unwelded (819)", find("SPQ-1-51252", 819)?.weldedExtMm ?? -1, 819);
+  expect("aux prints unwelded (1805)", find("AD16014", 1805)?.weldedExtMm ?? -1, 1805);
+  const steel = out.parts.reinforcement.find((b) => b.code === "AU26X26" && Math.abs(b.extMm - 1874) <= 0.6);
+  expect("sash steel prints unwelded (1874)", steel?.weldedExtMm ?? -1, 1874);
 }
 
 // ---------- Welding-shrinkage check --------------------------------
@@ -694,10 +823,12 @@ function validateColourAndJoints(): void {
 
   [
     JOB_85, JOB_88, JOB_90,
-    JOB_104_OX, JOB_104_OXO, JOB_104_OXXO,
+    JOB_44_ANDREI, JOB_48_ANDREI,
+    JOB_SL_OX, JOB_SL_OXO, JOB_SL_OXXO,
     JOB_264_T, JOB_264_MIDRAIL, JOB_264_UNEQUAL,
   ].forEach(validate);
   validateSlidingSpans();
+  validateSlidingWeld();
   validateFrenchDoor();
   validateCustomMode();
   validateWeldMath();
