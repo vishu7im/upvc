@@ -118,7 +118,10 @@ export default function Configurator(props: ConfiguratorProps) {
 
   useEffect(() => {
     if (!systemId) return;
-    apiGet<SystemOptions>(`/api/systems/${systemId}/options`)
+    const frameQuery = props.designFrameKey
+      ? `?frameKey=${encodeURIComponent(props.designFrameKey)}`
+      : "";
+    apiGet<SystemOptions>(`/api/systems/${systemId}/options${frameQuery}`)
       .then((o) => {
         setOptions(o);
         setColourKey(o.defaultColourKey ?? "");
@@ -127,7 +130,7 @@ export default function Configurator(props: ConfiguratorProps) {
         setCillKey("");
       })
       .catch(() => setOptions(null));
-  }, [systemId]);
+  }, [systemId, props.designFrameKey]);
 
   // Reset split overrides when the design changes — the pathId scheme is
   // design-specific. (Width/height changes keep them: full-window fractions

@@ -62,9 +62,25 @@ app.get("/api/systems", (_req, res) => {
 app.get("/api/systems/:id/options", asyncHandler(async (req, res) => {
   const sys = await refreshSystemCatalog(req.params.id);
   if (!sys) throw new HttpError(404, `Unknown system: ${req.params.id}`);
+
+  // A physical profile can have multiple internal calibration rows. For
+  // example, frame-6ch and frame-french share supplier code SPQ-6-11252 but
+  // retain different calibrated face widths. Show that physical chamber only
+  // once, preferring the current design's frame key so quotes keep the correct
+  // calibration behind the single visible option.
+  const preferredFrameKey =
+    typeof req.query.frameKey === "string" ? req.query.frameKey : undefined;
+  const chamberByCode = new Map<string, { key: string; name: string }>();
+  for (const [key, frame] of Object.entries(sys.frames)) {
+    const existing = chamberByCode.get(frame.code);
+    if (!existing || key === preferredFrameKey) {
+      chamberByCode.set(frame.code, { key, name: frame.name });
+    }
+  }
+
   res.json({
     // Chamber options = the system's frame profiles (e.g. 5ch / 6ch).
-    chambers: Object.entries(sys.frames).map(([key, f]) => ({ key, name: f.name })),
+    chambers: [...chamberByCode.values()],
     glass: Object.entries(sys.glass).map(([key, g]) => ({ key, name: g.name })),
     colours: Object.values(sys.colours ?? {}).map((c) => ({
       key: c.key,

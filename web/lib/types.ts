@@ -112,7 +112,7 @@ export interface DesignDetail {
   imageSvg: string | null;
 }
 
-/** GET /api/systems/:id/options — selectable glass + colours + cills (U3). */
+/** GET /api/systems/:id/options?frameKey=… — selectable chambers, glass, colours + cills (U3). */
 export interface SystemOptions {
   /** Selectable frame profiles (chambers, e.g. 5ch / 6ch). */
   chambers?: { key: string; name: string }[];
