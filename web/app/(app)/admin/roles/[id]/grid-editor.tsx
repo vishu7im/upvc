@@ -137,16 +137,19 @@ export default function GridEditor({
 
       {grouped.map(([category, mods]) => (
         <Card key={category} className="overflow-hidden">
-          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase text-slate-500">{category}</div>
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
+            <h2 className="text-sm font-semibold text-slate-950">{category}</h2>
+            <span className="text-xs font-medium text-slate-500">{mods.length} {mods.length === 1 ? "module" : "modules"}</span>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
+            <table className="w-full min-w-[760px] border-separate border-spacing-0 text-sm">
               <thead>
                 <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Module</th>
+                  <th className="sticky left-0 z-20 min-w-52 border-b border-r border-slate-200 bg-slate-50 px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">Module</th>
                   {actions.map((a) => (
-                    <th key={a.slug} className="px-3 py-2.5 text-center text-xs font-semibold uppercase text-slate-500">{a.name}</th>
+                    <th key={a.slug} className="min-w-24 border-b border-slate-200 bg-slate-50 px-3 py-3 text-center text-xs font-semibold uppercase text-slate-500">{a.name}</th>
                   ))}
-                  <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase text-slate-500">Data scope</th>
+                  <th className="min-w-36 border-b border-slate-200 bg-slate-50 px-3 py-3 text-center text-xs font-semibold uppercase text-slate-500">Data scope</th>
                 </tr>
               </thead>
               <tbody>
@@ -154,27 +157,29 @@ export default function GridEditor({
                   const state = grid.get(mod.slug);
                   const hasRead = state?.actions.has("read") ?? false;
                   return (
-                    <tr key={mod.slug} className="border-t border-slate-100">
-                      <td className="px-4 py-2.5 font-semibold text-slate-800">{mod.name}</td>
+                    <tr key={mod.slug}>
+                      <td className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white px-5 py-4 font-semibold text-slate-900">{mod.name}</td>
                       {actions.map((a) => {
                         const checked = state?.actions.has(a.slug) ?? false;
                         const editable = actorHolds(mod.slug, a.slug);
                         return (
-                          <td key={a.slug} className="px-3 py-2.5 text-center">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-[#4442e3] disabled:opacity-40"
-                              checked={checked}
-                              disabled={!editable}
-                              title={editable ? undefined : "You don't hold this permission"}
-                              onChange={() => toggle(mod.slug, a.slug)}
-                            />
+                          <td key={a.slug} className={cn("border-b border-slate-100 px-3 py-4 text-center", !editable && "bg-slate-100/90")}>
+                            <span className={cn("mx-auto flex h-9 w-9 items-center justify-center rounded-md border", editable ? "border-slate-200 bg-white" : "border-slate-300 bg-slate-200")}>
+                              <input
+                                type="checkbox"
+                                className="h-5 w-5 cursor-pointer accent-[#4442e3] disabled:cursor-not-allowed disabled:accent-slate-400"
+                                checked={checked}
+                                disabled={!editable}
+                                title={editable ? undefined : "You don't hold this permission"}
+                                onChange={() => toggle(mod.slug, a.slug)}
+                              />
+                            </span>
                           </td>
                         );
                       })}
-                      <td className="px-3 py-2.5 text-center">
+                      <td className={cn("border-b border-slate-100 px-3 py-4 text-center", !hasRead && "bg-slate-100/90")}>
                         <select
-                          className={cn(selectClass, "mx-auto h-9 w-28")}
+                          className={cn(selectClass, "mx-auto h-9 w-28 disabled:border-slate-300 disabled:bg-slate-200")}
                           value={state?.scope ?? "ALL"}
                           disabled={!hasRead}
                           onChange={(e) => setScope(mod.slug, e.target.value as Scope)}
@@ -196,7 +201,6 @@ export default function GridEditor({
         <Button icon="check" onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save permissions"}
         </Button>
-        <span className="text-xs text-slate-500">Create / Update / Delete require Read.</span>
       </div>
     </div>
   );

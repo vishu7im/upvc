@@ -12,6 +12,7 @@ import type { MetaPermissions, RoleDetail } from "@/lib/types";
 import { Badge, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import GridEditor from "./grid-editor";
+import RoleHeaderEditor from "./role-header-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export default async function RolePermissionsPage({
         title={role.name}
         description={role.description ?? "Toggle each module's actions and its data scope. Cells you can't grant are disabled."}
         meta={role.isSystem ? <Badge tone="blue">System role</Badge> : <Badge tone="slate">Custom role</Badge>}
+        actions={(!role.isSystem || user.isSuperAdmin) ? <RoleHeaderEditor role={role} /> : undefined}
       />
       <GridEditor
         roleId={role.id}

@@ -30,6 +30,7 @@ import { catalogRouter } from "./catalog.ts";
 import { usersRouter } from "./users.ts";
 import { rolesRouter } from "./roles.ts";
 import { metaRouter } from "./meta.ts";
+import { approvalsRouter } from "./approvals.ts";
 import { requireAuth } from "./middleware/auth.ts";
 import { asyncHandler, HttpError, errorHandler } from "./http.ts";
 import { ensureBucket, getObject, storageConfigured } from "../services/storage.ts";
@@ -141,6 +142,7 @@ app.use("/api/catalog", catalogRouter); // admin-only (guards inside the router)
 app.use("/api/users", usersRouter); // per-route requirePermission("users", …)
 app.use("/api/roles", rolesRouter); // per-route requirePermission("roles", …)
 app.use("/api/meta", metaRouter); // requireAuth-only metadata for the grid editor
+app.use("/api/approvals", requireAuth, approvalsRouter); // peer-consent Super Admin deletion
 
 // Public company logo (so a browser <img> can load it without a token).
 app.get(

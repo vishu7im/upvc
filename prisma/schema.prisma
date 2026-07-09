@@ -33,7 +33,7 @@ enum PartKind {
 
 // ---- A profile system (e.g. "sunnyplast-70") -------------------------
 model ProfileSystem {
-  id               String  @id // = systemId, e.g. "sunnyplast-70"
+  id               String @id // = systemId, e.g. "sunnyplast-70"
   name             String
   currency         String
   stockBarLengthMm Int
@@ -44,13 +44,13 @@ model ProfileSystem {
   // for now this is the system-wide default (e.g. base "white", 0% uplift).
   defaultColourKey String?
 
-  parts             ProfilePart[]
-  glass             Glass[]
-  gaskets           Gasket[]
-  hardware          Hardware[]
-  colours           ColourOption[]
-  cills             Cill[]
-  reinforcementMap  ReinforcementMapEntry[]
+  parts            ProfilePart[]
+  glass            Glass[]
+  gaskets          Gasket[]
+  hardware         Hardware[]
+  colours          ColourOption[]
+  cills            Cill[]
+  reinforcementMap ReinforcementMapEntry[]
 
   @@map("profile_system")
 }
@@ -59,7 +59,7 @@ model ProfileSystem {
 // They share the ProfileSection base; specialised fields are nullable
 // and only populated for the relevant kind.
 model ProfilePart {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   systemId String
   system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
@@ -81,13 +81,13 @@ model ProfilePart {
   financialCategory String
 
   // FrameSection / SashSection
-  glassRebate Decimal? @db.Decimal(10, 4)
+  glassRebate  Decimal? @db.Decimal(10, 4)
   // SashSection
-  overlap Decimal? @db.Decimal(10, 4)
+  overlap      Decimal? @db.Decimal(10, 4)
   // BeadSection
-  stickOut Decimal? @db.Decimal(10, 4)
+  stickOut     Decimal? @db.Decimal(10, 4)
   // TransomSection: "T" | "Z"
-  jointType String?
+  jointType    String?
   // Reinforcement
   endClearance Decimal? @db.Decimal(10, 4)
 
@@ -127,15 +127,15 @@ model Supplier {
 }
 
 model PriceDocument {
-  id            String   @id @default(uuid())
-  supplierId    String
-  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   docKey        String   @unique // stable key, e.g. "sp-profiles-anglia-2025-04-25"
-  sourceFile    String            // exact PDF filename in docs/price_list/
+  sourceFile    String // exact PDF filename in docs/price_list/
   effectiveDate DateTime
-  currency      String            // "GBP"
-  priceBasis    String?           // e.g. "engross nett £/m, 6m lengths, 3 colour tiers"
+  currency      String // "GBP"
+  priceBasis    String? // e.g. "engross nett £/m, 6m lengths, 3 colour tiers"
   notes         String?
   importedAt    DateTime @default(now())
 
@@ -149,15 +149,15 @@ model PriceItem {
   documentId String
   document   PriceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  supplierCode String        // VERBATIM from the PDF ("" when the row carries no code)
-  description  String        // verbatim
-  unit         String        // "m" | "m2" | "pc" | "lm" | "length" | "sheet"
-  colourTier   String?       // "white" | "1p" | "2p" | null (tierless)
-  variant      String?       // Doc B volume tier: "lorry" | "company" | "normal"
-  packQty      Int?          // e.g. GLIS 04 Bump Stop = 2
-  stockLengthM Decimal?      @db.Decimal(10, 4) // 6 / 4.2 where the PDF states it
-  unitPrice    Decimal       @db.Decimal(12, 4) // nett GBP per `unit`
-  source       String        // per-line citation ("Doc A row 'Window Frame 70mm 5ch', White")
+  supplierCode String // VERBATIM from the PDF ("" when the row carries no code)
+  description  String // verbatim
+  unit         String // "m" | "m2" | "pc" | "lm" | "length" | "sheet"
+  colourTier   String? // "white" | "1p" | "2p" | null (tierless)
+  variant      String? // Doc B volume tier: "lorry" | "company" | "normal"
+  packQty      Int? // e.g. GLIS 04 Bump Stop = 2
+  stockLengthM Decimal? @db.Decimal(10, 4) // 6 / 4.2 where the PDF states it
+  unitPrice    Decimal  @db.Decimal(12, 4) // nett GBP per `unit`
+  source       String // per-line citation ("Doc A row 'Window Frame 70mm 5ch', White")
 
   // Mapping outcome, written by the import script (null ⇒ recorded-only/unmapped).
   mappedTable   String? // "profile_part" | "glass" | "cill" | "hardware" | "auxiliary"
@@ -171,7 +171,7 @@ model PriceItem {
 
 // ---- Glass -----------------------------------------------------------
 model Glass {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   systemId String
   system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
@@ -191,7 +191,7 @@ model Glass {
 
 // ---- Gaskets ---------------------------------------------------------
 model Gasket {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   systemId String
   system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
@@ -210,17 +210,17 @@ model Gasket {
 
 // ---- Hardware --------------------------------------------------------
 model Hardware {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   systemId String
   system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
   partKey           String
   code              String
   name              String
-  cost              Decimal @db.Decimal(12, 4)
-  price             Decimal @db.Decimal(12, 4)
+  cost              Decimal  @db.Decimal(12, 4)
+  price             Decimal  @db.Decimal(12, 4)
   per               String // "pc"
-  weight            Decimal @db.Decimal(12, 4)
+  weight            Decimal  @db.Decimal(12, 4)
   financialCategory String
   lengthMm          Decimal? @db.Decimal(10, 4) // espagnolettes / friction hinges
 
@@ -235,7 +235,7 @@ model Hardware {
 // quote is byte-identical to pre-M5. Real foiled-colour uplifts are
 // entered by the owner via the admin catalog API (never guessed).
 model ColourOption {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   systemId String
   system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
@@ -258,14 +258,14 @@ model ColourOption {
 // metre of product width. Cost/price/weight default to 0 (golden rule) until
 // the owner fills them via the admin catalog CRUD / CSV import.
 model Cill {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   systemId String
   system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
   partKey           String // in-memory Record key, e.g. "cill-95-white"
   code              String // stock code, e.g. "GL-1-00095"
   name              String // e.g. "95mm Cill — White"
-  projectionMm      Int    // nominal size; also the SVG draw height
+  projectionMm      Int // nominal size; also the SVG draw height
   cost              Decimal @default(0) @db.Decimal(12, 4)
   price             Decimal @default(0) @db.Decimal(12, 4)
   per               String  @default("m")
@@ -278,7 +278,7 @@ model Cill {
 
 // ---- reinforcementMap: profile code -> reinforcement record key ------
 model ReinforcementMapEntry {
-  id       String @id @default(uuid())
+  id       String        @id @default(uuid())
   systemId String
   system   ProfileSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
 
@@ -302,11 +302,11 @@ model Design {
   svgPreview  String?
 
   // Catalogue / import metadata
-  externalId        String?  @unique // collections design UUID
+  externalId        String? @unique // collections design UUID
   imageSvg          String? // embedded SVG from collections (large)
   quantityOfSquares Int?
   listIndex         Int?
-  quotable          Boolean  @default(false)
+  quotable          Boolean @default(false)
 
   // Per-design default manufacturing size (mm) — preloads the configurator and
   // sizes the gallery preview, replacing the old hardcoded 1200×1200. Null ⇒
@@ -357,6 +357,15 @@ enum RoleScope {
 enum PermissionDataScope {
   OWN
   ALL
+}
+
+/// Lifecycle state for a peer-approved Super Admin deletion request.
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXECUTED
 }
 
 /// A tenant. Created NOW with one seeded "default" org so org FKs exist from
@@ -460,10 +469,14 @@ model AuditLog {
 
 // ---- Users (JWT auth) ------------------------------------------------
 model User {
-  id           String @id @default(uuid())
-  email        String @unique
+  id           String    @id @default(uuid())
+  email        String    @unique
   passwordHash String
   name         String
+  phone        String?
+  jobTitle     String?
+  department   String?
+  lastLoginAt  DateTime?
 
   // RBAC (PLAN §3.2). `roleId` is the single source of role truth (the legacy
   // free-form `role` string was dropped in Phase 6). Required now that every
@@ -478,12 +491,33 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  roleRef      Role?         @relation(fields: [roleId], references: [id])
-  organization Organization? @relation(fields: [organizationId], references: [id])
-  orders       Order[]
+  roleRef                  Role?                    @relation(fields: [roleId], references: [id])
+  organization             Organization?            @relation(fields: [organizationId], references: [id])
+  orders                   Order[]
+  deletionRequestsIncoming AccountDeletionRequest[] @relation("deletionTarget")
+  deletionRequestsOutgoing AccountDeletionRequest[] @relation("deletionRequester")
 
   @@index([roleId])
   @@map("user")
+}
+
+/// Append-only peer-consent workflow for deleting a platform Super Admin.
+/// targetId becomes null after execution so the resolved row remains auditable.
+model AccountDeletionRequest {
+  id           String         @id @default(uuid())
+  targetId     String?
+  requesterId  String
+  status       ApprovalStatus @default(PENDING)
+  reason       String?
+  createdAt    DateTime       @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+
+  target    User? @relation("deletionTarget", fields: [targetId], references: [id], onDelete: SetNull)
+  requester User  @relation("deletionRequester", fields: [requesterId], references: [id])
+
+  @@index([targetId, status])
+  @@map("account_deletion_request")
 }
 
 // ---- Customers (minimal, B2B) ----------------------------------------
@@ -500,19 +534,19 @@ model Customer {
 
 // ---- Orders ----------------------------------------------------------
 model Order {
-  id           String   @id @default(uuid())
-  orderNo      String   @unique
+  id           String    @id @default(uuid())
+  orderNo      String    @unique
   userId       String
-  user         User     @relation(fields: [userId], references: [id])
+  user         User      @relation(fields: [userId], references: [id])
   customerId   String?
   customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName String
   reference    String?
-  status       String   @default("draft") // "draft" | "confirmed"
+  status       String    @default("draft") // "draft" | "confirmed"
   // Grand total snapshot (M5) — set at confirm so the orders list can show a
   // price without re-solving. null for draft/legacy orders.
-  totalPrice   Decimal? @db.Decimal(12, 4)
-  createdAt    DateTime @default(now())
+  totalPrice   Decimal?  @db.Decimal(12, 4)
+  createdAt    DateTime  @default(now())
 
   items     OrderItem[]
   documents Document[]
@@ -523,25 +557,25 @@ model Order {
 
 // ---- Order items (one fabricated unit = product + design + W×H) ------
 model OrderItem {
-  id        String @id @default(uuid())
-  orderId   String
-  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  designId  String
-  design    Design  @relation(fields: [designId], references: [designId])
-  systemId  String
-  widthMm   Float
-  heightMm  Float
-  qty       Int    @default(1)
-  mode      String @default("default") // "default" | "custom"
-  overrides Json? // EngineOverrides when mode === "custom"
-  splitRatios Json? // per-quote span-drag overrides (Record<pathId, ratio>); null ⇒ default geometry
-  frameKey  String? // per-quote chamber override (frame partKey, e.g. "frame-6ch"); null ⇒ design's baked frame
-  cillKey   String? // selected cill Record key (null ⇒ no cill). Drives the 30mm deduction + cill render in confirmed docs.
+  id               String  @id @default(uuid())
+  orderId          String
+  order            Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product @relation(fields: [productId], references: [id])
+  designId         String
+  design           Design  @relation(fields: [designId], references: [designId])
+  systemId         String
+  widthMm          Float
+  heightMm         Float
+  qty              Int     @default(1)
+  mode             String  @default("default") // "default" | "custom"
+  overrides        Json? // EngineOverrides when mode === "custom"
+  splitRatios      Json? // per-quote span-drag overrides (Record<pathId, ratio>); null ⇒ default geometry
+  frameKey         String? // per-quote chamber override (frame partKey, e.g. "frame-6ch"); null ⇒ design's baked frame
+  cillKey          String? // selected cill Record key (null ⇒ no cill). Drives the 30mm deduction + cill render in confirmed docs.
   colourKeyInside  String? // per-quote inside/primary colour key; null ⇒ system default (byte-identical)
   colourKeyOutside String? // per-quote outside colour key (dual-colour finish); null ⇒ same as inside
-  pricingSnapshot Json? // totals captured at confirm
+  pricingSnapshot  Json? // totals captured at confirm
 
   @@index([orderId])
   @@map("order_item")

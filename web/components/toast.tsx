@@ -9,6 +9,7 @@ export type ToastKind = "updating" | "valid" | "invalid";
 export interface ToastState {
   id: number;
   kind: ToastKind;
+  message?: string;
 }
 
 const AUTO_HIDE_MS = 2500;
@@ -95,7 +96,7 @@ function ToastCard({ toast, onExpire }: { toast: ToastState; onExpire: (id: numb
       )}
     >
       <Glyph glyph={meta.glyph} />
-      <span>{meta.message}</span>
+      <span>{toast.message ?? meta.message}</span>
     </div>
   );
 }

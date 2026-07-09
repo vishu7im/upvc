@@ -32,11 +32,7 @@ export default async function AdminUsersPage({
     serverApiGet<Paginated<RoleSummary>>("/api/roles?limit=100"),
   ]);
 
-  const perms = {
-    create: can(user, "users", "create"),
-    update: can(user, "users", "update"),
-    delete: can(user, "users", "delete"),
-  };
+  const canCreate = can(user, "users", "create");
 
   return (
     <div>
@@ -47,15 +43,14 @@ export default async function AdminUsersPage({
       <PageHeader
         eyebrow="Administration"
         title="Users"
-        description="Invite users, assign roles, activate or deactivate accounts, and reset passwords."
+        description="Browse account status and activity, invite users, or open a profile to manage its details."
         meta={<Badge tone="purple">{users.pagination.total} total</Badge>}
       />
       <UsersManager
         users={users.data}
         roles={roles.data}
-        currentUserId={user.id}
         search={search}
-        perms={perms}
+        canCreate={canCreate}
       />
       <Pager
         page={users.pagination.page}

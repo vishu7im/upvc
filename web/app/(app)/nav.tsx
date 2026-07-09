@@ -164,14 +164,19 @@ export default function Nav({ user, children }: { user: AuthUser; children: Reac
               >
                 Quick quote
               </Link>
-              <button
-                type="button"
+              <Link
+                href="/account"
                 aria-label="Notifications"
-                className="flex h-10 w-10 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+                className="relative flex h-10 w-10 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
               >
                 <Icon name="bell" className="h-5 w-5" />
-              </button>
-              <div className="ml-1 hidden items-center gap-3 border-l border-slate-200 pl-4 sm:flex">
+                {user.incomingApprovals > 0 && (
+                  <span className="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                    {user.incomingApprovals > 9 ? "9+" : user.incomingApprovals}
+                  </span>
+                )}
+              </Link>
+              <Link href="/account" className="ml-1 hidden items-center gap-3 border-l border-slate-200 pl-4 sm:flex">
                 <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#0f172a] text-sm font-bold text-white">
                   {(user.name || user.email || "U").slice(0, 1).toUpperCase()}
                 </div>
@@ -179,7 +184,7 @@ export default function Nav({ user, children }: { user: AuthUser; children: Reac
                   <p className="truncate text-sm font-semibold text-slate-950">{user.name || user.email}</p>
                   <p className="text-xs uppercase text-slate-500">{user.role?.name ?? "User"}</p>
                 </div>
-              </div>
+              </Link>
             </div>
           </div>
         </header>

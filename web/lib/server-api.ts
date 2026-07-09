@@ -51,6 +51,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       ...me.user,
       role: me.role,
       isSuperAdmin: me.isSuperAdmin,
+      incomingApprovals: me.incomingApprovals,
       permissions: me.permissions,
       nav: me.nav,
     };

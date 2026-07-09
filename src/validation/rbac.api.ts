@@ -17,11 +17,13 @@
 // Assertions cover: the Phase-5 guard-map + orders data-scoping matrix, the
 // Phase-3 users/roles invariants (PLATFORM hiding, anti-escalation, system/
 // in-use role deletes), the reset-password forced-change gate, and the Phase-6
-// audit trail (rows written for each RBAC mutation).
+// audit trail, user profile fields, and peer-approved Super Admin deletion.
 // =====================================================================
 
 import { prisma } from "../db/client.ts";
 import { signToken } from "../api/middleware/auth.ts";
+import { assertNotLastSuperAdmin } from "../api/rbac/service.ts";
+import { HttpError } from "../api/http.ts";
 
 const BASE = process.env.RBAC_API_BASE ?? "http://localhost:3005";
 
@@ -76,6 +78,13 @@ async function postJson(
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+  return { status: r.status, body: await r.json().catch(() => null) };
+}
+async function deleteJson(path: string, token: string): Promise<{ status: number; body: any }> {
+  const r = await fetch(BASE + path, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
   });
   return { status: r.status, body: await r.json().catch(() => null) };
 }
@@ -185,6 +194,10 @@ async function main(): Promise<void> {
   // A SECOND platform Super Admin so the last-SA guard can be exercised without
   // ever endangering the real one (the real SA stays active throughout).
   const saTwo = await mkUser(`${TAG}-sa2@local`, saRole.id);
+  const saPeerTarget = await mkUser(`${TAG}-sa-target@local`, saRole.id);
+  const saNonTarget = await mkUser(`${TAG}-sa-nontarget@local`, saRole.id);
+  const saCancelTarget = await mkUser(`${TAG}-sa-cancel@local`, saRole.id);
+  const saLastRequester = await mkUser(`${TAG}-sa-last-requester@local`, saRole.id);
   const cust = await mkUser(`${TAG}-cust@local`, customerRole.id);
   const cust2 = await mkUser(`${TAG}-cust2@local`, customerRole.id);
   const auditor = await mkUser(`${TAG}-aud@local`, auditorRole.id);
@@ -197,12 +210,19 @@ async function main(): Promise<void> {
   const C2 = mint(cust2);
   const AU = mint(auditor);
   const LM = mint(limited);
+  const SA_TARGET = mint(saPeerTarget);
+  const SA_NON_TARGET = mint(saNonTarget);
 
   const createdOrderIds: string[] = [];
   const createdRoleIds: string[] = [auditorRole.id, limitedRole.id, inUseRole.id];
+  const createdApprovalIds: string[] = [];
   const throwawayUserIds = [
     orgAdmin.id,
     saTwo.id,
+    saPeerTarget.id,
+    saNonTarget.id,
+    saCancelTarget.id,
+    saLastRequester.id,
     cust.id,
     cust2.id,
     auditor.id,
@@ -414,6 +434,109 @@ async function main(): Promise<void> {
         body: JSON.stringify({ tempPassword: "whatever8" }),
       }),
     );
+    chk(
+      "Super Admin self-delete → 403",
+      403,
+      await status(`/api/users/${sa.id}`, SA, { method: "DELETE" }),
+    );
+
+    // === Post-Phase-6: soft user fields ================================
+    const profilePatch = await fetch(BASE + `/api/users/${cust2.id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${AD}`, ...jsonHeaders },
+      body: JSON.stringify({
+        phone: "+44 20 7946 0991",
+        jobTitle: "Estimator",
+        department: "Commercial",
+      }),
+    });
+    chk("user profile fields PATCH → 200", 200, profilePatch.status);
+    const profileBody = await profilePatch.json().catch(() => null);
+    chk("user phone round-trips", "+44 20 7946 0991", profileBody?.phone);
+    chk("user job title round-trips", "Estimator", profileBody?.jobTitle);
+    chk("user department round-trips", "Commercial", profileBody?.department);
+
+    // === Post-Phase-6: Super Admin peer-consent deletion ===============
+    const requested = await deleteJson(`/api/users/${saPeerTarget.id}`, SA);
+    chk("SA delete co-SA → 202 pending approval", 202, requested.status);
+    chk("co-SA deletion response status", "pending_approval", requested.body?.status);
+    if (requested.body?.request?.id) createdApprovalIds.push(requested.body.request.id);
+    chk(
+      "co-SA still exists while approval is pending",
+      true,
+      Boolean(await prisma.user.findUnique({ where: { id: saPeerTarget.id } })),
+    );
+
+    const requestId = requested.body?.request?.id as string;
+    chk(
+      "non-target SA cannot approve → 403",
+      403,
+      await status(`/api/approvals/${requestId}/approve`, SA_NON_TARGET, { method: "POST" }),
+    );
+    chk(
+      "target SA approves → 200",
+      200,
+      await status(`/api/approvals/${requestId}/approve`, SA_TARGET, { method: "POST" }),
+    );
+    chk(
+      "approved target user is deleted",
+      null,
+      await prisma.user.findUnique({ where: { id: saPeerTarget.id } }),
+    );
+    chk(
+      "approved request is EXECUTED",
+      "EXECUTED",
+      (await prisma.accountDeletionRequest.findUnique({ where: { id: requestId } }))?.status,
+    );
+
+    const cancelRequested = await deleteJson(`/api/users/${saCancelTarget.id}`, SA);
+    chk("second co-SA delete → 202", 202, cancelRequested.status);
+    const cancelRequestId = cancelRequested.body?.request?.id as string;
+    if (cancelRequestId) createdApprovalIds.push(cancelRequestId);
+    chk(
+      "requester cancels deletion → 200",
+      200,
+      await status(`/api/approvals/${cancelRequestId}/cancel`, SA, { method: "POST" }),
+    );
+    chk(
+      "cancelled request is CANCELLED",
+      "CANCELLED",
+      (await prisma.accountDeletionRequest.findUnique({ where: { id: cancelRequestId } }))?.status,
+    );
+    chk(
+      "cancelled target remains",
+      true,
+      Boolean(await prisma.user.findUnique({ where: { id: saCancelTarget.id } })),
+    );
+
+    // The real SA owns orders, so the HTTP delete route correctly stops at the
+    // orders guard before it can create a request. Seed only the workflow row,
+    // then exercise the exact production last-SA guard with every fixture peer
+    // inactive. This never mutates the real account or its orders.
+    const lastRequest = await prisma.accountDeletionRequest.create({
+      data: { targetId: sa.id, requesterId: saLastRequester.id },
+    });
+    createdApprovalIds.push(lastRequest.id);
+    await prisma.user.updateMany({
+      where: { id: { in: [saTwo.id, saNonTarget.id, saCancelTarget.id, saLastRequester.id] } },
+      data: { isActive: false },
+    });
+    let lastGuardStatus = 200;
+    try {
+      await assertNotLastSuperAdmin(sa.id);
+    } catch (err) {
+      lastGuardStatus = err instanceof HttpError ? err.status : 500;
+    }
+    chk(
+      "last active SA deletion guard remains blocked → 409",
+      409,
+      lastGuardStatus,
+    );
+    chk(
+      "last-SA failure leaves request PENDING",
+      "PENDING",
+      (await prisma.accountDeletionRequest.findUnique({ where: { id: lastRequest.id } }))?.status,
+    );
 
     // === Phase 3: last-active-Super-Admin guard (safe allow-path) =====
     // With TWO active Super Admins, deactivating one is allowed (200) — the
@@ -498,6 +621,15 @@ async function main(): Promise<void> {
       await prisma.document.deleteMany({ where: { orderId: id } });
       await prisma.order.deleteMany({ where: { id } });
     }
+    await prisma.accountDeletionRequest.deleteMany({
+      where: {
+        OR: [
+          { id: { in: createdApprovalIds } },
+          { targetId: { in: throwawayUserIds } },
+          { requesterId: { in: throwawayUserIds } },
+        ],
+      },
+    });
     await prisma.user.deleteMany({ where: { id: { in: throwawayUserIds } } });
     // roles created via the API (esc-ok, plus fixtures) + the fixtures.
     const apiRoles = await prisma.role.findMany({
@@ -516,6 +648,21 @@ async function main(): Promise<void> {
         ],
       },
     });
+    chk(
+      "cleanup leaves zero approval fixtures",
+      0,
+      await prisma.accountDeletionRequest.count({ where: { id: { in: createdApprovalIds } } }),
+    );
+    chk(
+      "cleanup leaves zero user fixtures",
+      0,
+      await prisma.user.count({ where: { email: { startsWith: TAG } } }),
+    );
+    chk(
+      "cleanup leaves zero role fixtures",
+      0,
+      await prisma.role.count({ where: { slug: { startsWith: TAG } } }),
+    );
 
     console.log("\n==================================================");
     console.log(`RBAC API RESULTS:  ${pass} passed,  ${fail} failed`);

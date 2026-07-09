@@ -47,6 +47,7 @@ export interface AuthUser {
   mustChangePassword: boolean;
   role: RoleInfo | null;
   isSuperAdmin: boolean;
+  incomingApprovals: number;
   permissions: PermissionsMap;
   nav: NavItem[];
 }
@@ -56,6 +57,7 @@ export interface MeResponse {
   user: { id: string; email: string; name: string; isActive: boolean; mustChangePassword: boolean };
   role: RoleInfo | null;
   isSuperAdmin: boolean;
+  incomingApprovals: number;
   permissions: PermissionsMap;
   nav: NavItem[];
 }
@@ -284,10 +286,41 @@ export interface UserRow {
   id: string;
   email: string;
   name: string;
+  phone: string | null;
+  jobTitle: string | null;
+  department: string | null;
+  lastLoginAt: string | null;
   isActive: boolean;
   mustChangePassword: boolean;
-  role: { id: string; slug: string; name: string } | null;
+  role: { id: string; slug: string; name: string; scope: "PLATFORM" | "ORG" } | null;
   createdAt: string;
+}
+
+/** GET /api/users/:id — editable user record. */
+export type UserDetail = UserRow;
+
+export interface ApprovalParticipant {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" | "EXECUTED";
+  reason: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedById: string | null;
+  targetId: string | null;
+  requesterId: string;
+  target: ApprovalParticipant | null;
+  requester: ApprovalParticipant;
+}
+
+export interface ApprovalsInbox {
+  incoming: ApprovalRequest[];
+  outgoing: ApprovalRequest[];
 }
 
 /** GET /api/roles — one row. */

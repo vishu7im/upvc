@@ -38,20 +38,28 @@ const USER_SELECT = {
   id: true,
   email: true,
   name: true,
+  phone: true,
+  jobTitle: true,
+  department: true,
+  lastLoginAt: true,
   isActive: true,
   mustChangePassword: true,
   createdAt: true,
-  roleRef: { select: { id: true, slug: true, name: true } },
+  roleRef: { select: { id: true, slug: true, name: true, scope: true } },
 } as const;
 
 type UserRow = {
   id: string;
   email: string;
   name: string;
+  phone: string | null;
+  jobTitle: string | null;
+  department: string | null;
+  lastLoginAt: Date | null;
   isActive: boolean;
   mustChangePassword: boolean;
   createdAt: Date;
-  roleRef: { id: string; slug: string; name: string } | null;
+  roleRef: { id: string; slug: string; name: string; scope: "PLATFORM" | "ORG" } | null;
 };
 
 function shapeUser(u: UserRow) {
@@ -59,6 +67,10 @@ function shapeUser(u: UserRow) {
     id: u.id,
     email: u.email,
     name: u.name,
+    phone: u.phone,
+    jobTitle: u.jobTitle,
+    department: u.department,
+    lastLoginAt: u.lastLoginAt,
     isActive: u.isActive,
     mustChangePassword: u.mustChangePassword,
     role: u.roleRef,
@@ -79,6 +91,9 @@ export async function createUserRecord(
     password: string;
     roleId: string;
     mustChangePassword: boolean;
+    phone?: string | null;
+    jobTitle?: string | null;
+    department?: string | null;
   },
 ) {
   // May the actor hand out this role at all? (404 for an unknown/hidden role.)
@@ -94,6 +109,9 @@ export async function createUserRecord(
       passwordHash: await bcrypt.hash(input.password, 10),
       roleId: input.roleId,
       mustChangePassword: input.mustChangePassword,
+      phone: input.phone ?? null,
+      jobTitle: input.jobTitle ?? null,
+      department: input.department ?? null,
     },
     select: USER_SELECT,
   });
@@ -156,6 +174,9 @@ const createSchema = z.object({
   name: z.string().min(1),
   password: z.string().min(8),
   roleId: z.string().uuid(),
+  phone: z.string().max(50).nullable().optional(),
+  jobTitle: z.string().max(120).nullable().optional(),
+  department: z.string().max(120).nullable().optional(),
 });
 
 usersRouter.post(
@@ -197,6 +218,9 @@ const patchSchema = z
     name: z.string().min(1),
     email: z.string().email(),
     roleId: z.string().uuid(),
+    phone: z.string().max(50).nullable(),
+    jobTitle: z.string().max(120).nullable(),
+    department: z.string().max(120).nullable(),
   })
   .partial();
 
@@ -213,6 +237,9 @@ usersRouter.patch(
 
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) data.name = body.name;
+    if (body.phone !== undefined) data.phone = body.phone;
+    if (body.jobTitle !== undefined) data.jobTitle = body.jobTitle;
+    if (body.department !== undefined) data.department = body.department;
 
     if (body.email !== undefined) {
       const clash = await prisma.user.findUnique({ where: { email: body.email } });
@@ -352,6 +379,45 @@ usersRouter.delete(
     if (orderCount > 0) {
       throw new HttpError(409, "User has orders and cannot be deleted; deactivate instead");
     }
+
+    if (target.roleScope === "PLATFORM") {
+      const requestSelect = {
+        id: true,
+        status: true,
+        reason: true,
+        createdAt: true,
+        target: { select: { id: true, name: true, email: true } },
+        requester: { select: { id: true, name: true, email: true } },
+      } as const;
+      const pending = await prisma.accountDeletionRequest.findFirst({
+        where: { targetId: target.id, status: "PENDING" },
+        orderBy: { createdAt: "desc" },
+        select: requestSelect,
+      });
+      if (pending) {
+        res.status(409).json({
+          error: "deletion_request_pending",
+          status: "pending_approval",
+          request: pending,
+        });
+        return;
+      }
+
+      const request = await prisma.accountDeletionRequest.create({
+        data: { targetId: target.id, requesterId: req.auth!.user.id },
+        select: requestSelect,
+      });
+      await writeAuditLog({
+        actorId: req.auth!.user.id,
+        action: "user.delete_requested",
+        targetType: "user",
+        targetId: target.id,
+        detail: { requestId: request.id },
+      });
+      res.status(202).json({ status: "pending_approval", request });
+      return;
+    }
+
     await prisma.user.delete({ where: { id: target.id } });
     await writeAuditLog({
       actorId: req.auth!.user.id,

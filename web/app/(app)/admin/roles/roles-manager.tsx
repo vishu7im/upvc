@@ -1,27 +1,18 @@
 "use client";
 
-// =====================================================================
-// Roles manager (Client Component). Lists roles with user counts; create a new
-// role (name + optional description → navigate to its grid editor); delete a
-// role (disabled + tooltip for system/in-use roles; surfaces the 409
-// role_in_use hint). Editing the grid happens on /admin/roles/[id].
-// =====================================================================
-
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ApiError, createRole, deleteRole } from "@/lib/api";
 import type { RoleSummary } from "@/lib/types";
 import {
+  Alert,
   Badge,
   Button,
+  ButtonLink,
   Card,
+  EmptyState,
   fieldClass,
   FieldLabel,
-  tableClass,
-  tableWrapClass,
-  tdClass,
-  thClass,
 } from "@/components/ui";
 
 export default function RolesManager({
@@ -34,8 +25,9 @@ export default function RolesManager({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
@@ -46,22 +38,22 @@ export default function RolesManager({
     setCreating(true);
     try {
       const role = await createRole({ name, description: description || undefined, permissions: [] });
-      router.push(`/admin/roles/${role.id}`); // straight to the grid editor
+      router.push(`/admin/roles/${role.id}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Create failed");
+      setError(err instanceof ApiError ? err.message : "Could not create role");
       setCreating(false);
     }
   }
 
   async function onDelete(role: RoleSummary) {
-    if (!confirm(`Delete role "${role.name}"?`)) return;
     setError(null);
     setBusyId(role.id);
     try {
       await deleteRole(role.id);
+      setConfirmId(null);
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Delete failed");
+      setError(err instanceof ApiError ? err.message : "Could not delete role");
     } finally {
       setBusyId(null);
     }
@@ -70,92 +62,95 @@ export default function RolesManager({
   return (
     <div className="space-y-4">
       {perms.create && (
-        <div>
-          <Button icon="plus" onClick={() => setShowCreate((v) => !v)}>
-            {showCreate ? "Cancel" : "New role"}
+        <div className="flex justify-end">
+          <Button icon={showCreate ? "x" : "plus"} onClick={() => setShowCreate((open) => !open)}>
+            {showCreate ? "Close" : "New role"}
           </Button>
         </div>
       )}
 
-      {error && (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      )}
+      {error && <Alert tone="red" title="Could not complete the request">{error}</Alert>}
 
       {showCreate && perms.create && (
-        <Card className="p-5">
-          <form onSubmit={onCreate} className="grid gap-4 md:grid-cols-2">
-            <label className="block">
+        <Card>
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2 className="font-semibold text-slate-950">Create a custom role</h2>
+            <p className="mt-1 text-sm text-slate-500">Start with an empty permission grid, then assign access.</p>
+          </div>
+          <form onSubmit={onCreate} className="grid gap-4 p-5 md:grid-cols-2">
+            <label>
               <FieldLabel>Role name</FieldLabel>
               <input required value={name} onChange={(e) => setName(e.target.value)} className={fieldClass} />
             </label>
-            <label className="block">
-              <FieldLabel>Description (optional)</FieldLabel>
+            <label>
+              <FieldLabel>Description</FieldLabel>
               <input value={description} onChange={(e) => setDescription(e.target.value)} className={fieldClass} />
             </label>
             <div className="md:col-span-2">
               <Button type="submit" icon="check" disabled={creating}>
-                {creating ? "Creating…" : "Create & edit permissions"}
+                {creating ? "Creating..." : "Create and edit permissions"}
               </Button>
             </div>
           </form>
         </Card>
       )}
 
-      <div className={tableWrapClass}>
-        <table className={tableClass}>
-          <thead>
-            <tr>
-              <th className={thClass}>Role</th>
-              <th className={thClass}>Users</th>
-              <th className={thClass}>Type</th>
-              <th className={thClass}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {roles.map((r) => {
-              const busy = busyId === r.id || pending;
-              const canDelete = perms.delete && !r.isSystem && r.userCount === 0;
-              const deleteTitle = r.isSystem
-                ? "System roles cannot be deleted"
-                : r.userCount > 0
-                  ? "Reassign its users before deleting"
-                  : undefined;
-              return (
-                <tr key={r.id}>
-                  <td className={tdClass}>
-                    <div className="font-semibold text-slate-950">{r.name}</div>
-                    {r.description && <div className="text-xs text-slate-500">{r.description}</div>}
-                  </td>
-                  <td className={tdClass}>{r.userCount}</td>
-                  <td className={tdClass}>
-                    {r.scope === "PLATFORM" ? (
-                      <Badge tone="purple">Platform</Badge>
-                    ) : r.isSystem ? (
-                      <Badge tone="blue">System</Badge>
-                    ) : (
-                      <Badge tone="slate">Custom</Badge>
-                    )}
-                  </td>
-                  <td className={tdClass}>
-                    <div className="flex flex-wrap gap-2">
-                      {perms.update && r.scope !== "PLATFORM" && (
-                        <Link href={`/admin/roles/${r.id}`} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 transition hover:bg-slate-50">
-                          Edit permissions
-                        </Link>
-                      )}
-                      {perms.delete && (
-                        <Button variant="danger" disabled={!canDelete || busy} title={deleteTitle} onClick={() => onDelete(r)}>
-                          Delete
-                        </Button>
-                      )}
+      {roles.length === 0 ? (
+        <EmptyState icon="admin" title="No roles found" description="Create a role to define a new access profile." />
+      ) : (
+        <div className="grid gap-3">
+          {roles.map((role) => {
+            const canDelete = perms.delete && !role.isSystem && role.userCount === 0;
+            const deleteTitle = role.isSystem
+              ? "System roles cannot be deleted"
+              : role.userCount > 0
+                ? "Reassign its users before deleting"
+                : undefined;
+            return (
+              <Card key={role.id} className="overflow-hidden">
+                <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-base font-semibold text-slate-950">{role.name}</h2>
+                      <Badge tone={role.scope === "PLATFORM" ? "purple" : role.isSystem ? "blue" : "slate"}>
+                        {role.scope === "PLATFORM" ? "Platform" : role.isSystem ? "System" : "Custom"}
+                      </Badge>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    <p className="mt-1 max-w-3xl text-sm text-slate-500">{role.description ?? "No description"}</p>
+                    <p className="mt-2 text-xs font-semibold uppercase text-slate-500">{role.userCount} {role.userCount === 1 ? "user" : "users"}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {perms.update && role.scope !== "PLATFORM" && (
+                      <ButtonLink href={`/admin/roles/${role.id}`} variant="secondary" icon="settings">Edit role</ButtonLink>
+                    )}
+                    {perms.delete && (
+                      <Button
+                        variant="danger"
+                        disabled={!canDelete || pending || busyId === role.id}
+                        title={deleteTitle}
+                        onClick={() => setConfirmId(role.id)}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {confirmId === role.id && (
+                  <div className="flex flex-col gap-3 border-t border-red-200 bg-red-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm font-medium text-red-900">Delete {role.name}? This cannot be undone.</p>
+                    <div className="flex gap-2">
+                      <Button variant="danger" onClick={() => onDelete(role)} disabled={busyId === role.id}>
+                        {busyId === role.id ? "Deleting..." : "Confirm delete"}
+                      </Button>
+                      <Button variant="secondary" onClick={() => setConfirmId(null)}>Cancel</Button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

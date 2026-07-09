@@ -42,6 +42,10 @@ authRouter.post(
     if (!user || !(await bcrypt.compare(password, user.passwordHash)) || !user.isActive) {
       throw new HttpError(401, "Invalid email or password");
     }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
     const pub = { id: user.id, email: user.email, name: user.name };
     const token = signToken({ ...pub, roleId: user.roleId, tokenVersion: user.tokenVersion });
     res.json({ token, user: { ...pub, mustChangePassword: user.mustChangePassword } });
@@ -91,7 +95,14 @@ authRouter.get(
   requireAuth,
   asyncHandler(async (req: AuthedRequest, res) => {
     const auth = req.auth!;
-    const nav = await buildNav(auth);
+    const [nav, incomingApprovals] = await Promise.all([
+      buildNav(auth),
+      auth.isSuperAdmin
+        ? prisma.accountDeletionRequest.count({
+            where: { targetId: auth.user.id, status: "PENDING" },
+          })
+        : Promise.resolve(0),
+    ]);
     res.json({
       user: {
         id: auth.user.id,
@@ -110,6 +121,7 @@ authRouter.get(
           }
         : null,
       isSuperAdmin: auth.isSuperAdmin,
+      incomingApprovals,
       permissions: serializePermissions(auth.permissions),
       nav,
     });

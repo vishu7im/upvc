@@ -5,7 +5,16 @@
 // can be bundled into the browser. Server Components use lib/server-api.ts.
 // =====================================================================
 
-import type { LoginUser, OrderSummary, QuoteResult, UserRow } from "./types";
+import type {
+  ApprovalRequest,
+  ApprovalsInbox,
+  LoginUser,
+  OrderSummary,
+  QuoteResult,
+  RoleSummary,
+  UserDetail,
+  UserRow,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -98,13 +107,23 @@ export function createUser(body: {
   name: string;
   password: string;
   roleId: string;
+  phone?: string | null;
+  jobTitle?: string | null;
+  department?: string | null;
 }): Promise<UserRow> {
   return apiSend<UserRow>("/api/users", "POST", body);
 }
 
 export function updateUser(
   id: string,
-  body: { name?: string; email?: string; roleId?: string },
+  body: {
+    name?: string;
+    email?: string;
+    roleId?: string;
+    phone?: string | null;
+    jobTitle?: string | null;
+    department?: string | null;
+  },
 ): Promise<UserRow> {
   return apiSend<UserRow>(`/api/users/${id}`, "PATCH", body);
 }
@@ -118,8 +137,32 @@ export function deactivateUser(id: string): Promise<UserRow> {
 export function resetUserPassword(id: string, tempPassword: string): Promise<{ ok: boolean }> {
   return apiSend(`/api/users/${id}/reset-password`, "POST", { tempPassword });
 }
-export function deleteUser(id: string): Promise<{ ok: boolean }> {
+export function getUser(id: string): Promise<UserDetail> {
+  return apiGet<UserDetail>(`/api/users/${id}`);
+}
+
+export type DeleteUserResponse =
+  | { ok: true }
+  | { status: "pending_approval"; request: ApprovalRequest };
+
+export function deleteUser(id: string): Promise<DeleteUserResponse> {
   return apiSend(`/api/users/${id}`, "DELETE");
+}
+
+export function listApprovals(): Promise<ApprovalsInbox> {
+  return apiGet<ApprovalsInbox>("/api/approvals");
+}
+
+export function approveDeletion(id: string): Promise<{ ok: boolean; status: "executed" }> {
+  return apiSend(`/api/approvals/${id}/approve`, "POST");
+}
+
+export function rejectDeletion(id: string): Promise<{ ok: boolean; status: "rejected" }> {
+  return apiSend(`/api/approvals/${id}/reject`, "POST");
+}
+
+export function cancelDeletion(id: string): Promise<{ ok: boolean; status: "cancelled" }> {
+  return apiSend(`/api/approvals/${id}/cancel`, "POST");
 }
 
 // ---------- RBAC: roles (Phase 4) ------------------------------------
@@ -135,7 +178,7 @@ export function createRole(body: {
 export function updateRole(
   id: string,
   body: { name?: string; description?: string | null },
-): Promise<unknown> {
+): Promise<RoleSummary> {
   return apiSend(`/api/roles/${id}`, "PATCH", body);
 }
 
