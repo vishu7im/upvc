@@ -2,8 +2,8 @@
 // them to the client form.
 
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentUser, serverApiGet } from "@/lib/server-api";
+import { serverApiGet } from "@/lib/server-api";
+import { requirePagePermission } from "@/lib/authz";
 import type { SettingsResponse } from "@/lib/types";
 import SettingsForm from "./settings-form";
 import { Badge, PageHeader } from "@/components/ui";
@@ -12,8 +12,7 @@ import { Icon } from "@/components/icons";
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
-  const user = await getCurrentUser();
-  if (!user || user.role !== "admin") redirect("/");
+  await requirePagePermission("settings", "view");
 
   const settings = await serverApiGet<SettingsResponse>("/api/settings");
 

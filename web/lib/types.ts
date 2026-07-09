@@ -13,12 +13,59 @@ export interface SystemSummary {
   stockBarLengthMm: number;
 }
 
-/** The authenticated user (login / GET /api/auth/me). */
+/** One data-driven sidebar entry (from GET /api/auth/me `nav`). */
+export interface NavItem {
+  slug: string;
+  name: string;
+  path: string | null;
+  icon: string | null;
+  sortOrder: number;
+}
+
+/** The caller's role, as surfaced by /api/auth/me. */
+export interface RoleInfo {
+  id: string;
+  slug: string;
+  name: string;
+  scope: "PLATFORM" | "ORG";
+  isSystem: boolean;
+}
+
+/** moduleSlug → granted actions + data scope (materialized grid). */
+export type PermissionsMap = Record<string, { actions: string[]; scope: string }>;
+
+/**
+ * The authenticated user — the FLATTENED GET /api/auth/me (§6.4) shape produced
+ * by getCurrentUser(): identity fields hoisted alongside role/permissions/nav
+ * so callers read `user.name` / `user.role.name` / `user.permissions` directly.
+ */
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  role: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  role: RoleInfo | null;
+  isSuperAdmin: boolean;
+  permissions: PermissionsMap;
+  nav: NavItem[];
+}
+
+/** Raw GET /api/auth/me envelope, before getCurrentUser() flattens it. */
+export interface MeResponse {
+  user: { id: string; email: string; name: string; isActive: boolean; mustChangePassword: boolean };
+  role: RoleInfo | null;
+  isSuperAdmin: boolean;
+  permissions: PermissionsMap;
+  nav: NavItem[];
+}
+
+/** POST /api/auth/login → user summary (identity + forced-change flag). */
+export interface LoginUser {
+  id: string;
+  email: string;
+  name: string;
+  mustChangePassword: boolean;
 }
 
 /** Standard paginated list envelope (GET /api/products, …/designs). */
@@ -230,6 +277,50 @@ export interface CatalogCill {
   price: number;
   weight: number;
 }
+// ---------- RBAC: users, roles, meta (Phase 4) -----------------------
+
+/** GET /api/users — one row (passwordHash never present). */
+export interface UserRow {
+  id: string;
+  email: string;
+  name: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  role: { id: string; slug: string; name: string } | null;
+  createdAt: string;
+}
+
+/** GET /api/roles — one row. */
+export interface RoleSummary {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  scope: "PLATFORM" | "ORG";
+  isSystem: boolean;
+  version: number;
+  userCount: number;
+  createdAt: string;
+}
+
+/** One grid cell (module × action + scope). */
+export interface GridTuple {
+  module: string;
+  action: string;
+  scope: "OWN" | "ALL";
+}
+
+/** GET /api/roles/:id — role incl. its full permission grid. */
+export interface RoleDetail extends RoleSummary {
+  permissions: GridTuple[];
+}
+
+/** GET /api/meta/permissions — modules + actions for the grid editor. */
+export interface MetaPermissions {
+  modules: { slug: string; name: string; navPath: string | null; category: string | null; sortOrder: number }[];
+  actions: { slug: string; name: string }[];
+}
+
 /** GET /api/catalog/:systemId — full priced dump (admin). */
 export interface CatalogDump {
   systemId: string;

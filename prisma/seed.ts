@@ -25,6 +25,8 @@ import { renderSvg } from "../src/engine/svg.ts";
 import { DERIVED } from "../src/catalog/derived-topologies.generated.ts";
 import { SLIDING_DESIGNS } from "../src/catalog/sliding-designs.ts";
 import { DEFAULT_SETTINGS } from "../src/catalog/settings.ts";
+import { syncRbac } from "../src/rbac/sync.ts";
+import { DEFAULT_ORG } from "../src/rbac/registry.ts";
 import type { Design, ProfileSystem } from "../src/types.ts";
 
 const prisma = new PrismaClient();
@@ -356,6 +358,16 @@ async function main() {
   await linkEngineDesigns();
   await applyDerivedTopologies();
   await applySlidingTopologies();
+
+  // RBAC foundation (org, actions, modules, roles, default grids) from the
+  // registry — idempotent, inserts-only for grids (owner-edited grids kept).
+  // Mirrors the Phase-1 migration backfill so fresh + migrated installs match.
+  const rbac = await syncRbac(prisma);
+  console.log(
+    `RBAC synced: ${rbac.modules} modules, ${rbac.actions} actions, ${rbac.roles} roles, ` +
+      `+${rbac.grantsInserted} grants inserted.`,
+  );
+
   await seedAdminUser();
 
   // Quick summary so the operator can eyeball the counts.
@@ -556,17 +568,30 @@ async function applySlidingTopologies() {
   console.log(`Applied ${applied} sliding-patio topologies (quotable).`);
 }
 
-/** One admin user (only if no users exist yet). */
+/**
+ * One admin user (only if no users exist yet). Assigned the seeded Super Admin
+ * role + default organization so the RBAC identity is complete from install.
+ * `roleId` is the single source of role truth (the legacy `role` string was
+ * dropped in Phase 6).
+ */
 async function seedAdminUser() {
   if ((await prisma.user.count()) > 0) return;
   const email = process.env.ADMIN_EMAIL ?? "admin@local";
   const password = process.env.ADMIN_PASSWORD ?? "admin123";
+
+  const org = await prisma.organization.findUnique({ where: { slug: DEFAULT_ORG.slug } });
+  const superAdmin = await prisma.role.findFirst({
+    where: { slug: "super-admin", organizationId: null },
+  });
+  if (!superAdmin) throw new Error("super-admin role missing — run syncRbac before seedAdminUser");
+
   await prisma.user.create({
     data: {
       email,
       passwordHash: await bcrypt.hash(password, 10),
       name: "Admin",
-      role: "admin",
+      roleId: superAdmin.id,
+      organizationId: org?.id ?? null,
     },
   });
   console.log(`Seeded admin user: ${email} (password: ${password})`);

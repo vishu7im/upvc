@@ -4,29 +4,49 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/server-api";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { can } from "@/lib/permissions";
+import { Badge, Card, EmptyState, PageHeader } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
 const CARDS = [
   {
+    href: "/admin/users",
+    module: "users",
+    title: "Users",
+    desc: "Invite users, assign roles, activate/deactivate accounts, and reset passwords.",
+    icon: "user",
+  },
+  {
+    href: "/admin/roles",
+    module: "roles",
+    title: "Roles & permissions",
+    desc: "Define roles and edit their module × action permission grid.",
+    icon: "admin",
+  },
+  {
     href: "/admin/settings",
+    module: "settings",
     title: "Settings & branding",
     desc: "Currency, tax, markup, wastage, labour — plus company name, address, accent colour, and logo.",
     icon: "settings",
   },
   {
     href: "/admin/catalog",
+    module: "catalog",
     title: "Catalog pricing",
     desc: "Enter supplier cost/price/weight per part, manage colours & glass variants, or bulk-import via CSV.",
     icon: "catalog",
   },
-] satisfies Array<{ href: string; title: string; desc: string; icon: IconName }>;
+] satisfies Array<{ href: string; module: string; title: string; desc: string; icon: IconName }>;
 
 export default async function AdminPage() {
   const user = await getCurrentUser();
-  if (!user || user.role !== "admin") redirect("/");
+  if (!user) redirect("/login");
+  if (user.mustChangePassword) redirect("/change-password");
+
+  const cards = CARDS.filter((c) => can(user, c.module, "view"));
 
   return (
     <div>
@@ -36,8 +56,11 @@ export default async function AdminPage() {
         description="Configure commercial settings, brand identity, supplier pricing, and catalog data used by the quote engine."
         meta={<Badge tone="purple">Admin access</Badge>}
       />
+      {cards.length === 0 ? (
+        <EmptyState icon="admin" title="No admin sections available" description="Your role doesn't grant access to any administration module." />
+      ) : (
       <div className="grid gap-5 lg:grid-cols-2">
-        {CARDS.map((c) => (
+        {cards.map((c) => (
           <Link
             key={c.href}
             href={c.href}
@@ -56,6 +79,7 @@ export default async function AdminPage() {
           </Link>
         ))}
       </div>
+      )}
       <Card className="mt-6 p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>

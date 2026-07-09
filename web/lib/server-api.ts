@@ -8,7 +8,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { ApiError } from "./api";
-import type { AuthUser } from "./types";
+import type { AuthUser, MeResponse } from "./types";
 
 const EXPRESS_API_BASE = process.env.EXPRESS_API_BASE ?? "http://localhost:3005";
 const TOKEN_COOKIE = "token";
@@ -44,7 +44,16 @@ export async function serverApiGet<T>(path: string): Promise<T> {
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    return await serverApiGet<AuthUser>("/api/auth/me");
+    const me = await serverApiGet<MeResponse>("/api/auth/me");
+    // Flatten identity alongside role/permissions/nav so callers read
+    // `user.name` / `user.role.name` / `user.permissions` directly.
+    return {
+      ...me.user,
+      role: me.role,
+      isSuperAdmin: me.isSuperAdmin,
+      permissions: me.permissions,
+      nav: me.nav,
+    };
   } catch {
     return null;
   }

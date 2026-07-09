@@ -35,6 +35,7 @@ import {
   HttpError,
   validate,
 } from "./http.ts";
+import { requirePermission, scopeFilter } from "./middleware/authorize.ts";
 import { paginated, parsePagination } from "./pagination.ts";
 import { htmlToPdf } from "../services/pdf.ts";
 import { getObject, objectExists, putObject } from "../services/storage.ts";
@@ -43,10 +44,16 @@ export const ordersRouter = Router();
 
 // ---- helpers --------------------------------------------------------
 
-/** Fetch an order owned by the caller, or 404. */
+/**
+ * Fetch an order the caller may access, or 404. Data scope comes from the
+ * caller's `orders` grant (PLAN §5.4): scope OWN ⇒ only their own rows
+ * (`{ userId }`), scope ALL / Super Admin ⇒ any order (`{}`). This is what
+ * finally lets an admin see other users' orders — as a permission-driven
+ * behaviour, not a hardcoded owner filter.
+ */
 async function ownOrder(req: AuthedRequest, id: string) {
   const order = await prisma.order.findFirst({
-    where: { id, userId: req.user!.id },
+    where: { id, ...scopeFilter(req.auth!, "orders") },
   });
   if (!order) throw new HttpError(404, "Order not found");
   return order;
@@ -105,6 +112,7 @@ const createOrderSchema = z.object({
 
 ordersRouter.post(
   "/",
+  requirePermission("orders", "create"),
   asyncHandler(async (req: AuthedRequest, res) => {
     const body = validate(createOrderSchema, req.body);
     const orderNo = `ORD-${Date.now()}`;
@@ -123,9 +131,11 @@ ordersRouter.post(
 
 ordersRouter.get(
   "/",
+  requirePermission("orders", "read"),
   asyncHandler(async (req: AuthedRequest, res) => {
     const p = parsePagination(req.query);
-    const where = { userId: req.user!.id };
+    // OWN ⇒ only the caller's orders; ALL / Super Admin ⇒ every order.
+    const where = scopeFilter(req.auth!, "orders");
     const [data, total] = await Promise.all([
       prisma.order.findMany({
         where,
@@ -142,9 +152,10 @@ ordersRouter.get(
 
 ordersRouter.get(
   "/:id",
+  requirePermission("orders", "read"),
   asyncHandler(async (req: AuthedRequest, res) => {
     const order = await prisma.order.findFirst({
-      where: { id: req.params.id, userId: req.user!.id },
+      where: { id: req.params.id, ...scopeFilter(req.auth!, "orders") },
       include: {
         items: {
           include: {
@@ -177,8 +188,13 @@ const addItemSchema = z.object({
   colourKeyOutside: z.string().optional(),
 });
 
+// Assembling a draft (add/remove items, confirm) is part of "create" on orders:
+// the seeded Customer role holds orders create OWN and must be able to build and
+// confirm its own orders. A role with only `read` (e.g. a read-all auditor) can
+// view but reaches none of these — the PLAN §5.4 "view but not mutate" case.
 ordersRouter.post(
   "/:id/items",
+  requirePermission("orders", "create"),
   asyncHandler(async (req: AuthedRequest, res) => {
     const order = await ownDraftOrder(req, req.params.id);
     const body = validate(addItemSchema, req.body);
@@ -250,6 +266,7 @@ ordersRouter.post(
 
 ordersRouter.delete(
   "/:id/items/:itemId",
+  requirePermission("orders", "create"),
   asyncHandler(async (req: AuthedRequest, res) => {
     const order = await ownDraftOrder(req, req.params.id);
     const result = await prisma.orderItem.deleteMany({
@@ -264,6 +281,7 @@ ordersRouter.delete(
 
 ordersRouter.post(
   "/:id/confirm",
+  requirePermission("orders", "create"),
   asyncHandler(async (req: AuthedRequest, res) => {
     const order = await ownDraftOrder(req, req.params.id);
     const items = await prisma.orderItem.findMany({
@@ -525,6 +543,7 @@ ordersRouter.post(
 
 ordersRouter.get(
   "/:id/documents",
+  requirePermission("orders", "read"),
   asyncHandler(async (req: AuthedRequest, res) => {
     await ownOrder(req, req.params.id);
     const docs = await prisma.document.findMany({
@@ -537,6 +556,7 @@ ordersRouter.get(
 
 ordersRouter.get(
   "/:id/documents/:type",
+  requirePermission("orders", "read"),
   asyncHandler(async (req: AuthedRequest, res) => {
     await ownOrder(req, req.params.id);
     const type = req.params.type.toUpperCase() as DocumentType;
@@ -560,6 +580,7 @@ ordersRouter.get(
 // cached PDF never goes stale. Key existence IS the cache.
 ordersRouter.get(
   "/:id/documents/:type/pdf",
+  requirePermission("orders", "read"),
   asyncHandler(async (req: AuthedRequest, res) => {
     await ownOrder(req, req.params.id);
     const type = req.params.type.toUpperCase() as DocumentType;

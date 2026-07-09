@@ -25,13 +25,15 @@ import { PartKind } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../db/client.ts";
 import { asyncHandler, HttpError, validate } from "./http.ts";
-import { requireAuth, requireAdmin } from "./middleware/auth.ts";
+import { requireAuth } from "./middleware/auth.ts";
+import { requirePermission } from "./middleware/authorize.ts";
 import { loadCatalog, refreshSystemCatalog } from "../catalog/index.ts";
 
 export const catalogRouter = Router();
 
-// Every catalog route is admin-only.
-catalogRouter.use(requireAuth, requireAdmin);
+// Every catalog route needs a valid session; the specific permission
+// (catalog.read / .update / .create) is enforced per-route below (PLAN §5.3).
+catalogRouter.use(requireAuth);
 
 /** 404 unless the system exists. */
 async function assertSystem(systemId: string) {
@@ -42,6 +44,7 @@ async function assertSystem(systemId: string) {
 // ---- Read: full priced dump (served from the in-memory catalog) ------
 catalogRouter.get(
   "/:systemId",
+  requirePermission("catalog", "read"),
   asyncHandler(async (req, res) => {
     const sys = await refreshSystemCatalog(req.params.systemId);
     if (!sys) throw new HttpError(404, `Unknown system: ${req.params.systemId}`);
@@ -80,6 +83,7 @@ const partSchema = z
 
 catalogRouter.put(
   "/:systemId/parts/:kind/:partKey",
+  requirePermission("catalog", "update"),
   asyncHandler(async (req, res) => {
     await assertSystem(req.params.systemId);
     const kind = req.params.kind.toUpperCase();
@@ -114,10 +118,11 @@ function makePartPriceUpdater(
   });
 }
 
-catalogRouter.put("/:systemId/glass/:partKey", makePartPriceUpdater("glass", "glass"));
-catalogRouter.put("/:systemId/gaskets/:partKey", makePartPriceUpdater("gasket", "gasket"));
-catalogRouter.put("/:systemId/hardware/:partKey", makePartPriceUpdater("hardware", "hardware"));
-catalogRouter.put("/:systemId/cills/:partKey", makePartPriceUpdater("cill", "cill"));
+const catalogUpdate = requirePermission("catalog", "update");
+catalogRouter.put("/:systemId/glass/:partKey", catalogUpdate, makePartPriceUpdater("glass", "glass"));
+catalogRouter.put("/:systemId/gaskets/:partKey", catalogUpdate, makePartPriceUpdater("gasket", "gasket"));
+catalogRouter.put("/:systemId/hardware/:partKey", catalogUpdate, makePartPriceUpdater("hardware", "hardware"));
+catalogRouter.put("/:systemId/cills/:partKey", catalogUpdate, makePartPriceUpdater("cill", "cill"));
 
 // ---- Add a glass variant --------------------------------------------
 const newGlassSchema = z.object({
@@ -133,6 +138,7 @@ const newGlassSchema = z.object({
 
 catalogRouter.post(
   "/:systemId/glass",
+  requirePermission("catalog", "create"),
   asyncHandler(async (req, res) => {
     await assertSystem(req.params.systemId);
     const b = validate(newGlassSchema, req.body);
@@ -173,6 +179,7 @@ const newCillSchema = z.object({
 
 catalogRouter.post(
   "/:systemId/cills",
+  requirePermission("catalog", "create"),
   asyncHandler(async (req, res) => {
     await assertSystem(req.params.systemId);
     const b = validate(newCillSchema, req.body);
@@ -212,6 +219,7 @@ const newColourSchema = z.object({
 
 catalogRouter.post(
   "/:systemId/colours",
+  requirePermission("catalog", "create"),
   asyncHandler(async (req, res) => {
     await assertSystem(req.params.systemId);
     const b = validate(newColourSchema, req.body);
@@ -250,6 +258,7 @@ const editColourSchema = z
 
 catalogRouter.put(
   "/:systemId/colours/:key",
+  requirePermission("catalog", "update"),
   asyncHandler(async (req, res) => {
     await assertSystem(req.params.systemId);
     const data = validate(editColourSchema, req.body);
@@ -269,6 +278,7 @@ catalogRouter.put(
 // and its cost/price upserted. Idempotent. Returns { updated, unmatched }.
 catalogRouter.post(
   "/:systemId/import",
+  requirePermission("catalog", "update"),
   express.text({ type: ["text/csv", "text/plain"], limit: "1mb" }),
   asyncHandler(async (req, res) => {
     await assertSystem(req.params.systemId);

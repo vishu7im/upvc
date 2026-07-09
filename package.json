@@ -10,12 +10,14 @@
     "start": "tsx src/api/server.ts",
     "dev": "tsx watch src/api/server.ts",
     "validate": "tsx src/validation/jobs.ts",
+    "validate:rbac": "tsx src/validation/rbac.api.ts",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "import:prices": "tsx src/tools/import-prices.ts"
+    "import:prices": "tsx src/tools/import-prices.ts",
+    "sync:permissions": "tsx src/tools/sync-permissions.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

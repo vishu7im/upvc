@@ -2,8 +2,8 @@
 // full priced dump for the selected system, then hands them to the editor.
 
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentUser, serverApiGet } from "@/lib/server-api";
+import { serverApiGet } from "@/lib/server-api";
+import { requirePagePermission } from "@/lib/authz";
 import type { CatalogDump, SystemSummary } from "@/lib/types";
 import CatalogEditor from "./catalog-editor";
 import { Badge, EmptyState, PageHeader } from "@/components/ui";
@@ -16,8 +16,7 @@ export default async function AdminCatalogPage({
 }: {
   searchParams: Promise<{ system?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user || user.role !== "admin") redirect("/");
+  await requirePagePermission("catalog", "view");
 
   const systems = await serverApiGet<SystemSummary[]>("/api/systems");
   const selected = (await searchParams).system || systems[0]?.systemId;

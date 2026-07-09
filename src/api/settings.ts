@@ -16,7 +16,8 @@ import express, { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db/client.ts";
 import { asyncHandler, HttpError, validate } from "./http.ts";
-import { requireAuth, requireAdmin } from "./middleware/auth.ts";
+import { requireAuth } from "./middleware/auth.ts";
+import { requirePermission } from "./middleware/authorize.ts";
 import { loadCatalog } from "../catalog/index.ts";
 import { putObject } from "../services/storage.ts";
 
@@ -27,7 +28,7 @@ const LOGO_KEY = "branding/logo";
 settingsRouter.get(
   "/",
   requireAuth,
-  requireAdmin,
+  requirePermission("settings", "read"),
   asyncHandler(async (_req, res) => {
     const s = await prisma.setting.findUnique({ where: { id: 1 } });
     if (!s) throw new HttpError(404, "Settings not seeded");
@@ -75,7 +76,7 @@ const updateSchema = z
 settingsRouter.put(
   "/",
   requireAuth,
-  requireAdmin,
+  requirePermission("settings", "update"),
   asyncHandler(async (req, res) => {
     const data = validate(updateSchema, req.body);
     if (Object.keys(data).length === 0) throw new HttpError(400, "No fields to update");
@@ -89,7 +90,7 @@ settingsRouter.put(
 settingsRouter.post(
   "/logo",
   requireAuth,
-  requireAdmin,
+  requirePermission("settings", "update"),
   express.raw({ type: "image/*", limit: "2mb" }),
   asyncHandler(async (req, res) => {
     const body = req.body as Buffer;

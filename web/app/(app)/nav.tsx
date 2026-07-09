@@ -12,21 +12,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
-import { Icon, type IconName } from "@/components/icons";
+import { navIcon } from "@/lib/nav-icons";
+import { Icon } from "@/components/icons";
 import { ButtonLink, cn } from "@/components/ui";
-
-const LINKS = [
-  { href: "/", label: "Dashboard", icon: "dashboard" },
-  { href: "/products", label: "Products", icon: "products" },
-  { href: "/quote", label: "Quotes", icon: "quote" },
-  { href: "/orders", label: "Orders", icon: "orders" },
-] satisfies Array<{ href: string; label: string; icon: IconName }>;
-
-const ADMIN_LINKS = [{ href: "/admin", label: "Administration", icon: "admin" }] satisfies Array<{
-  href: string;
-  label: string;
-  icon: IconName;
-}>;
 
 function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -39,7 +27,11 @@ export default function Nav({ user, children }: { user: AuthUser; children: Reac
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const links = user.role === "admin" ? [...LINKS, ...ADMIN_LINKS] : LINKS;
+  // The sidebar is DATA: server-filtered by the caller's `view` permission,
+  // ordered by sortOrder (PLAN §6.4/§7.2). Only entries with a real path show.
+  const links = user.nav
+    .filter((n): n is typeof n & { path: string } => Boolean(n.path))
+    .map((n) => ({ href: n.path, label: n.name, icon: navIcon(n.icon) }));
 
   async function onLogout() {
     setLoggingOut(true);
@@ -185,7 +177,7 @@ export default function Nav({ user, children }: { user: AuthUser; children: Reac
                 </div>
                 <div className="hidden min-w-0 md:block">
                   <p className="truncate text-sm font-semibold text-slate-950">{user.name || user.email}</p>
-                  <p className="text-xs uppercase text-slate-500">{user.role === "admin" ? "Administrator" : "Operator"}</p>
+                  <p className="text-xs uppercase text-slate-500">{user.role?.name ?? "User"}</p>
                 </div>
               </div>
             </div>

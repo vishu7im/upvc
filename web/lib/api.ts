@@ -5,7 +5,7 @@
 // can be bundled into the browser. Server Components use lib/server-api.ts.
 // =====================================================================
 
-import type { AuthUser, OrderSummary, QuoteResult } from "./types";
+import type { LoginUser, OrderSummary, QuoteResult, UserRow } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -67,13 +67,87 @@ export async function apiSendRaw<T>(
 }
 
 /** Log in: sets the httpOnly cookie server-side, returns the user. */
-export function login(email: string, password: string): Promise<{ user: AuthUser }> {
-  return apiSend<{ user: AuthUser }>("/api/auth/login", "POST", { email, password });
+export function login(email: string, password: string): Promise<{ user: LoginUser }> {
+  return apiSend<{ user: LoginUser }>("/api/auth/login", "POST", { email, password });
 }
 
 /** Log out: clears the httpOnly cookie. */
 export function logout(): Promise<{ ok: boolean }> {
   return apiSend<{ ok: boolean }>("/api/auth/logout", "POST");
+}
+
+/**
+ * Change the current user's password. The BFF route re-sets the httpOnly cookie
+ * with the fresh token the API returns (the tokenVersion bump would otherwise
+ * 401 the caller's own session on the next request).
+ */
+export function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ user: LoginUser }> {
+  return apiSend<{ user: LoginUser }>("/api/auth/change-password", "POST", {
+    currentPassword,
+    newPassword,
+  });
+}
+
+// ---------- RBAC: users (Phase 4) ------------------------------------
+
+export function createUser(body: {
+  email: string;
+  name: string;
+  password: string;
+  roleId: string;
+}): Promise<UserRow> {
+  return apiSend<UserRow>("/api/users", "POST", body);
+}
+
+export function updateUser(
+  id: string,
+  body: { name?: string; email?: string; roleId?: string },
+): Promise<UserRow> {
+  return apiSend<UserRow>(`/api/users/${id}`, "PATCH", body);
+}
+
+export function activateUser(id: string): Promise<UserRow> {
+  return apiSend<UserRow>(`/api/users/${id}/activate`, "POST");
+}
+export function deactivateUser(id: string): Promise<UserRow> {
+  return apiSend<UserRow>(`/api/users/${id}/deactivate`, "POST");
+}
+export function resetUserPassword(id: string, tempPassword: string): Promise<{ ok: boolean }> {
+  return apiSend(`/api/users/${id}/reset-password`, "POST", { tempPassword });
+}
+export function deleteUser(id: string): Promise<{ ok: boolean }> {
+  return apiSend(`/api/users/${id}`, "DELETE");
+}
+
+// ---------- RBAC: roles (Phase 4) ------------------------------------
+
+export function createRole(body: {
+  name: string;
+  description?: string;
+  permissions: { module: string; action: string; scope?: "OWN" | "ALL" }[];
+}): Promise<{ id: string }> {
+  return apiSend<{ id: string }>("/api/roles", "POST", body);
+}
+
+export function updateRole(
+  id: string,
+  body: { name?: string; description?: string | null },
+): Promise<unknown> {
+  return apiSend(`/api/roles/${id}`, "PATCH", body);
+}
+
+export function updateRolePermissions(
+  id: string,
+  permissions: { module: string; action: string; scope?: "OWN" | "ALL" }[],
+): Promise<{ ok: boolean; count: number }> {
+  return apiSend(`/api/roles/${id}/permissions`, "PUT", { permissions });
+}
+
+export function deleteRole(id: string): Promise<{ ok: boolean }> {
+  return apiSend(`/api/roles/${id}`, "DELETE");
 }
 
 // ---------- Quote (U3) -----------------------------------------------

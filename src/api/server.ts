@@ -9,7 +9,7 @@
 //   GET  /                     → driver UI (public/index.html)
 //
 // Authenticated (JWT bearer) — the SaaS order flow:
-//   /api/auth/*                → login / register / me
+//   /api/auth/*                → login / me / change-password
 //   /api/products/*            → product lines + paginated design gallery
 //   /api/designs/:id           → single design (incl. SVG, quotable flag)
 //   /api/orders/*              → draft → items → confirm → documents
@@ -27,6 +27,9 @@ import { designsRouter } from "./designs.ts";
 import { ordersRouter } from "./orders.ts";
 import { settingsRouter } from "./settings.ts";
 import { catalogRouter } from "./catalog.ts";
+import { usersRouter } from "./users.ts";
+import { rolesRouter } from "./roles.ts";
+import { metaRouter } from "./meta.ts";
 import { requireAuth } from "./middleware/auth.ts";
 import { asyncHandler, HttpError, errorHandler } from "./http.ts";
 import { ensureBucket, getObject, storageConfigured } from "../services/storage.ts";
@@ -135,6 +138,9 @@ app.use("/api/designs", requireAuth, designsRouter); // only defines "/:id"
 app.use("/api/orders", requireAuth, ordersRouter);
 app.use("/api/settings", settingsRouter); // per-route admin guards inside
 app.use("/api/catalog", catalogRouter); // admin-only (guards inside the router)
+app.use("/api/users", usersRouter); // per-route requirePermission("users", …)
+app.use("/api/roles", rolesRouter); // per-route requirePermission("roles", …)
+app.use("/api/meta", metaRouter); // requireAuth-only metadata for the grid editor
 
 // Public company logo (so a browser <img> can load it without a token).
 app.get(

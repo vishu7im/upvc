@@ -339,17 +339,150 @@ model Product {
   @@map("product")
 }
 
+// =====================================================================
+// RBAC (dynamic role & user management) — see docs/rbac/PLAN.md.
+// Roles, permission actions, modules and the role×module×action grid are all
+// DATA, not code. The only code-level special case is the Super Admin bypass,
+// keyed off Role.scope == PLATFORM.
+// =====================================================================
+
+/// PLATFORM = Super Admin only (invisible/immutable to org actors). ORG = all else.
+enum RoleScope {
+  PLATFORM
+  ORG
+}
+
+/// Row-level data scope carried by a permission grant. Each value maps to a
+/// where-clause builder in code (OWN → {userId}, ALL → {}); ORG lands with tenancy.
+enum PermissionDataScope {
+  OWN
+  ALL
+}
+
+/// A tenant. Created NOW with one seeded "default" org so org FKs exist from
+/// day one; subdomain tenancy routing comes later (PLAN §9).
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+  roles Role[]
+
+  @@map("organization")
+}
+
+/// The dynamic module registry — one row per application module. navPath/navIcon/
+/// sortOrder drive the sidebar; category groups modules in the role editor; a null
+/// navPath = permission-only module (no nav). Source of truth: src/rbac/registry.ts.
+model Module {
+  id        String  @id @default(uuid())
+  slug      String  @unique
+  name      String
+  navPath   String?
+  navIcon   String?
+  category  String?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  permissions RolePermission[]
+
+  @@map("module")
+}
+
+/// Permission actions as DATA (not an enum) so a new action is an INSERT.
+/// Seeds: view, read, create, update, delete.
+model PermissionAction {
+  id        String @id @default(uuid())
+  slug      String @unique
+  name      String
+  sortOrder Int    @default(0)
+
+  permissions RolePermission[]
+
+  @@map("permission_action")
+}
+
+model Role {
+  id             String    @id @default(uuid())
+  organizationId String? // null ⇒ platform-level role
+  slug           String
+  name           String
+  description    String?
+  scope          RoleScope @default(ORG)
+  isSystem       Boolean   @default(false) // seed roles: undeletable, slug/scope immutable
+  version        Int       @default(1) // bumped on grid change → permission-cache bust
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization?    @relation(fields: [organizationId], references: [id])
+  permissions  RolePermission[]
+  users        User[]
+
+  @@unique([organizationId, slug])
+  @@map("role")
+}
+
+/// One cell of the role × module × action grid, plus its data scope.
+model RolePermission {
+  id       String              @id @default(uuid())
+  roleId   String
+  moduleId String
+  actionId String
+  scope    PermissionDataScope @default(ALL)
+
+  role   Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module Module           @relation(fields: [moduleId], references: [id])
+  action PermissionAction @relation(fields: [actionId], references: [id])
+
+  @@unique([roleId, moduleId, actionId])
+  @@index([roleId])
+  @@map("role_permission")
+}
+
+/// Append-only RBAC audit trail (written from the service layer in Phase 6).
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String? // who did it (null for system/seed)
+  action     String // "user.deactivate", "role.permissions.update", …
+  targetType String // "user" | "role"
+  targetId   String?
+  detail     Json? // before/after or grid diff
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([actorId, createdAt])
+  @@map("audit_log")
+}
+
 // ---- Users (JWT auth) ------------------------------------------------
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String @id @default(uuid())
+  email        String @unique
   passwordHash String
   name         String
-  role         String   @default("user")
-  createdAt    DateTime @default(now())
 
-  orders Order[]
+  // RBAC (PLAN §3.2). `roleId` is the single source of role truth (the legacy
+  // free-form `role` string was dropped in Phase 6). Required now that every
+  // user is backfilled; organizationId stays nullable until tenancy lands.
+  roleId             String
+  organizationId     String?
+  isActive           Boolean @default(true)
+  mustChangePassword Boolean @default(false)
+  // Bumped on deactivate / role-change / password-reset → live JWTs rejected.
+  tokenVersion       Int     @default(0)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  roleRef      Role?         @relation(fields: [roleId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  orders       Order[]
+
+  @@index([roleId])
   @@map("user")
 }
 
