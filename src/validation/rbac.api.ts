@@ -11,7 +11,7 @@
 //
 // It mints tokens directly with signToken (no passwords needed) and creates
 // throwaway users/roles straight through Prisma, then DELETES every fixture it
-// made (orders first — there is no DELETE-order route) so the DB is left clean.
+// made (orders first) so the DB is left clean.
 // The real platform Super Admin is discovered, never modified.
 //
 // Assertions cover: the Phase-5 guard-map + orders data-scoping matrix, the
@@ -327,6 +327,33 @@ async function main(): Promise<void> {
       403,
       await status(`/api/orders/${ordId}/items/nope`, AU, { method: "DELETE" }),
     );
+    chk(
+      "auditor DELETE order → 403 (no delete)",
+      403,
+      await status(`/api/orders/${ordId}`, AU, { method: "DELETE" }),
+    );
+    chk(
+      "customer DELETE own order → 403 (no delete)",
+      403,
+      await status(`/api/orders/${ordId}`, CT, { method: "DELETE" }),
+    );
+
+    const disposableOrder = await postJson("/api/orders", C2, { customerName: "DeleteMe" });
+    chk("other customer creates disposable order → 201", 201, disposableOrder.status);
+    const disposableOrderId = disposableOrder.body?.id as string;
+    if (disposableOrderId) {
+      createdOrderIds.push(disposableOrderId);
+      chk(
+        "org-admin DELETE customer order → 204 (delete ALL)",
+        204,
+        await status(`/api/orders/${disposableOrderId}`, AD, { method: "DELETE" }),
+      );
+      chk(
+        "deleted order is no longer readable → 404",
+        404,
+        await status(`/api/orders/${disposableOrderId}`, AD),
+      );
+    }
 
     // === Phase 3: PLATFORM hiding (no existence leak) ================
     const adUsers = await jsonGet("/api/users?limit=500", AD);
@@ -615,7 +642,7 @@ async function main(): Promise<void> {
       chk("audit: user.create logged", 1, await auditFor("user.create", apiUser.body.id));
     }
   } finally {
-    // ---- cleanup (orders first — no DELETE-order route) -------------
+    // ---- cleanup (orders first) -------------------------------------
     for (const id of createdOrderIds) {
       await prisma.orderItem.deleteMany({ where: { orderId: id } });
       await prisma.document.deleteMany({ where: { orderId: id } });

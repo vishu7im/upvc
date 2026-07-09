@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { serverApiGet } from "@/lib/server-api";
+import { getCurrentUser, serverApiGet } from "@/lib/server-api";
 import { ApiError } from "@/lib/api";
+import { can } from "@/lib/permissions";
 import type { OrderDetail } from "@/lib/types";
 import { money, dateShort, docLabel } from "@/lib/format";
 import { StatusBadge } from "../page";
@@ -20,6 +21,7 @@ import {
   thClass,
 } from "@/components/ui";
 import { Icon } from "@/components/icons";
+import DeleteOrderButton from "../delete-order-button";
 
 export const dynamic = "force-dynamic";
 
@@ -29,8 +31,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
 
   let order: OrderDetail;
+  let canDeleteOrder = false;
   try {
-    order = await serverApiGet<OrderDetail>(`/api/orders/${id}`);
+    const [fetchedOrder, user] = await Promise.all([
+      serverApiGet<OrderDetail>(`/api/orders/${id}`),
+      getCurrentUser(),
+    ]);
+    order = fetchedOrder;
+    canDeleteOrder = can(user, "orders", "delete");
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
@@ -69,15 +77,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </>
         }
         actions={
-          isDraft ? (
-            <ButtonLink href={`/products?orderId=${order.id}`} variant="secondary" icon="plus">
-              Add item from gallery
-            </ButtonLink>
-          ) : (
-            <ButtonLink href="/orders" variant="secondary" icon="orders">
-              All orders
-            </ButtonLink>
-          )
+          <>
+            {isDraft ? (
+              <ButtonLink href={`/products?orderId=${order.id}`} variant="secondary" icon="plus">
+                Add item from gallery
+              </ButtonLink>
+            ) : (
+              <ButtonLink href="/orders" variant="secondary" icon="orders">
+                All orders
+              </ButtonLink>
+            )}
+            {canDeleteOrder && (
+              <DeleteOrderButton orderId={order.id} orderNo={order.orderNo} status={order.status} />
+            )}
+          </>
         }
         meta={
           <>

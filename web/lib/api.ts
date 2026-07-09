@@ -240,6 +240,10 @@ export function deleteOrderItem(orderId: string, itemId: string): Promise<unknow
   return apiSend(`/api/orders/${orderId}/items/${itemId}`, "DELETE");
 }
 
+export function deleteOrder(orderId: string): Promise<void> {
+  return apiSend<void>(`/api/orders/${orderId}`, "DELETE");
+}
+
 export function confirmOrder(orderId: string): Promise<unknown> {
   return apiSend(`/api/orders/${orderId}/confirm`, "POST");
 }

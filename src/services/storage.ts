@@ -23,6 +23,8 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 
 const BUCKET = process.env.MINIO_BUCKET ?? "upvc";
@@ -109,4 +111,38 @@ export async function objectExists(key: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Delete every object beneath a prefix (used when an order is deleted). */
+export async function deleteObjectsWithPrefix(prefix: string): Promise<number> {
+  const c = s3();
+  let continuationToken: string | undefined;
+  let deleted = 0;
+
+  do {
+    const page = await c.send(
+      new ListObjectsV2Command({
+        Bucket: BUCKET,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+    const objects = (page.Contents ?? [])
+      .filter((object): object is typeof object & { Key: string } => Boolean(object.Key))
+      .map((object) => ({ Key: object.Key }));
+
+    if (objects.length > 0) {
+      await c.send(
+        new DeleteObjectsCommand({
+          Bucket: BUCKET,
+          Delete: { Objects: objects, Quiet: true },
+        }),
+      );
+      deleted += objects.length;
+    }
+
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return deleted;
 }

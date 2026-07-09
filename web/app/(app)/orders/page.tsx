@@ -4,11 +4,13 @@
 // =====================================================================
 
 import Link from "next/link";
-import { serverApiGet } from "@/lib/server-api";
+import { getCurrentUser, serverApiGet } from "@/lib/server-api";
 import type { OrderSummary, Paginated } from "@/lib/types";
+import { can } from "@/lib/permissions";
 import { money, dateShort } from "@/lib/format";
 import Pager from "@/components/pager";
 import NewOrderButton from "./new-order-button";
+import DeleteOrderButton from "./delete-order-button";
 import { Alert, Badge, EmptyState, PageHeader, tableClass, tableWrapClass, tdClass, thClass } from "@/components/ui";
 import { Icon } from "@/components/icons";
 
@@ -28,8 +30,14 @@ export default async function OrdersPage({
 
   let result: Paginated<OrderSummary> | null = null;
   let error: string | null = null;
+  let canDeleteOrders = false;
   try {
-    result = await serverApiGet<Paginated<OrderSummary>>(`/api/orders?page=${page}&limit=20`);
+    const [orders, user] = await Promise.all([
+      serverApiGet<Paginated<OrderSummary>>(`/api/orders?page=${page}&limit=20`),
+      getCurrentUser(),
+    ]);
+    result = orders;
+    canDeleteOrders = can(user, "orders", "delete");
   } catch (e) {
     error = e instanceof Error ? e.message : "Unknown error";
   }
@@ -87,6 +95,7 @@ export default async function OrdersPage({
                   <th className={thClass + " text-right"}>Items</th>
                   <th className={thClass + " text-right"}>Total</th>
                   <th className={thClass}>Created</th>
+                  {canDeleteOrders && <th className={thClass + " text-right"}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -107,6 +116,16 @@ export default async function OrdersPage({
                     <td className={tdClass + " text-right font-semibold"}>{o._count?.items ?? "--"}</td>
                     <td className={tdClass + " text-right font-semibold"}>{money(o.totalPrice)}</td>
                     <td className={tdClass + " text-slate-500"}>{dateShort(o.createdAt)}</td>
+                    {canDeleteOrders && (
+                      <td className={tdClass + " text-right"}>
+                        <DeleteOrderButton
+                          orderId={o.id}
+                          orderNo={o.orderNo}
+                          status={o.status}
+                          compact
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

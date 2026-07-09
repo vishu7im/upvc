@@ -25,6 +25,7 @@ export type IconName =
   | "search"
   | "settings"
   | "spark"
+  | "trash"
   | "user"
   | "x";
 
@@ -192,6 +193,15 @@ const icons: Record<IconName, ReactNode> = {
   spark: (
     <>
       <path d="m13 2-2 7-7 2 7 2 2 7 2-7 7-2-7-2-2-7Z" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 15H6L5 6" />
+      <path d="M10 11v5" />
+      <path d="M14 11v5" />
     </>
   ),
   user: (

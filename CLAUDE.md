@@ -117,7 +117,8 @@ Default seeded admin (override via `ADMIN_EMAIL`/`ADMIN_PASSWORD`): `admin@local
 - `GET  /api/products?page&limit` · `GET /api/products/:id` · `GET /api/products/:id/designs?page&limit`
   (paginated gallery; SVG-only designs flagged `quotable:false`)
 - `GET  /api/designs/:id` — single design incl. `imageSvg` + `quotable`
-- `POST /api/orders` (draft) · `GET /api/orders?page&limit` · `GET /api/orders/:id`
+- `POST /api/orders` (draft) · `GET /api/orders?page&limit` · `GET /api/orders/:id` ·
+  `DELETE /api/orders/:id` (`orders.delete`, scoped OWN/ALL; cascades items/documents)
 - `POST /api/orders/:id/items` (rejects non-quotable designs) · `DELETE /api/orders/:id/items/:itemId`
 - `POST /api/orders/:id/confirm` → generates & persists 7 documents (aggregated across items)
 - `GET  /api/orders/:id/documents` · `GET /api/orders/:id/documents/:type` (HTML)

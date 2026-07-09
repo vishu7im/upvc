@@ -38,7 +38,13 @@ import {
 import { requirePermission, scopeFilter } from "./middleware/authorize.ts";
 import { paginated, parsePagination } from "./pagination.ts";
 import { htmlToPdf } from "../services/pdf.ts";
-import { getObject, objectExists, putObject } from "../services/storage.ts";
+import {
+  deleteObjectsWithPrefix,
+  getObject,
+  objectExists,
+  putObject,
+  storageConfigured,
+} from "../services/storage.ts";
 
 export const ordersRouter = Router();
 
@@ -168,6 +174,30 @@ ordersRouter.get(
     });
     if (!order) throw new HttpError(404, "Order not found");
     res.json(order);
+  }),
+);
+
+ordersRouter.delete(
+  "/:id",
+  requirePermission("orders", "delete"),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const order = await ownOrder(req, req.params.id);
+
+    // OrderItem and Document rows cascade from the Order relation.
+    await prisma.order.delete({ where: { id: order.id } });
+
+    // Generated PDFs live outside PostgreSQL. The database deletion is the
+    // authoritative operation, so unavailable object storage is logged without
+    // turning a successful delete into a misleading 500 response.
+    if (storageConfigured()) {
+      try {
+        await deleteObjectsWithPrefix(`orders/${order.id}/`);
+      } catch (err) {
+        console.error(`[storage] failed to remove cached files for order ${order.id}`, err);
+      }
+    }
+
+    res.status(204).end();
   }),
 );
 
