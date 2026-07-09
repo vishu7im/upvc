@@ -124,4 +124,57 @@ export function validatePricing(expect: Expect): void {
   // Internal steel still never upcharged, even with a dual finish.
   const dualReinf = lineFor(dualSys, "R1");
   expect("dual reinforcement unitPrice unchanged = 8", dualReinf?.unitPrice ?? -1, 8);
+
+  // ---------- Per-profile colour-tier prices (M5.5) ----------
+  // A frame carrying supplier 1P/2P tier prices; the colour resolves a tier and
+  // the tier price is used VERBATIM (no %-uplift stacking). Missing tier columns
+  // fall back to base × %-uplift. A part with NO tierPrices always falls back.
+  const tierSys = makeSystem();
+  tierSys.frames.f1.tierPrices = { cost1p: 15, price1p: 25, cost2p: 18, price2p: 30 };
+  // A frame with ONLY a 2P price (no cost2p) to prove independent cost fallback.
+  tierSys.frames.f2 = {
+    code: "F2", name: "Frame 2", faceWidth: 64, glassRebate: 15, weldAllowanceMm: 0,
+    cost: 10, price: 20, per: "m", weight: 0, financialCategory: "Frame",
+    tierPrices: { price2p: 40 },
+  };
+  // A frame with NO tier prices at all (fallback to %-uplift).
+  tierSys.frames.f3 = {
+    code: "F3", name: "Frame 3", faceWidth: 64, glassRebate: 15, weldAllowanceMm: 0,
+    cost: 10, price: 20, per: "m", weight: 0, financialCategory: "Frame",
+  };
+  tierSys.colours.anthracite = { key: "anthracite", code: "C7016", name: "Anthracite", costUpliftPct: 20, priceUpliftPct: 30, isBase: false };
+  tierSys.colours["__combined__:white+anthracite"] = {
+    key: "__combined__:white+anthracite", code: "W/A", name: "White / Anthracite",
+    costUpliftPct: 30, priceUpliftPct: 30, isBase: false, tier: "1p",
+  };
+  const tierPlan: CuttingPlan = {
+    byCode: {
+      F1: { name: "F1", bars: [], totalLengthMm: 1000, utilizationPct: 0 },
+      F2: { name: "F2", bars: [], totalLengthMm: 1000, utilizationPct: 0 },
+      F3: { name: "F3", bars: [], totalLengthMm: 1000, utilizationPct: 0 },
+    },
+  };
+  const tierLine = (colourKey: string | undefined, code: string) => {
+    const s = { ...tierSys, ...(colourKey ? { defaultColourKey: colourKey } : { defaultColourKey: undefined }) };
+    return computePricing(PARTS, tierPlan, GEOMETRY, s, SETTINGS).lines.find((l) => l.code === code);
+  };
+
+  // Single non-base colour ⇒ derived 2P. F1 has tier prices ⇒ used verbatim.
+  const a1 = tierLine("anthracite", "F1");
+  expect("2P tier: F1 unitPrice = price2p 30 (no uplift stacking)", a1?.unitPrice ?? -1, 30);
+  expect("2P tier: F1 unitCost = cost2p 18", a1?.unitCost ?? -1, 18);
+  // F2 has only price2p ⇒ price uses it; cost falls back to base × costMul (10×1.2).
+  const a2 = tierLine("anthracite", "F2");
+  expect("2P tier: F2 unitPrice = price2p 40", a2?.unitPrice ?? -1, 40);
+  expect("2P tier: F2 unitCost falls back to 12", a2?.unitCost ?? -1, 12);
+  // F3 has no tier prices ⇒ full %-uplift fallback (20×1.3 = 26).
+  const a3 = tierLine("anthracite", "F3");
+  expect("2P tier: F3 (no tierPrices) unitPrice = 26 fallback", a3?.unitPrice ?? -1, 26);
+  // Dual white+anthracite ⇒ tier "1p" ⇒ F1 uses price1p 25.
+  const d1 = tierLine("__combined__:white+anthracite", "F1");
+  expect("1P tier: F1 unitPrice = price1p 25", d1?.unitPrice ?? -1, 25);
+  expect("1P tier: F1 unitCost = cost1p 15", d1?.unitCost ?? -1, 15);
+  // Base white ⇒ no tier ⇒ tierPrices ignored, byte-identical raw price.
+  const w1 = tierLine("white", "F1");
+  expect("white: F1 ignores tierPrices (unitPrice 20)", w1?.unitPrice ?? -1, 20);
 }

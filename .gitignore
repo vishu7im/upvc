@@ -11,5 +11,5 @@ pgdata/
 
 # Local-only docs (not for the repo)
 ENGINE_ARCHITECTURE.md
-docs/architecture/
+docs
 

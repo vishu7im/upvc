@@ -45,6 +45,13 @@ export function computePricing(
   const colour = system.defaultColourKey ? system.colours?.[system.defaultColourKey] : undefined;
   const costMul = colour ? 1 + colour.costUpliftPct / 100 : 1;
   const priceMul = colour ? 1 + colour.priceUpliftPct / 100 : 1;
+  // Which per-profile supplier tier price to prefer (M5.5). Explicit `tier` is
+  // set by solve.ts on a dual-colour finish; otherwise derive it — a single
+  // non-base colour means BOTH sides are that colour ⇒ 2P. Base/White ⇒ no tier
+  // ⇒ the exact pre-M5.5 base × %-uplift path below (byte-identical).
+  const tier: "1p" | "2p" | undefined = colour
+    ? colour.tier ?? (colour.isBase ? undefined : "2p")
+    : undefined;
 
   // ---------- Linear profiles (frames, sashes, transoms, mullions, beads, reinforcement)
   // We use total cut length per code from the cutting plan — that's the
@@ -54,8 +61,22 @@ export function computePricing(
     const def = findProfileByCode(system, code);
     if (!def) continue;
     const coloured = isColourBearingCode(system, code);
-    const unitCost = coloured ? def.cost * costMul : def.cost;
-    const unitPrice = coloured ? def.price * priceMul : def.price;
+    const tierPrice = coloured && tier ? def.tierPrices?.[`price${tier}` as const] : undefined;
+    let unitCost: number;
+    let unitPrice: number;
+    if (coloured && tier && tierPrice != null) {
+      // Supplier's absolute tier price wins verbatim (no %-uplift stacking) — the
+      // quote matches the price list per-profile. cost falls back independently
+      // (only price tiers may be known for some rows).
+      unitPrice = tierPrice;
+      unitCost = def.tierPrices?.[`cost${tier}` as const] ?? def.cost * costMul;
+    } else {
+      // No tier price for this part/tier (e.g. beads have no 1P row, or a colour
+      // with only a %-uplift): fall back to base × colour %-uplift — the original
+      // path, so White/default and %-only colours stay byte-identical.
+      unitCost = coloured ? def.cost * costMul : def.cost;
+      unitPrice = coloured ? def.price * priceMul : def.price;
+    }
     lines.push(makeLine(code, group.name, def.financialCategory, lengthM, def.per as any, unitCost, unitPrice));
   }
 

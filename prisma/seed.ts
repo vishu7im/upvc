@@ -100,15 +100,19 @@ async function seedSystem(
       endClearance?: number;
     } = {},
   ) => {
-    // These values are edited in Admin > Catalog. Do not reset them on every
-    // deploy, because docker-compose runs this seed during backend startup.
+    // These values are edited in Admin > Catalog / filled by the price-list
+    // import. Do not reset them on every deploy, because docker-compose runs
+    // this seed during backend startup. tierPrices is stripped too — it is never
+    // set in the catalog source (imported into cost1p/… by import-prices), so it
+    // must never reach a Prisma payload (it is not a column) nor clobber imports.
     const {
       cost: _cost,
       price: _price,
       weight: _weight,
       weldAllowanceMm: _weldAllowanceMm,
+      tierPrices: _tierPrices,
       ...catalogFields
-    } = base;
+    } = base as typeof base & { tierPrices?: unknown };
 
     return tx.profilePart.upsert({
       where: {
@@ -220,20 +224,25 @@ async function seedSystem(
     });
   }
 
-  // 6b. Cills (window sills) — 3 sizes × 3 finishes; cost/price/weight = 0
-  // (golden rule). The owner fills prices via the admin catalog CRUD / CSV.
+  // 6b. Cills (window sills) — 3 sizes × 3 finishes. cost/price/weight are
+  // owner-editable / price-list-imported, so (like glass/gasket/hardware) they
+  // are STRIPPED from the update branch — a reseed must not reset imported cill
+  // prices back to 0. Only structural fields are re-applied on update.
   for (const [partKey, c] of Object.entries(sys.cills)) {
+    const {
+      cost: _cost,
+      price: _price,
+      weight: _weight,
+      ...cillFields
+    } = c;
     await tx.cill.upsert({
       where: { systemId_partKey: { systemId: sys.systemId, partKey } },
       update: {
-        code: c.code,
-        name: c.name,
-        projectionMm: c.projectionMm,
-        cost: c.cost,
-        price: c.price,
-        per: c.per,
-        weight: c.weight,
-        financialCategory: c.financialCategory,
+        code: cillFields.code,
+        name: cillFields.name,
+        projectionMm: cillFields.projectionMm,
+        per: cillFields.per,
+        financialCategory: cillFields.financialCategory,
       },
       create: {
         systemId: sys.systemId,
@@ -262,6 +271,16 @@ async function seedSystem(
       create: { systemId: sys.systemId, profileCode, reinforcementKey },
     });
   }
+  // Drop stale map entries whose profile code is no longer in the catalog map.
+  // The map is NOT owner-edited, so deleting rows the source removed is safe —
+  // this clears the old placeholder keys (SPQ-T-SASH, SPQ-DOOR-Z) after the
+  // code reconciliation so they can't linger and mis-reinforce.
+  await tx.reinforcementMapEntry.deleteMany({
+    where: {
+      systemId: sys.systemId,
+      profileCode: { notIn: Object.keys(sys.reinforcementMap) },
+    },
+  });
 }
 
 async function main() {

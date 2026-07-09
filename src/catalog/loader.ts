@@ -152,6 +152,16 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
   const auxiliaries: Record<string, AuxiliaryProfile> = {};
 
   for (const p of s.parts) {
+    // Per-profile colour-tier prices (M5.5) — attach only when at least one
+    // tier column is set, so parts without them stay shaped exactly as before
+    // (undefined `tierPrices`), keeping default quotes byte-identical.
+    const tp = {
+      cost1p: optNum(p.cost1p),
+      price1p: optNum(p.price1p),
+      cost2p: optNum(p.cost2p),
+      price2p: optNum(p.price2p),
+    };
+    const tierPrices = Object.values(tp).some((v) => v !== undefined) ? tp : undefined;
     const base = {
       code: p.code,
       name: p.name,
@@ -162,6 +172,7 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
       per: p.per as "m" | "pc" | "m2" | "set",
       weight: num(p.weight),
       financialCategory: p.financialCategory,
+      ...(tierPrices ? { tierPrices } : {}),
     };
     switch (p.kind) {
       case "FRAME":

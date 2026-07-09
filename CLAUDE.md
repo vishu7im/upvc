@@ -79,12 +79,20 @@ npm run prisma:generate  # (migrate already does this)
 # 3. Seed catalog + products + 503 designs + admin user:
 npm run db:seed          # prints the seeded admin email/password
 
-# 4. Prove the engine is intact (MUST be 147 passed, 0 failed):
-npm run validate         # 132 default jobs + 3 custom-mode + 12 M3 extractor assertions
+# 4. Prove the engine is intact (baseline: ~481 passed, 3 pre-existing weld-drift
+#    failures — see memory/validate-weld-drift.md; price assertions SKIP until step 4b):
+npm run validate         # geometry + custom-mode + extractor + pricing + svg + supplier-price
+
+# 4b. (M5.5) Import the supplier price lists → catalog cost/price + 1P/2P tiers + provenance:
+npm run import:prices    # prints applied / flags / recorded-only / still-unpriced report
+npm run validate         # re-run: the gated supplier-price assertions now execute & pass
 
 # 5. Run the API:
 npm start                # http://localhost:3005  (or PORT from .env)
 ```
+
+Behind a transaction-mode pooler (PgBouncer on :5433) use `npx prisma migrate deploy` instead of
+`prisma migrate dev` (no shadow DB); the M5.5 migrations ship as plain SQL for exactly this.
 
 No Docker? Any local/remote Postgres works — point `DATABASE_URL` at it and run steps 2–5.
 The catalog seed avoids interactive transactions, so `npm run db:seed` works **through a pooler**
@@ -152,11 +160,16 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
   resolves the stored logo key → embedded data-URI.
 - `prisma/schema.prisma`, `prisma/seed.ts` — persistence + seed. **The catalog seed runs WITHOUT an
   interactive `$transaction`** (plain idempotent upserts) so it survives transaction-mode poolers.
-- `src/validation/jobs.ts` — the 147-assertion geometry safety net (run after ANY engine/catalog
-  change); also calls `src/tools/extract-topology.test.ts#validateExtractor` and (M5)
-  `src/engine/pricing.test.ts#validatePricing` (+10 colour-uplift assertions → 157 total).
+- `src/validation/jobs.ts` — the geometry + pricing safety net (run after ANY engine/catalog change);
+  also calls `src/tools/extract-topology.test.ts#validateExtractor`, `src/engine/pricing.test.ts#validatePricing`
+  (colour-uplift + M5.5 tier assertions), `src/engine/svg.test.ts#validateSvg`, and
+  `src/validation/prices.test.ts#validateSupplierPrices` (M5.5, gated on import). Current baseline:
+  **~484 passed, 3 pre-existing DB weld-drift failures** (see memory/validate-weld-drift.md — not a regression).
 - `src/tools/extract-topology.ts` — M3 SVG→topology extractor (build/seed-time; pure of the engine).
 - `src/catalog/derived-topologies.generated.ts` — generated extractor output (DO NOT hand-edit).
+- `src/catalog/price-lists/*` — M5.5 verbatim supplier-price transcriptions + `mapping.ts` (see
+  "## M5.5"). `src/tools/import-prices.ts` (`npm run import:prices`) applies them + writes provenance.
+- `src/validation/prices.test.ts` — gated post-import supplier-price assertions (`validateSupplierPrices`).
 
 ## Roadmap (milestones)
 
@@ -366,7 +379,61 @@ M5 instead builds the **editing surface** so the owner fills real prices, plus a
 
 **Caveat:** quotes read **zero prices until the owner enters them** via the CRUD/CSV; only White (0%)
 ships seeded. Colour upcharge is a flat % on profiles — per-metre/per-component pricing is a future
-refinement.
+refinement. **M5.5 (below) now imports real supplier prices + per-profile colour tiers.**
+
+## M5.5 — Supplier price-list import
+
+Integrates the 4 real Sunny Plast PDFs in `docs/price_list/` (ANGLIA profiles, Cills, Panels, Sliding
+System) into pricing. Three layers keep the engine pure and the numbers auditable:
+
+1. **Transcription (source of truth).** `src/catalog/price-lists/*.ts` — every PDF line transcribed
+   VERBATIM with a per-line `source` citation (golden rule; same convention as the calibration
+   comments). `doc-a-…` (profiles + cills, 3 colour tiers), `doc-b-…` (cill volume tiers),
+   `doc-c-panels`, `doc-d-sliding` + `mapping.ts` (explicit supplier-code → catalog `(table,kind,
+   partKey)` wiring, with a `note`/`flag` on every alias/derivation) + `index.ts`.
+2. **Provenance (audit).** New tables `supplier` / `price_document` / `price_item` (migration
+   `20260709010000_add_price_provenance`) record **every** extracted price — mapped or not — with
+   source file, effective date, unit, colour tier, pack qty, and the mapping outcome written back.
+3. **Runtime read model.** Existing catalog cost/price columns + new nullable `cost1p/price1p/cost2p/
+   price2p` on `profile_part` (migration `20260709020000_add_profile_tier_prices`).
+
+**Apply:** `npm run import:prices` (`src/tools/import-prices.ts`) — deterministic, idempotent, applies
+**by partKey** (never fuzzy code, so duplicate-code rows like frame-6ch/frame-french and
+transom-z-67/midrail-67 are BOTH priced), then prints a mismatch report (applied / flags /
+recorded-only / still-unpriced). The seed never writes prices; the M5 CSV endpoint stays for ad-hoc edits
+(its duplicate-code last-wins bug is fixed — it now updates all rows sharing a code).
+
+**Owner decisions:** cost = price = supplier nett (settings markup/wastage/VAT produce sell); per-profile
+colour tiers (colour one side ⇒ 1P, both ⇒ 2P; **White byte-identical**); cills cost = Doc A £/m, price =
+Doc B "Normal" ÷ 6 m; **panels = glass rows** (per m², via existing `glassKey`).
+
+**Tier-aware pricing (engine stays pure).** `ProfileSection.tierPrices` (loader attaches it only when a
+tier column is set) + `ColourOption.tier`. `pricing.ts` resolves the tier (explicit on the dual-colour
+combined option set by `solve.ts`, else derived: any non-base single colour ⇒ 2P) and uses the supplier
+tier price VERBATIM when the colour-bearing part has one; otherwise falls back to base × the colour
+%-uplift (so parts without a tier price, e.g. 1P beads, and %-only colours keep working). White/default
+⇒ no tier ⇒ the exact pre-M5.5 path ⇒ byte-identical (the 267 assertions hold).
+
+**Codes reconciled** (placeholder → authentic, in `system-sunnyplast.ts` + asserted in `jobs.ts`):
+`sash-t` SPQ-T-SASH→**SPQ-05-30252**; `sash-door-z` SPQ-DOOR-Z→**SPQ-5-45252**; `bead-28`
+BEAD-28→**SPQ-1-51252**; sliding hardware `SL-*`→**GLIS-*** + new `hw-patio-cylinder` (GLIS-12, so
+sliding doesn't reuse the door brass cylinder's price). Seed **cill-overwrite bug fixed** (cill prices now
+preserved on reseed) and **stale reinforcement_map rows cleaned** (old placeholder keys dropped).
+
+**Validation.** `prices.test.ts#validateSupplierPrices` (wired into `npm run validate`) is **GATED** — it
+SKIPS until prices are imported (frame-5ch.cost === 0) so validate stays green on a fresh DB; after import
+it asserts catalog == transcription, White/1P/2P quote lines match the list £/m, cills, panels, sliding
+hardware, and that unpriced items (glass units, gaskets, casement/door hardware) stay exactly £0 (nothing
+guessed). `pricing.test.ts` adds ~10 DB-free tier assertions.
+
+**Missing data (never guessed, all £0 or recorded-only):** glazed units, gaskets, all casement/door/T&T/
+French hardware, casement/door steels, aux caps GLIS16/17; open flags — sliding bead SPQ-1-51252 vs Doc D
+SPQ-3-51252, bead-32 code 52253 vs 52252, steel aliases, GLIS 04 pack-of-2, GLIS 10+11 summed lock&keep.
+Full list in `memory/supplier-price-lists.md` and the import report.
+
+**Runbook** (pooler on :5433 ⇒ `migrate deploy`, not `migrate dev`):
+`npx prisma migrate deploy` → `npm run db:seed` → `npm run validate` (price checks SKIP) →
+`npm run import:prices` → `npm run validate` (all green) → restart API.
 
 ## Sliding Patio
 

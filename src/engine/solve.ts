@@ -50,6 +50,9 @@ export function solve(input: QuoteInput): QuoteOutput {
 
   if (dualColour && insideColour && outsideColour) {
     const combinedKey = `__combined__:${insideColour.key}+${outsideColour.key}`;
+    // Tier for per-profile supplier tier prices (M5.5): count coloured sides.
+    // Both White ⇒ no tier (byte-identical); one coloured ⇒ 1P; both ⇒ 2P.
+    const nonBaseSides = (insideColour.isBase ? 0 : 1) + (outsideColour.isBase ? 0 : 1);
     const combined: ColourOption = {
       key: combinedKey,
       code: `${insideColour.code}/${outsideColour.code}`,
@@ -58,6 +61,7 @@ export function solve(input: QuoteInput): QuoteOutput {
       priceUpliftPct: insideColour.priceUpliftPct + outsideColour.priceUpliftPct,
       isBase: false,
       hex: outsideColour.hex ?? insideColour.hex,
+      ...(nonBaseSides === 2 ? { tier: "2p" as const } : nonBaseSides === 1 ? { tier: "1p" as const } : {}),
     };
     system = { ...system, colours: { ...system.colours, [combinedKey]: combined }, defaultColourKey: combinedKey };
   } else if (input.colourKey && input.colourKey !== system.defaultColourKey) {

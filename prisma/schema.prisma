@@ -91,8 +91,82 @@ model ProfilePart {
   // Reinforcement
   endClearance Decimal? @db.Decimal(10, 4)
 
+  // Per-profile colour-tier prices (supplier price lists, M5.5). The supplier
+  // lists visible profiles in three absolute price tiers — White (the `cost`/
+  // `price` columns above), "1P Colour 1P White" (foil one side) and "2P Colour"
+  // (foil both sides). These hold the 1P/2P £-per-unit; NULL ⇒ no tier price
+  // known, so pricing falls back to base × the colour's %-uplift. A default
+  // (White) quote never reads them ⇒ byte-identical. Only colour-bearing parts
+  // (frame/sash/transom/bead) use them; reinforcement/aux stay tierless.
+  cost1p  Decimal? @db.Decimal(12, 4)
+  price1p Decimal? @db.Decimal(12, 4)
+  cost2p  Decimal? @db.Decimal(12, 4)
+  price2p Decimal? @db.Decimal(12, 4)
+
   @@unique([systemId, kind, partKey])
   @@map("profile_part")
+}
+
+// =====================================================================
+// Supplier price-list provenance (M5.5) — the audit layer.
+//
+// Every price extracted from a supplier PDF is recorded here VERBATIM with
+// its source document + effective date + unit + colour tier, then (optionally)
+// mapped onto a catalog runtime row. The catalog cost/price columns stay the
+// engine's read model; these tables are the reviewable history of where each
+// number came from. Written by `npm run import:prices` from the transcribed
+// data files in src/catalog/price-lists/*.
+// =====================================================================
+model Supplier {
+  id        String          @id @default(uuid())
+  key       String          @unique // e.g. "sunny-plast"
+  name      String
+  documents PriceDocument[]
+
+  @@map("supplier")
+}
+
+model PriceDocument {
+  id            String   @id @default(uuid())
+  supplierId    String
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  docKey        String   @unique // stable key, e.g. "sp-profiles-anglia-2025-04-25"
+  sourceFile    String            // exact PDF filename in docs/price_list/
+  effectiveDate DateTime
+  currency      String            // "GBP"
+  priceBasis    String?           // e.g. "engross nett £/m, 6m lengths, 3 colour tiers"
+  notes         String?
+  importedAt    DateTime @default(now())
+
+  items PriceItem[]
+
+  @@map("price_document")
+}
+
+model PriceItem {
+  id         String        @id @default(uuid())
+  documentId String
+  document   PriceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  supplierCode String        // VERBATIM from the PDF ("" when the row carries no code)
+  description  String        // verbatim
+  unit         String        // "m" | "m2" | "pc" | "lm" | "length" | "sheet"
+  colourTier   String?       // "white" | "1p" | "2p" | null (tierless)
+  variant      String?       // Doc B volume tier: "lorry" | "company" | "normal"
+  packQty      Int?          // e.g. GLIS 04 Bump Stop = 2
+  stockLengthM Decimal?      @db.Decimal(10, 4) // 6 / 4.2 where the PDF states it
+  unitPrice    Decimal       @db.Decimal(12, 4) // nett GBP per `unit`
+  source       String        // per-line citation ("Doc A row 'Window Frame 70mm 5ch', White")
+
+  // Mapping outcome, written by the import script (null ⇒ recorded-only/unmapped).
+  mappedTable   String? // "profile_part" | "glass" | "cill" | "hardware" | "auxiliary"
+  mappedKind    String? // PartKind when profile_part
+  mappedPartKey String?
+  applyNote     String? // decision note: alias, derivation, or why unmapped
+
+  @@index([documentId])
+  @@map("price_item")
 }
 
 // ---- Glass -----------------------------------------------------------

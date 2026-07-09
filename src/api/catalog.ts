@@ -62,15 +62,21 @@ const priceSchema = z
 // Profile parts also carry a welding-shrinkage allowance (mm per welded end).
 // Only profile_part has this column, so it lives on the parts PUT — not on the
 // shared glass/gasket/hardware updater below.
+// The four cost1p/price1p/cost2p/price2p tier columns (M5.5) are nullable: pass
+// a number to set a tier price, or null to clear it back to the %-uplift fallback.
 const partSchema = z
   .object({
     cost: z.number().min(0),
     price: z.number().min(0),
     weight: z.number().min(0),
     weldAllowanceMm: z.number().min(0),
+    cost1p: z.number().min(0).nullable(),
+    price1p: z.number().min(0).nullable(),
+    cost2p: z.number().min(0).nullable(),
+    price2p: z.number().min(0).nullable(),
   })
   .partial()
-  .refine((d) => Object.keys(d).length > 0, "Provide at least one of cost, price, weight, weldAllowanceMm");
+  .refine((d) => Object.keys(d).length > 0, "Provide at least one editable field");
 
 catalogRouter.put(
   "/:systemId/parts/:kind/:partKey",
@@ -280,33 +286,45 @@ catalogRouter.post(
       prisma.cill.findMany({ where: { systemId }, select: { code: true, partKey: true } }),
     ]);
     type Target = { table: "profilePart" | "glass" | "gasket" | "hardware" | "cill"; kind?: PartKind; partKey: string };
-    const byCode = new Map<string, Target>();
-    for (const p of parts) byCode.set(p.code, { table: "profilePart", kind: p.kind, partKey: p.partKey });
-    for (const g of glass) byCode.set(g.code, { table: "glass", partKey: g.partKey });
-    for (const g of gaskets) byCode.set(g.code, { table: "gasket", partKey: g.partKey });
-    for (const h of hardware) byCode.set(h.code, { table: "hardware", partKey: h.partKey });
-    for (const c of cills) byCode.set(c.code, { table: "cill", partKey: c.partKey });
+    // One code can map to MULTIPLE catalog rows (e.g. frame-6ch and frame-french
+    // share SPQ-6-11252; transom-z-67 and midrail-67 share SPQ-005-30252). Index
+    // as code → Target[] and update ALL of them, so no row is silently skipped.
+    const byCode = new Map<string, Target[]>();
+    const push = (code: string, t: Target) => {
+      const list = byCode.get(code);
+      if (list) list.push(t);
+      else byCode.set(code, [t]);
+    };
+    for (const p of parts) push(p.code, { table: "profilePart", kind: p.kind, partKey: p.partKey });
+    for (const g of glass) push(g.code, { table: "glass", partKey: g.partKey });
+    for (const g of gaskets) push(g.code, { table: "gasket", partKey: g.partKey });
+    for (const h of hardware) push(h.code, { table: "hardware", partKey: h.partKey });
+    for (const c of cills) push(c.code, { table: "cill", partKey: c.partKey });
 
     const updates: Promise<unknown>[] = [];
     const unmatched: string[] = [];
+    let matchedRows = 0;
     for (const r of rows) {
-      const target = byCode.get(r.code);
-      if (!target) { unmatched.push(r.code); continue; }
+      const targets = byCode.get(r.code);
+      if (!targets || targets.length === 0) { unmatched.push(r.code); continue; }
+      matchedRows++;
       const data = { cost: r.cost, price: r.price };
-      if (target.table === "profilePart") {
-        updates.push(prisma.profilePart.updateMany({
-          where: { systemId, kind: target.kind, partKey: target.partKey }, data,
-        }));
-      } else {
-        // @ts-expect-error — delegate chosen dynamically; where/data shapes match.
-        updates.push(prisma[target.table].updateMany({
-          where: { systemId, partKey: target.partKey }, data,
-        }));
+      for (const target of targets) {
+        if (target.table === "profilePart") {
+          updates.push(prisma.profilePart.updateMany({
+            where: { systemId, kind: target.kind, partKey: target.partKey }, data,
+          }));
+        } else {
+          // @ts-expect-error — delegate chosen dynamically; where/data shapes match.
+          updates.push(prisma[target.table].updateMany({
+            where: { systemId, partKey: target.partKey }, data,
+          }));
+        }
       }
     }
     await prisma.$transaction(updates as any);
     await loadCatalog();
-    res.json({ ok: true, updated: rows.length - unmatched.length, unmatched });
+    res.json({ ok: true, updated: matchedRows, unmatched });
   }),
 );
 

@@ -38,6 +38,17 @@ export interface ProfileSection {
   weight: number;
   /** Financial category from your spec (e.g. "Frame – (Standard)"). */
   financialCategory: string;
+  /**
+   * Per-profile colour-tier prices (supplier price lists, M5.5). The supplier
+   * lists visible profiles in three absolute £-per-unit tiers: White (the
+   * `cost`/`price` above), "1P Colour 1P White" (foil one side), and "2P Colour"
+   * (foil both sides). When present, `computePricing` uses the 1P/2P price for a
+   * 1P/2P colour selection VERBATIM (no %-uplift stacking); each field may be
+   * absent (e.g. beads have no 1P row) ⇒ that tier falls back to base × the
+   * colour's %-uplift. Absent entirely ⇒ pre-M5.5 behaviour, byte-identical for
+   * White. Only colour-bearing parts (frame/sash/transom/bead) carry these.
+   */
+  tierPrices?: { cost1p?: number; price1p?: number; cost2p?: number; price2p?: number };
 }
 
 /** Glass profile data. */
@@ -152,6 +163,15 @@ export interface ColourOption {
    * grey profile fill (so base/unsetted colours render byte-identically).
    */
   hex?: string;
+  /**
+   * Which per-profile tier price (`ProfileSection.tierPrices`) this colour picks
+   * (M5.5). "1p" = foil one side, "2p" = foil both sides; absent ⇒ derive from
+   * isBase (base ⇒ no tier; any non-base single colour ⇒ 2P, both sides coloured).
+   * `solve.ts` sets this explicitly on the synthesized dual-colour option so an
+   * inside/outside pair resolves the right tier. When a part has no tier price for
+   * the resolved tier, pricing falls back to base × the %-uplift.
+   */
+  tier?: "1p" | "2p";
 }
 
 /**

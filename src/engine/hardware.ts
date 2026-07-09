@@ -135,7 +135,9 @@ export function computeHardware(
       } else {
         // sliding-slide-left / sliding-slide-right — per SLIDING panel.
         add("hw-patio-handle-white", 1, "patio handle");
-        add("hw-cylinder-brass", 1, "patio cylinder");
+        // Dedicated patio cylinder (GLIS-12) — NOT the door brass cylinder, which
+        // is a different (door) price. Keeps sliding pricing off the door line.
+        add("hw-patio-cylinder", 1, "patio cylinder");
         add("hw-patio-lock-keep", 1, "patio lock & keep set");
         add("hw-patio-roller", 2, "2 patio rollers per sliding panel");
         add("hw-panel-stopper", 1, "panel stopper");

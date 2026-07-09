@@ -132,7 +132,11 @@ export const SUNNYPLAST_70: ProfileSystem = {
   // ---------- SASHES ------------------------------------------------
   sashes: {
     "sash-t": {
-      code: "SPQ-T-SASH",
+      // Authentic code from the ANGLIA price list (Doc A, "T SASH 70MM
+      // internally glazed", SPQ-05-30252) AND the master fabrication PDF — both
+      // agree. Replaces the former "SPQ-T-SASH" placeholder. Priced White
+      // 2.80 / 1P 3.80 / 2P 4.80 £/m (Doc A) via the price-list import.
+      code: "SPQ-05-30252",
       name: "T Sash",
       faceWidth: 79,
       overlap: 28,              // sash extends 28mm into frame/transom rebate per side
@@ -144,7 +148,14 @@ export const SUNNYPLAST_70: ProfileSystem = {
       financialCategory: "Sash – (Standard)",
     },
     "sash-door-z": {
-      code: "SPQ-DOOR-Z",
+      // Physically the same "Z Door Sash inward opening 70mm" as the French Z
+      // leaf (sash-door-z-fr), so it now carries the authentic code SPQ-5-45252
+      // (Doc A) instead of the "SPQ-DOOR-Z" placeholder. Deliberate duplicate
+      // code (precedent: frame-6ch/frame-french); identical price tiers (White
+      // 4.40 / 1P 5.50 / 2P 6.70 £/m, Doc A) keep the by-code price lookup
+      // numerically unambiguous. Its reinforcement now resolves via the
+      // SPQ-5-45252 map entry (reinforcementMap below).
+      code: "SPQ-5-45252",
       name: "Door Sash Z",
       faceWidth: 105,
       overlap: 28,
@@ -282,12 +293,19 @@ export const SUNNYPLAST_70: ProfileSystem = {
   // ---------- BEADS -------------------------------------------------
   // NB: bead-28 must stay the FIRST entry — cells without an explicit beadKey
   // default to the first bead (topology.ts), and the calibrated casement /
-  // door jobs assert BEAD-28. Sliding pins bead-sl-24; French pins bead-32.
+  // door jobs assert SPQ-1-51252. Sliding pins bead-sl-24; French pins bead-32.
   // The loader orders parts by partKey (asc), so every OTHER bead key must
   // sort AFTER "bead-28" or it silently becomes the default bead.
   beads: {
     "bead-28": {
-      code: "BEAD-28",
+      // Authentic code SPQ-1-51252 ("Bead 28mm -Glass Holder", Doc A) replaces
+      // the "BEAD-28" placeholder. Same physical code as bead-sl-24 (both the
+      // 28mm glass-holder bead); duplicate code is safe (identical price tiers,
+      // never in one quote — casement uses bead-28, sliding pins bead-sl-24).
+      // Priced White 0.60 / 2P 1.50 £/m (Doc A has no 1P bead row ⇒ 1P falls
+      // back to the colour %-uplift). partKey "bead-28" MUST stay first — this
+      // only changes the code string, not the ordering.
+      code: "SPQ-1-51252",
       name: "28mm Bead",
       faceWidth: 20,            // bead face contribution per side (Ext-Int = 40 = 2x20)
       stickOut: 28,
@@ -458,8 +476,10 @@ export const SUNNYPLAST_70: ProfileSystem = {
   // ---------- WHICH PROFILE GETS WHICH REINFORCEMENT --------------
   // Keys are profile codes (must match the .code field above).
   reinforcementMap: {
-    "SPQ-T-SASH":      "reinf-28x24",        // casement sash
-    "SPQ-DOOR-Z":      "reinf-28x44.5-u",    // door sash
+    "SPQ-05-30252":    "reinf-28x24",        // casement T sash (was placeholder SPQ-T-SASH)
+    // NB: the door Z sash (sash-door-z) now shares code SPQ-5-45252 with the
+    // French Z leaf; its reinforcement is covered by the SPQ-5-45252 entry below,
+    // so the old "SPQ-DOOR-Z" key is gone.
     "SPQ-005-30252":   "reinf-13x29",        // Z-transom carries top-hung load (Job 85)
     "SPQ-5-30252":     "reinf-26x26-u",      // 78mm mullion when used full-height (Job 90)
     "SPQ-GL-10252":    "reinf-44x12",        // sliding frame: every bar reinforced (Jobs 44/48)
@@ -538,6 +558,53 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Glazing Accessories",
     },
+    // ---------- INFILL / DOOR PANELS (priced per m²) -----------------
+    // Solid panels used in place of glazing on door leaves — selectable via the
+    // same per-cell glassKey mechanism (they price per m² exactly like glass).
+    // Codes are synthesized (the PANEL PRICES doc prints none); prices come from
+    // that doc (Doc C, £/m² ex VAT) via the price-list import — 0 until then.
+    "panel-28-white": {
+      code: "PNL-28-W",
+      name: "White PVC Panel 28mm (1.3mm plaques + 3mm HDF)",
+      rebatePerSide: 0,
+      cost: 0, price: 0, per: "m2", weight: 0,
+      financialCategory: "Panels",
+    },
+    "panel-28-1p": {
+      code: "PNL-28-1P",
+      name: "PVC Panel 28mm — 1P Colour / 1P White",
+      rebatePerSide: 0,
+      cost: 0, price: 0, per: "m2", weight: 0,
+      financialCategory: "Panels",
+    },
+    "panel-28-2p": {
+      code: "PNL-28-2P",
+      name: "PVC Panel 28mm — 2P Colour",
+      rebatePerSide: 0,
+      cost: 0, price: 0, per: "m2", weight: 0,
+      financialCategory: "Panels",
+    },
+    "panel-hpl-1p": {
+      code: "PNL-HPL-1P",
+      name: "Laminated HPL Door Panel — 1P Std Colour / 1P White",
+      rebatePerSide: 0,
+      cost: 0, price: 0, per: "m2", weight: 0,
+      financialCategory: "Panels",
+    },
+    "panel-hpl-2p": {
+      code: "PNL-HPL-2P",
+      name: "Laminated HPL Door Panel — 2P Standard Colour",
+      rebatePerSide: 0,
+      cost: 0, price: 0, per: "m2", weight: 0,
+      financialCategory: "Panels",
+    },
+    "panel-28-alu": {
+      code: "PNL-28-ALU",
+      name: "White PVC Panel 28mm + 1mm Aluminium Sheet",
+      rebatePerSide: 0,
+      cost: 0, price: 0, per: "m2", weight: 0,
+      financialCategory: "Panels",
+    },
   },
 
   // ---------- HARDWARE ---------------------------------------------
@@ -592,19 +659,26 @@ export const SUNNYPLAST_70: ProfileSystem = {
     "hw-shootbolt":           { code: "FR-SHOOT",    name: "Shootbolt (Meeting Stile)",            cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Door Lock" },
 
     // Sliding patio — calibrated counts from Job 104 (yogi test 1–4). Per SLIDING
-    // panel: 1 handle, 1 cylinder (reuses hw-cylinder-brass), 1 lock&keep, 2 rollers,
-    // 1 panel stopper, 1 top + 1 bottom brush block. Per FIXED panel: 7 fixed-panel
-    // supports. Codes are PLACEHOLDERS pending authentic part numbers.
-    "hw-patio-handle-white":  { code: "SL-HDL-W",    name: "White Patio Handle",                   cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Handles" },
-    "hw-patio-lock-keep":     { code: "SL-LOCK-KEEP", name: "Patio Lock & Keep Set",               cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Locking" },
-    "hw-patio-roller":        { code: "SL-ROLLER",   name: "Ciilock Patio Roller",                 cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
-    "hw-panel-stopper":       { code: "SL-STOPPER",  name: "Panel Stopper",                        cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
-    "hw-fixed-panel-support": { code: "SL-FIX-SUP",  name: "Fixed Panel Support",                  cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
-    "hw-brush-top":           { code: "SL-BRUSH-T",  name: "Top Brush Block",                      cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
-    "hw-brush-bottom":        { code: "SL-BRUSH-B",  name: "Bottom Brush Block",                   cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    // panel: 1 handle, 1 cylinder, 1 lock&keep, 2 rollers, 1 panel stopper, 1 top +
+    // 1 bottom brush block. Per FIXED panel: 7 fixed-panel supports. Codes are the
+    // authentic Sliding-System price-list GLIS numbers (Doc D), priced via the
+    // import: GLIS 01 top brush 2.21, GLIS 02 bottom brush 1.92, GLIS 03 fixed
+    // support 0.37, GLIS 04 bump-stop 1.47 (pack of 2), GLIS 09 handle 14.74,
+    // GLIS 13 rolls 2.14. Lock+keep = GLIS 10 (14.74) + GLIS 11 (7.37) modelled
+    // as one set (import sums them). Cylinder = its own GLIS-12 row below (NOT the
+    // door brass cylinder — different price).
+    "hw-patio-handle-white":  { code: "GLIS-09",     name: "White Patio Handle",                   cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Handles" },
+    "hw-patio-lock-keep":     { code: "GLIS-10",     name: "Patio Lock & Keep Set",               cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Locking" },
+    "hw-patio-cylinder":      { code: "GLIS-12",     name: "Patio Cylinder",                       cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Cylinders" },
+    "hw-patio-roller":        { code: "GLIS-13",     name: "Ciilock Patio Roller",                 cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-panel-stopper":       { code: "GLIS-04",     name: "Panel Stopper (Bump Stop)",            cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-fixed-panel-support": { code: "GLIS-03",     name: "Fixed Panel Support",                  cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-brush-top":           { code: "GLIS-01",     name: "Top Brush Block",                      cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-brush-bottom":        { code: "GLIS-02",     name: "Bottom Brush Block",                   cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
     // APPROXIMATE count (like the glazing-bridge-packer rule): Bridge Packer. Job
     // 104 bridge-packer counts (8/14/14/16) are not cleanly geometry-derived, so
-    // this uses a simple per-panel estimate — flagged, tune with more jobs.
+    // this uses a simple per-panel estimate — flagged, tune with more jobs. No
+    // supplier price row (recorded-only) — stays £0.
     "hw-bridge-packer":       { code: "SL-BRDG-PK",  name: "Bridge Packer",                        cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Glazing Accessories" },
   },
 };

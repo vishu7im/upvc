@@ -11,6 +11,7 @@ import type { QuoteOutput } from "../types.ts";
 import { validateExtractor } from "../tools/extract-topology.test.ts";
 import { validatePricing } from "../engine/pricing.test.ts";
 import { validateSvg } from "../engine/svg.test.ts";
+import { validateSupplierPrices } from "./prices.test.ts";
 
 interface ExpectedBar {
   code: string;
@@ -49,20 +50,20 @@ const JOB_85: ExpectedJob = {
     // Z-transom
     { code: "SPQ-005-30252", ext: 1206, int: 1072, orientation: "H" },
     // Top sash (T Sash) — 1128 × 358.5 outer
-    { code: "SPQ-T-SASH", ext: 1128,  int: 970,    orientation: "H" }, // head
-    { code: "SPQ-T-SASH", ext: 1128,  int: 970,    orientation: "H" }, // sill
-    { code: "SPQ-T-SASH", ext: 358.5, int: 200.5,  orientation: "V" }, // left
-    { code: "SPQ-T-SASH", ext: 358.5, int: 200.5,  orientation: "V" }, // right
+    { code: "SPQ-05-30252", ext: 1128,  int: 970,    orientation: "H" }, // head
+    { code: "SPQ-05-30252", ext: 1128,  int: 970,    orientation: "H" }, // sill
+    { code: "SPQ-05-30252", ext: 358.5, int: 200.5,  orientation: "V" }, // left
+    { code: "SPQ-05-30252", ext: 358.5, int: 200.5,  orientation: "V" }, // right
     // Beads — top sash (970 × 200.5 inner)
-    { code: "BEAD-28", ext: 1010,  int: 970,   orientation: "H" }, // top×2 → recorded as Ext 1010
-    { code: "BEAD-28", ext: 1010,  int: 970,   orientation: "H" },
-    { code: "BEAD-28", ext: 240.5, int: 200.5, orientation: "V" },
-    { code: "BEAD-28", ext: 240.5, int: 200.5, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 1010,  int: 970,   orientation: "H" }, // top×2 → recorded as Ext 1010
+    { code: "SPQ-1-51252", ext: 1010,  int: 970,   orientation: "H" },
+    { code: "SPQ-1-51252", ext: 240.5, int: 200.5, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 240.5, int: 200.5, orientation: "V" },
     // Beads — bottom fixed (1072 × 702.5 cell daylight)
-    { code: "BEAD-28", ext: 1112,  int: 1072,  orientation: "H" },
-    { code: "BEAD-28", ext: 1112,  int: 1072,  orientation: "H" },
-    { code: "BEAD-28", ext: 742.5, int: 702.5, orientation: "V" },
-    { code: "BEAD-28", ext: 742.5, int: 702.5, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 1112,  int: 1072,  orientation: "H" },
+    { code: "SPQ-1-51252", ext: 1112,  int: 1072,  orientation: "H" },
+    { code: "SPQ-1-51252", ext: 742.5, int: 702.5, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 742.5, int: 702.5, orientation: "V" },
   ],
   glass: [
     // Top sash: bead Int 970×200.5 + 2×18.5 sash glass rebate = 1007 × 237.5 (Quotila rounds 237.5→238)
@@ -97,24 +98,24 @@ const JOB_88: ExpectedJob = {
     // T-transom
     { code: "SPQ-05-20252", ext: 806, int: 672, orientation: "H" },
     // Top sash (728 × 358.5 outer)
-    { code: "SPQ-T-SASH", ext: 728,   int: 570,   orientation: "H" },
-    { code: "SPQ-T-SASH", ext: 728,   int: 570,   orientation: "H" },
-    { code: "SPQ-T-SASH", ext: 358.5, int: 200.5, orientation: "V" },
-    { code: "SPQ-T-SASH", ext: 358.5, int: 200.5, orientation: "V" },
+    { code: "SPQ-05-30252", ext: 728,   int: 570,   orientation: "H" },
+    { code: "SPQ-05-30252", ext: 728,   int: 570,   orientation: "H" },
+    { code: "SPQ-05-30252", ext: 358.5, int: 200.5, orientation: "V" },
+    { code: "SPQ-05-30252", ext: 358.5, int: 200.5, orientation: "V" },
     // Bottom sash (728 × 758.5 outer)
-    { code: "SPQ-T-SASH", ext: 728,   int: 570,   orientation: "H" },
-    { code: "SPQ-T-SASH", ext: 728,   int: 570,   orientation: "H" },
-    { code: "SPQ-T-SASH", ext: 758.5, int: 600.5, orientation: "V" },
-    { code: "SPQ-T-SASH", ext: 758.5, int: 600.5, orientation: "V" },
+    { code: "SPQ-05-30252", ext: 728,   int: 570,   orientation: "H" },
+    { code: "SPQ-05-30252", ext: 728,   int: 570,   orientation: "H" },
+    { code: "SPQ-05-30252", ext: 758.5, int: 600.5, orientation: "V" },
+    { code: "SPQ-05-30252", ext: 758.5, int: 600.5, orientation: "V" },
     // Beads
-    { code: "BEAD-28", ext: 610,   int: 570,   orientation: "H" },
-    { code: "BEAD-28", ext: 610,   int: 570,   orientation: "H" },
-    { code: "BEAD-28", ext: 610,   int: 570,   orientation: "H" },
-    { code: "BEAD-28", ext: 610,   int: 570,   orientation: "H" },
-    { code: "BEAD-28", ext: 240.5, int: 200.5, orientation: "V" },
-    { code: "BEAD-28", ext: 240.5, int: 200.5, orientation: "V" },
-    { code: "BEAD-28", ext: 640.5, int: 600.5, orientation: "V" },
-    { code: "BEAD-28", ext: 640.5, int: 600.5, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 610,   int: 570,   orientation: "H" },
+    { code: "SPQ-1-51252", ext: 610,   int: 570,   orientation: "H" },
+    { code: "SPQ-1-51252", ext: 610,   int: 570,   orientation: "H" },
+    { code: "SPQ-1-51252", ext: 610,   int: 570,   orientation: "H" },
+    { code: "SPQ-1-51252", ext: 240.5, int: 200.5, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 240.5, int: 200.5, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 640.5, int: 600.5, orientation: "V" },
+    { code: "SPQ-1-51252", ext: 640.5, int: 600.5, orientation: "V" },
   ],
   glass: [
     { width: 607, height: 237.5 },
@@ -149,10 +150,10 @@ const JOB_90: ExpectedJob = {
     { code: "SPQ-5-30252", ext: 749,  int: 593,  orientation: "H" },  // top-left transom
     { code: "SPQ-5-30252", ext: 749,  int: 593,  orientation: "H" },  // top-right transom
     // Door sash (649 × 1549)
-    { code: "SPQ-DOOR-Z", ext: 649,  int: 439,  orientation: "H" },
-    { code: "SPQ-DOOR-Z", ext: 649,  int: 439,  orientation: "H" },
-    { code: "SPQ-DOOR-Z", ext: 1549, int: 1339, orientation: "V" },
-    { code: "SPQ-DOOR-Z", ext: 1549, int: 1339, orientation: "V" },
+    { code: "SPQ-5-45252", ext: 649,  int: 439,  orientation: "H" },
+    { code: "SPQ-5-45252", ext: 649,  int: 439,  orientation: "H" },
+    { code: "SPQ-5-45252", ext: 1549, int: 1339, orientation: "V" },
+    { code: "SPQ-5-45252", ext: 1549, int: 1339, orientation: "V" },
   ],
   glass: [
     // Top-left fixed (cell 593 × 293): 593+30 × 293+30 = 623 × 323
@@ -229,11 +230,11 @@ const JOB_44_ANDREI: ExpectedJob = {
   glass: [{ width: 809, height: 1874 }], // doc "Gol 24mm 809 × 1874" ×2
   gaskets: [{ code: "GKT-02", lengthMm: 10732 }], // Σ glass perimeter (formula; not on the doc)
   hardware: [
-    { code: "SL-FIX-SUP",   qty: 7 },  // 1 fixed panel × 7
-    { code: "SL-HDL-W",     qty: 1 },  // 1 slider
-    { code: "DR-CYL-BR",    qty: 1 },
-    { code: "SL-LOCK-KEEP", qty: 1 },
-    { code: "SL-ROLLER",    qty: 2 },
+    { code: "GLIS-03",   qty: 7 },  // 1 fixed panel × 7
+    { code: "GLIS-09",     qty: 1 },  // 1 slider
+    { code: "GLIS-12",    qty: 1 },
+    { code: "GLIS-10", qty: 1 },
+    { code: "GLIS-13",    qty: 2 },
   ],
 };
 
@@ -269,11 +270,11 @@ const JOB_48_ANDREI: ExpectedJob = {
   glass: [{ width: 964, height: 2084 }], // doc "Gol 24mm 964 × 2084" ×2
   gaskets: [{ code: "GKT-02", lengthMm: 12192 }],
   hardware: [
-    { code: "SL-FIX-SUP",   qty: 7 },
-    { code: "SL-HDL-W",     qty: 1 },
-    { code: "DR-CYL-BR",    qty: 1 },
-    { code: "SL-LOCK-KEEP", qty: 1 },
-    { code: "SL-ROLLER",    qty: 2 },
+    { code: "GLIS-03",   qty: 7 },
+    { code: "GLIS-09",     qty: 1 },
+    { code: "GLIS-12",    qty: 1 },
+    { code: "GLIS-10", qty: 1 },
+    { code: "GLIS-13",    qty: 2 },
   ],
 };
 
@@ -304,11 +305,11 @@ const JOB_SL_OX: ExpectedJob = {
   glass: [{ width: 609, height: 1524 }],
   gaskets: [{ code: "GKT-02", lengthMm: 8532 }],
   hardware: [
-    { code: "SL-FIX-SUP",   qty: 7 },
-    { code: "SL-HDL-W",     qty: 1 },
-    { code: "DR-CYL-BR",    qty: 1 },
-    { code: "SL-LOCK-KEEP", qty: 1 },
-    { code: "SL-ROLLER",    qty: 2 },
+    { code: "GLIS-03",   qty: 7 },
+    { code: "GLIS-09",     qty: 1 },
+    { code: "GLIS-12",    qty: 1 },
+    { code: "GLIS-10", qty: 1 },
+    { code: "GLIS-13",    qty: 2 },
   ],
 };
 
@@ -341,9 +342,9 @@ const JOB_SL_OXO: ExpectedJob = {
   glass: [{ width: 524, height: 1524 }],
   gaskets: [{ code: "GKT-02", lengthMm: 12288 }],
   hardware: [
-    { code: "SL-FIX-SUP", qty: 14 }, // 2 fixed panels × 7
-    { code: "SL-HDL-W",   qty: 1 },  // 1 slider
-    { code: "SL-ROLLER",  qty: 2 },
+    { code: "GLIS-03", qty: 14 }, // 2 fixed panels × 7
+    { code: "GLIS-09",   qty: 1 },  // 1 slider
+    { code: "GLIS-13",  qty: 2 },
   ],
 };
 
@@ -368,9 +369,9 @@ const JOB_SL_OXXO: ExpectedJob = {
   glass: [{ width: 523.8, height: 1524 }],
   gaskets: [{ code: "GKT-02", lengthMm: 16382 }],
   hardware: [
-    { code: "SL-FIX-SUP", qty: 14 }, // 2 fixed panels × 7
-    { code: "SL-HDL-W",   qty: 2 },  // 2 sliders
-    { code: "SL-ROLLER",  qty: 4 },  // 2 per slider
+    { code: "GLIS-03", qty: 14 }, // 2 fixed panels × 7
+    { code: "GLIS-09",   qty: 2 },  // 2 sliders
+    { code: "GLIS-13",  qty: 4 },  // 2 per slider
   ],
 };
 
@@ -712,7 +713,7 @@ function validateWeldMath(): void {
   expect("transom weldedExtMm = 1211", transom?.weldedExtMm ?? -1, 1211);
 
   // Bead (square "[ - ]", allowance 0): no welds, welded == finished.
-  const bead = job85.parts.bars.find((b) => b.code === "BEAD-28");
+  const bead = job85.parts.bars.find((b) => b.code === "SPQ-1-51252");
   expect("bead weldedEndCount = 0", bead?.weldedEndCount ?? -1, 0);
   expect("bead weldedExtMm == extMm", bead?.weldedExtMm ?? -1, bead?.extMm ?? -2);
 
@@ -836,6 +837,7 @@ function validateColourAndJoints(): void {
   validateExtractor(expect);
   validatePricing(expect);
   validateSvg(expect);
+  validateSupplierPrices(expect);
 
   console.log("\n==================================================");
   console.log(`RESULTS:  ${passCount} passed,  ${failCount} failed`);
