@@ -215,6 +215,9 @@ const newColourSchema = z.object({
   priceUpliftPct: z.number().min(0).optional(),
   isBase: z.boolean().optional(),
   hex: z.string().regex(/^#[0-9a-fA-F]{6}$/, "hex must be like #353b3f").optional(),
+  // Surface texture for the realistic preview only. A supplier fact about the
+  // foil, so it is entered here rather than guessed from the swatch colour.
+  texture: z.enum(["woodgrain"]).nullable().optional(),
 });
 
 catalogRouter.post(
@@ -237,6 +240,7 @@ catalogRouter.post(
         priceUpliftPct: b.priceUpliftPct ?? 0,
         isBase: b.isBase ?? false,
         hex: b.hex ?? null,
+        texture: b.texture ?? null,
       },
     });
     await loadCatalog();
@@ -252,6 +256,7 @@ const editColourSchema = z
     priceUpliftPct: z.number().min(0),
     isBase: z.boolean(),
     hex: z.string().regex(/^#[0-9a-fA-F]{6}$/, "hex must be like #353b3f"),
+    texture: z.enum(["woodgrain"]).nullable(),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, "Provide at least one field to update");

@@ -49,6 +49,8 @@ export const MODULES: ModuleDef[] = [
   // customers has no page yet ⇒ navPath null (permission-only until a page lands).
   { slug: "customers", name: "Customers", navPath: null, navIcon: "customers", category: "Sales", sortOrder: 35 },
   { slug: "orders", name: "Orders", navPath: "/orders", navIcon: "orders", category: "Sales", sortOrder: 40 },
+  // Commercial (not catalog) data: discount codes applied to an order basket.
+  { slug: "discounts", name: "Discounts", navPath: "/admin/discounts", navIcon: "discounts", category: "Sales", sortOrder: 50 },
   { slug: "catalog", name: "Catalog", navPath: "/admin/catalog", navIcon: "catalog", category: "Administration", sortOrder: 60 },
   { slug: "settings", name: "Settings", navPath: "/admin/settings", navIcon: "settings", category: "Administration", sortOrder: 70 },
   { slug: "users", name: "Users", navPath: "/admin/users", navIcon: "users", category: "Administration", sortOrder: 80 },

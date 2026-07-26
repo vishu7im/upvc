@@ -224,7 +224,7 @@ function PriceRow({
     }
   }
 
-  const inp = "h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-right text-sm focus:border-[#4442e3] focus:ring-4 focus:ring-[#4442e3]/10";
+  const inp = "h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-right text-sm focus:border-[#4442e3] focus:outline-none focus:ring-[3px] focus:ring-[#4442e3]/12";
 
   return (
     <tr className={err ? "bg-red-50" : "transition hover:bg-slate-50"}>
@@ -390,6 +390,7 @@ function Colours({
               <th className={thClass}>Key</th>
               <th className={thClass}>Name</th>
               <th className={thClass + " w-20"}>Swatch</th>
+              <th className={thClass + " w-32"}>Texture</th>
               <th className={thClass + " w-36 text-right"}>Cost uplift %</th>
               <th className={thClass + " w-36 text-right"}>Price uplift %</th>
               <th className={thClass + " w-24"} />
@@ -433,17 +434,24 @@ function ColourRow({
   const [costPct, setCostPct] = useState(colour.costUpliftPct);
   const [pricePct, setPricePct] = useState(colour.priceUpliftPct);
   const [hex, setHex] = useState(colour.hex ?? "#e6e6e6");
+  const [texture, setTexture] = useState<"" | "woodgrain">(colour.texture ?? "");
   const [busy, setBusy] = useState(false);
   const dirty =
     costPct !== colour.costUpliftPct ||
     pricePct !== colour.priceUpliftPct ||
-    hex !== (colour.hex ?? "#e6e6e6");
-  const inp = "h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-right text-sm focus:border-[#4442e3] focus:ring-4 focus:ring-[#4442e3]/10";
+    hex !== (colour.hex ?? "#e6e6e6") ||
+    texture !== (colour.texture ?? "");
+  const inp = "h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-right text-sm focus:border-[#4442e3] focus:outline-none focus:ring-[3px] focus:ring-[#4442e3]/12";
 
   async function save() {
     setBusy(true);
     try {
-      await updateColour(systemId, colour.key, { costUpliftPct: costPct, priceUpliftPct: pricePct, hex });
+      await updateColour(systemId, colour.key, {
+        costUpliftPct: costPct,
+        priceUpliftPct: pricePct,
+        hex,
+        texture: texture === "" ? null : texture,
+      });
       onSaved();
     } finally {
       setBusy(false);
@@ -458,7 +466,21 @@ function ColourRow({
       </td>
       <td className={tdClass + " font-semibold text-slate-900"}>{colour.name}</td>
       <td className={tdClass}>
-        <input type="color" value={hex} onChange={(e) => setHex(e.target.value)} className="h-8 w-12 cursor-pointer rounded border border-slate-300" title="Display swatch" />
+        <input type="color" value={hex} onChange={(e) => setHex(e.target.value)} className="h-8 w-12 cursor-pointer rounded border border-slate-200" title="Display swatch" />
+      </td>
+      <td className={tdClass}>
+        {/* Whether the foil is grained is a supplier fact, so it is entered
+            here rather than guessed from the swatch colour. It drives the
+            realistic PREVIEW only — no price, no BOM line, no document. */}
+        <select
+          value={texture}
+          onChange={(e) => setTexture(e.target.value as "" | "woodgrain")}
+          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm focus:border-[#4442e3] focus:outline-none focus:ring-[3px] focus:ring-[#4442e3]/12"
+          title="Surface texture used by the realistic preview"
+        >
+          <option value="">Smooth</option>
+          <option value="woodgrain">Woodgrain</option>
+        </select>
       </td>
       <td className={tdClass}>
         <input type="number" step="0.1" value={costPct} onChange={(e) => setCostPct(+e.target.value)} className={inp} />

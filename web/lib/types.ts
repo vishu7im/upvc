@@ -195,6 +195,53 @@ export interface QuoteResult {
   pricing: { currency: string; lines: QuoteLine[]; totals: QuoteTotals };
 }
 
+// ---------- Basket / commercial layer (D6) ---------------------------
+
+export type FittingType = "none" | "fit" | "fit-and-survey";
+
+export interface BasketLine {
+  id: string;
+  kind: "legacy" | "designer";
+  label: string;
+  qty: number;
+  unitNetPrice: number;
+  lineNetPrice: number;
+  errorCount: number;
+}
+
+/** `computeBasket()` output — the one place order money is derived. */
+export interface BasketTotals {
+  currency: string;
+  lines: BasketLine[];
+  linesSubtotal: number;
+  itemsAdjustment: number;
+  itemsSubtotal: number;
+  discount: number;
+  discountCode: string | null;
+  discountKind: "percent" | "fixed" | null;
+  discountValue: number | null;
+  fittingType: FittingType;
+  fitting: number;
+  survey: number;
+  delivery: number;
+  extras: number;
+  taxableBase: number;
+  taxRatePct: number;
+  tax: number;
+  grandTotal: number;
+}
+
+/** GET /api/discounts row. */
+export interface DiscountCodeRow {
+  code: string;
+  kind: "percent" | "fixed";
+  value: number;
+  active: boolean;
+  validFrom: string | null;
+  validTo: string | null;
+  createdAt: string;
+}
+
 /** GET /api/orders — list row. */
 export interface OrderSummary {
   id: string;
@@ -203,8 +250,10 @@ export interface OrderSummary {
   reference: string | null;
   status: "draft" | "confirmed";
   totalPrice: number | null;
+  /** Basket grand total: live for drafts, frozen snapshot for confirmed (D6). */
+  basketTotal?: number | null;
   createdAt: string;
-  _count?: { items: number; documents: number };
+  _count?: { items: number; designerItems?: number; documents: number };
 }
 
 /** GET /api/orders/:id — full order. */
@@ -223,7 +272,17 @@ export interface OrderItem {
 }
 export interface OrderDetail extends OrderSummary {
   items: OrderItem[];
+  /** Designer line items (D2) — coexist with legacy `items` on the same order. */
+  designerItems?: DesignerItemRow[];
   documents: { type: string; variant: string; createdAt: string }[];
+  /** Commercial layer (D6): live for drafts, frozen snapshot once confirmed. */
+  basket?: BasketTotals;
+  fittingType?: FittingType | null;
+  fittingPrice?: number | null;
+  surveyPrice?: number | null;
+  deliveryCharge?: number | null;
+  discountCode?: string | null;
+  taxRatePct?: number | null;
 }
 
 // ---------- Admin (U5) -----------------------------------------------
@@ -269,6 +328,11 @@ export interface CatalogColour {
   isBase: boolean;
   /** Display swatch hex (e.g. "#353b3f"); null/absent ⇒ grey preview. */
   hex?: string | null;
+  /**
+   * Surface texture used by the realistic preview only ("woodgrain"). Supplier
+   * fact, never inferred from the hex; absent ⇒ rendered smooth.
+   */
+  texture?: "woodgrain" | null;
 }
 export interface CatalogCill {
   key: string;
@@ -352,6 +416,256 @@ export interface RoleDetail extends RoleSummary {
 export interface MetaPermissions {
   modules: { slug: string; name: string; navPath: string | null; category: string | null; sortOrder: number }[];
   actions: { slug: string; name: string }[];
+}
+
+// ---------- Designer (Phase 3 / D3) ----------------------------------
+//
+// Mirrors of the server contracts in src/designer/option-types.ts and
+// src/designer/line-item-types.ts — only the fields the UI consumes. Same repo
+// convention as the rest of this file: we do NOT import from root ../src.
+
+export type DesignerComponentType =
+  | "frame-edge"
+  | "transom"
+  | "mullion"
+  | "sash"
+  | "glass"
+  | "panel"
+  | "cill"
+  | "addon";
+
+export type OptionDisplay =
+  | "select"
+  | "select-image"
+  | "segmented"
+  | "toggle"
+  | "number"
+  | "text"
+  | "action";
+
+export type ApplyScope = "this" | "all-of-type";
+export type SplitMode = "byDimensions" | "equalSplit" | "equalGlass";
+
+export interface FamilyDimension {
+  key: string;
+  label: string;
+  unit: "mm";
+  required: boolean;
+  min: number;
+  max: number;
+  defaultFrom?: "design";
+  /** true ⇒ recorded on documents, no engine effect. */
+  informational?: boolean;
+}
+
+/** GET /api/families/:key → `family` (the fields the designer renders from). */
+export interface FamilyDescriptor {
+  familyKey: string;
+  name: string;
+  status: "active" | "hidden" | "deprecated";
+  systemIds: string[];
+  designSource: { mode: string; productIds?: string[] };
+  dimensions: FamilyDimension[];
+  splitModes: SplitMode[];
+  viewModes: string[];
+  engine: { adapter: string; quotable: boolean };
+  /** Which conversions the Component-type control may offer (phase 4). */
+  componentConversions?: { from: DesignerComponentType; to: DesignerComponentType[] }[];
+  componentTypes?: { type: DesignerComponentType; sides?: string[]; kinds?: string[] }[];
+}
+
+export interface OptionChoice {
+  key: string;
+  optionKey: string;
+  label: string;
+  order: number;
+  isDefault: boolean;
+  filterKeys?: string[];
+  image?: { kind: string; ref: string };
+  swatchHex?: string;
+  partKey?: string;
+  /**
+   * Which engine slot this choice drives (option-schema.md's closed enum). The
+   * UI reads only `kind`/`params` — e.g. to know a choice is the OUTSIDE colour
+   * without matching on option keys.
+   */
+  engineEffect?: { kind: string; params?: Record<string, string | number | boolean> };
+}
+
+export interface OptionDef {
+  key: string;
+  groupKey: string;
+  name: string;
+  order: number;
+  display: OptionDisplay;
+  required: boolean;
+  scope: {
+    level: "item" | "component";
+    componentTypes?: DesignerComponentType[];
+    applyScopes?: ApplyScope[];
+  };
+  filters?: { key: string; label: string }[];
+  validation?: { min?: number; max?: number; regex?: string; maxLength?: number };
+  presentation?: {
+    omitFromSummary?: boolean;
+    omitFromDocuments?: boolean;
+    helpText?: string;
+    suggestions?: string[];
+  };
+  pricingMode: "catalog" | "none";
+  /**
+   * `display: "action"` only — the TopologyEdit this instant action performs,
+   * with `componentId` left out (the designer fills it from the selection).
+   */
+  action?: TopologyEditTemplate;
+  choices: OptionChoice[];
+}
+
+/** A structural edit as the draft stores it (mirror of designer/option-types.ts). */
+export type TopologyEdit =
+  | {
+      op: "split";
+      componentId: string;
+      axis: "horizontal" | "vertical";
+      position: "equal" | "at-ratio";
+      atRatio?: number;
+      dividerKey?: string;
+    }
+  | {
+      op: "add-midrail";
+      componentId: string;
+      position: "equal" | "at-ratio";
+      atRatio?: number;
+      transomKey?: string;
+    }
+  | { op: "convert-component"; componentId: string; to: DesignerComponentType; kind?: string }
+  | { op: "set-sash-kind"; componentId: string; kind: string }
+  | { op: "remove-divider"; componentId: string };
+
+/** The same edit with its target omitted — what an action option carries. */
+export type TopologyEditTemplate =
+  | Omit<Extract<TopologyEdit, { op: "split" }>, "componentId">
+  | Omit<Extract<TopologyEdit, { op: "add-midrail" }>, "componentId">
+  | Omit<Extract<TopologyEdit, { op: "convert-component" }>, "componentId">
+  | Omit<Extract<TopologyEdit, { op: "set-sash-kind" }>, "componentId">
+  | Omit<Extract<TopologyEdit, { op: "remove-divider" }>, "componentId">;
+
+export interface OptionGroupWithOptions {
+  key: string;
+  name: string;
+  order: number;
+  icon?: string;
+  defaultCollapsed: boolean;
+  scope: "item" | "component" | "mixed";
+  options: OptionDef[];
+}
+
+/** GET /api/families/:key */
+export interface FamilyResponse {
+  family: FamilyDescriptor;
+  optionSystem: { groups: OptionGroupWithOptions[] };
+}
+
+/** GET /api/families */
+export interface FamilySummary {
+  familyKey: string;
+  name: string;
+  status: string;
+  systemIds: string[];
+}
+
+export interface DraftSelection {
+  optionKey: string;
+  choiceKey?: string;
+  value?: string | number | boolean;
+  scope?: string;
+  appliedVia?: ApplyScope;
+}
+
+export interface DraftTopologyEdit {
+  id: string;
+  edit: TopologyEdit;
+}
+
+/**
+ * An addressable component of the solved geometry (`ResolvedLineItem.components`).
+ * `componentId` is position-derived and stable across re-solves — which is what
+ * lets a canvas selection and a component-scoped answer survive a resize.
+ */
+export interface ComponentRef {
+  componentId: string;
+  type: DesignerComponentType;
+  label: string;
+  /** Hit-test rect in window mm coordinates (same space as QuoteGeometry). */
+  rect: Rect;
+  path: string;
+  /** Sash kind / divider joint type — refines `type`. */
+  kind?: string;
+}
+
+/** The authoritative user intent — POSTed to /api/line-items/resolve verbatim. */
+export interface LineItemDraft {
+  schemaVersion: number;
+  familyKey: string;
+  systemId: string;
+  designId: string;
+  quantity: number;
+  location?: string;
+  dimensions: Record<string, number>;
+  splitMode?: SplitMode;
+  splitRatios?: Record<string, number>;
+  topologyEdits?: DraftTopologyEdit[];
+  selections?: DraftSelection[];
+}
+
+export interface LineItemIssue {
+  severity: "warning" | "error";
+  kind: string;
+  message: string;
+  optionKey?: string;
+  scope?: string;
+  dimensionKey?: string;
+  constraintId?: string;
+  editId?: string;
+  source?: string;
+}
+
+export interface ResolvedSummary {
+  sizeLabel: string;
+  colourLabel?: string;
+  locationLabel?: string;
+  leafCount: number;
+  glassSizes: { componentId: string; wMm: number; hMm: number }[];
+}
+
+/** POST /api/line-items/resolve → the computed view of a draft. */
+export interface ResolvedLineItem {
+  resolvedAt: string;
+  catalogVersion: string;
+  issues: LineItemIssue[];
+  invalidDimensions: boolean;
+  invalidSpec: boolean;
+  pricing?: { currency: string; lines: QuoteLine[]; totals: QuoteTotals };
+  summary?: ResolvedSummary;
+  /** `external` always; the others only when the request asked for them (phase 5). */
+  geometrySvg?: { external?: string; internal?: string; schematic?: string };
+  /** Solved rects (no `svg` — that's geometrySvg.external). */
+  geometry?: Omit<QuoteGeometry, "svg">;
+  /** Addressable components for canvas hit-testing + scoped options (phase 4). */
+  components?: ComponentRef[];
+}
+
+/** GET /api/orders/:id → designerItems[] (draft + light resolve projection). */
+export interface DesignerItemRow {
+  id: string;
+  position: number;
+  draft: LineItemDraft;
+  catalogVersion: string | null;
+  summary: ResolvedSummary | null;
+  issues: LineItemIssue[];
+  invalidSpec: boolean;
+  invalidDimensions: boolean;
+  totals: QuoteTotals | null;
 }
 
 /** GET /api/catalog/:systemId — full priced dump (admin). */

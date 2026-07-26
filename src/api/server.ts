@@ -19,14 +19,18 @@ import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { solve } from "../engine/solve.ts";
+import { checkSizeLimits } from "../engine/limits.ts";
 import { loadCatalog, refreshSystemCatalog, listSystems, listDesigns, getSystem } from "../catalog/index.ts";
 import { prisma } from "../db/client.ts";
 import { authRouter } from "./auth.ts";
 import { productsRouter } from "./products.ts";
 import { designsRouter } from "./designs.ts";
+import { familiesRouter } from "./families.ts";
+import { lineItemsRouter } from "./lineitems.ts";
 import { ordersRouter } from "./orders.ts";
 import { settingsRouter } from "./settings.ts";
 import { catalogRouter } from "./catalog.ts";
+import { discountsRouter } from "./discounts.ts";
 import { usersRouter } from "./users.ts";
 import { rolesRouter } from "./roles.ts";
 import { metaRouter } from "./meta.ts";
@@ -87,6 +91,7 @@ app.get("/api/systems/:id/options", asyncHandler(async (req, res) => {
       name: c.name,
       priceUpliftPct: c.priceUpliftPct,
       ...(c.hex ? { hex: c.hex } : {}),
+      ...(c.texture ? { texture: c.texture } : {}),
     })),
     cills: Object.values(sys.cills ?? {}).map((c) => ({
       key: c.key,
@@ -118,7 +123,12 @@ app.post("/api/quote", (req, res) => {
     }
     if (!input.orderNo) input.orderNo = "Q-" + Date.now();
     if (!input.customer) input.customer = "Customer";
-    res.json(solve(input));
+    const out = solve(input);
+    // ADVISORY size/weight check (migration phase-4, HAWDIO p70/p71). Purely
+    // additive: `solve()` is untouched, nothing here can change a cut size or
+    // price, and an oversize quote is still returned in full — the fabricator
+    // decides. Empty array when everything is within the printed maxima.
+    res.json({ ...out, limitIssues: checkSizeLimits(out.geometry) });
   } catch (err: any) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -147,6 +157,15 @@ app.post("/api/quote/document", (req, res) => {
   }
 });
 
+// Designer platform: product families + the JSON option system. The two GET
+// routes are public (no supplier costs — same split as /api/systems/:id/options);
+// the PATCH routes inside the router carry their own auth + permission guards.
+app.use("/api/families", familiesRouter);
+
+// Designer stateless resolve (phase 2) — public like /api/quote: it powers the
+// live designer preview and neither reads nor writes order state.
+app.use("/api/line-items", lineItemsRouter);
+
 // ---- Authenticated flow routers -------------------------------------
 
 app.use("/api/auth", authRouter);
@@ -155,6 +174,7 @@ app.use("/api/designs", requireAuth, designsRouter); // only defines "/:id"
 app.use("/api/orders", requireAuth, ordersRouter);
 app.use("/api/settings", settingsRouter); // per-route admin guards inside
 app.use("/api/catalog", catalogRouter); // admin-only (guards inside the router)
+app.use("/api/discounts", discountsRouter); // per-route requirePermission("discounts", …)
 app.use("/api/users", usersRouter); // per-route requirePermission("users", …)
 app.use("/api/roles", rolesRouter); // per-route requirePermission("roles", …)
 app.use("/api/meta", metaRouter); // requireAuth-only metadata for the grid editor

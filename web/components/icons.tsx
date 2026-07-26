@@ -16,6 +16,7 @@ export type IconName =
   | "document"
   | "download"
   | "filter"
+  | "info"
   | "logout"
   | "menu"
   | "orders"
@@ -25,6 +26,7 @@ export type IconName =
   | "search"
   | "settings"
   | "spark"
+  | "tag"
   | "trash"
   | "user"
   | "x";
@@ -132,6 +134,13 @@ const icons: Record<IconName, ReactNode> = {
       <path d="M10 18h4" />
     </>
   ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </>
+  ),
   logout: (
     <>
       <path d="M10 17l5-5-5-5" />
@@ -193,6 +202,12 @@ const icons: Record<IconName, ReactNode> = {
   spark: (
     <>
       <path d="m13 2-2 7-7 2 7 2 2 7 2-7 7-2-7-2-2-7Z" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M20.6 13.4 12 4.8H4.8V12l8.6 8.6a1.7 1.7 0 0 0 2.4 0l4.8-4.8a1.7 1.7 0 0 0 0-2.4Z" />
+      <path d="M8.5 8.5h.01" />
     </>
   ),
   trash: (

@@ -21,6 +21,11 @@ export interface DesignCardProps {
   productId: string;
   /** When set, the configurator appends the item to this draft order. */
   orderId?: string;
+  /**
+   * Set when this product's family is registered with the Designer (D1/D3);
+   * adds the "Design in studio" action alongside the legacy "Configure".
+   */
+  designerFamilyKey?: string;
 }
 
 export default function DesignCard({
@@ -32,10 +37,15 @@ export default function DesignCard({
   systemId,
   productId,
   orderId,
+  designerFamilyKey,
 }: DesignCardProps) {
   const params = new URLSearchParams({ systemId, designId, productId, name });
   if (orderId) params.set("orderId", orderId);
   const configureHref = `/quote?${params.toString()}`;
+
+  const studioParams = new URLSearchParams({ family: designerFamilyKey ?? "", design: designId, system: systemId, name });
+  if (orderId) studioParams.set("orderId", orderId);
+  const studioHref = `/designer?${studioParams.toString()}`;
   const previewSvg = svg ? normalizeSvgForPreview(svg) : null;
 
   return (
@@ -79,15 +89,26 @@ export default function DesignCard({
         </Badge>
       </div>
       {quotable ? (
-        <Link
-          href={configureHref}
-          className={cn(
-            "mx-4 mb-4 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0f172a] px-3 text-sm font-semibold text-white transition hover:bg-[#172033]",
+        <div className="mx-4 mb-4 flex flex-col gap-2">
+          <Link
+            href={configureHref}
+            className={cn(
+              "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0f172a] px-3 text-sm font-semibold text-white transition hover:bg-[#172033]",
+            )}
+          >
+            <Icon name="quote" className="h-4 w-4" />
+            {orderId ? "Configure and add" : "Configure"}
+          </Link>
+          {designerFamilyKey && (
+            <Link
+              href={studioHref}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-[#4442e3]/50 hover:text-[#4442e3]"
+            >
+              <Icon name="spark" className="h-4 w-4" />
+              Design in studio
+            </Link>
           )}
-        >
-          <Icon name="quote" className="h-4 w-4" />
-          {orderId ? "Configure and add" : "Configure"}
-        </Link>
+        </div>
       ) : (
         <div className="mx-4 mb-4 inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-400">
           <Icon name="products" className="h-4 w-4" />

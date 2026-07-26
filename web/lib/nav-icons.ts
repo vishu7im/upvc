@@ -12,6 +12,7 @@ const MAP: Record<string, IconName> = {
   quote: "quote",
   customers: "user",
   orders: "orders",
+  discounts: "tag",
   catalog: "catalog",
   settings: "settings",
   users: "user",

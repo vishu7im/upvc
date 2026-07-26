@@ -1,3 +1,16 @@
+// =====================================================================
+// Dashboard.
+//
+// Everything on this page is REAL. It used to draw a hardcoded 12-bar chart
+// and a three-service "system health" list that were decoration; a dashboard
+// that invents numbers is worse than one that shows none, because you cannot
+// tell which panels to trust. The chart is now monthly confirmed-order value
+// from the orders API, the health panel reports things actually observed
+// (engine reachable, catalog loaded, documents generated), and every money
+// figure is the BASKET total — the same number the order page and the Price
+// Summary show.
+// =====================================================================
+
 import Link from "next/link";
 import { getCurrentUser, serverApiGet } from "@/lib/server-api";
 import type { OrderSummary, Paginated, ProductSummary, SystemSummary } from "@/lib/types";
@@ -18,7 +31,36 @@ import { StatusBadge } from "./orders/page";
 
 export const dynamic = "force-dynamic";
 
-const chartBars = [34, 42, 38, 54, 62, 58, 74, 68, 82, 77, 88, 92];
+/** How many months of history the chart shows. */
+const MONTHS = 6;
+
+const orderTotal = (o: OrderSummary): number => o.basketTotal ?? o.totalPrice ?? 0;
+const itemCount = (o: OrderSummary): number =>
+  (o._count?.items ?? 0) + (o._count?.designerItems ?? 0);
+
+/** Confirmed-order value per calendar month, oldest first. */
+function monthlyValue(orders: OrderSummary[]): { label: string; value: number; count: number }[] {
+  const now = new Date();
+  const buckets: { label: string; key: string; value: number; count: number }[] = [];
+  for (let i = MONTHS - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    buckets.push({
+      label: d.toLocaleDateString("en-GB", { month: "short" }),
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      value: 0,
+      count: 0,
+    });
+  }
+  for (const o of orders) {
+    if (o.status !== "confirmed") continue;
+    const d = new Date(o.createdAt);
+    const bucket = buckets.find((b) => b.key === `${d.getFullYear()}-${d.getMonth()}`);
+    if (!bucket) continue;
+    bucket.value += orderTotal(o);
+    bucket.count += 1;
+  }
+  return buckets.map(({ label, value, count }) => ({ label, value, count }));
+}
 
 export default async function Dashboard() {
   const user = await getCurrentUser();
@@ -26,7 +68,8 @@ export default async function Dashboard() {
   const [systemsResult, productsResult, ordersResult] = await Promise.allSettled([
     serverApiGet<SystemSummary[]>("/api/systems"),
     serverApiGet<Paginated<ProductSummary>>("/api/products?page=1&limit=6"),
-    serverApiGet<Paginated<OrderSummary>>("/api/orders?page=1&limit=5"),
+    // A wider window than the table needs: the chart buckets it by month.
+    serverApiGet<Paginated<OrderSummary>>("/api/orders?page=1&limit=100"),
   ]);
 
   const systems = systemsResult.status === "fulfilled" ? systemsResult.value : null;
@@ -34,11 +77,17 @@ export default async function Dashboard() {
   const orders = ordersResult.status === "fulfilled" ? ordersResult.value : null;
   const connected = Boolean(systems);
 
-  const recentOrders = orders?.data ?? [];
-  const confirmed = recentOrders.filter((o) => o.status === "confirmed");
-  const drafts = recentOrders.filter((o) => o.status === "draft");
-  const revenue = confirmed.reduce((sum, order) => sum + (order.totalPrice ?? 0), 0);
-  const orderItems = recentOrders.reduce((sum, order) => sum + (order._count?.items ?? 0), 0);
+  const allOrders = orders?.data ?? [];
+  const recentOrders = allOrders.slice(0, 5);
+  const confirmed = allOrders.filter((o) => o.status === "confirmed");
+  const drafts = allOrders.filter((o) => o.status === "draft");
+  const revenue = confirmed.reduce((sum, o) => sum + orderTotal(o), 0);
+  const draftItems = drafts.reduce((sum, o) => sum + itemCount(o), 0);
+  const documents = allOrders.reduce((sum, o) => sum + (o._count?.documents ?? 0), 0);
+
+  const months = monthlyValue(allOrders);
+  const peak = Math.max(...months.map((m) => m.value), 0);
+  const charted = months.reduce((s, m) => s + m.count, 0);
 
   return (
     <div>
@@ -72,48 +121,71 @@ export default async function Dashboard() {
           tone="blue"
         />
         <MetricCard label="Product lines" value={products?.pagination.total ?? "--"} icon="products" tone="slate" />
-        <MetricCard label="Recent revenue" value={money(revenue)} icon="chart" tone="green" />
-        <MetricCard label="Draft workload" value={drafts.length} delta={`${orderItems} items`} icon="orders" tone="amber" />
+        <MetricCard
+          label="Confirmed value"
+          value={money(revenue)}
+          delta={confirmed.length > 0 ? `${confirmed.length} orders` : undefined}
+          icon="chart"
+          tone="green"
+        />
+        <MetricCard
+          label="Draft workload"
+          value={drafts.length}
+          delta={draftItems > 0 ? `${draftItems} items` : undefined}
+          icon="orders"
+          tone="amber"
+        />
       </section>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
         <Card className="overflow-hidden">
           <SectionHeader
-            title="Revenue and production flow"
-            description="Recent order value and fabrication throughput indicators"
+            title="Confirmed order value"
+            description={`Last ${MONTHS} months, incl. extras, discount and VAT`}
             actions={
-              <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
-                <span className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#4442e3]" /> Revenue
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-blue-400" /> Units
-                </span>
-              </div>
+              <span className="text-xs font-semibold text-slate-500">
+                {charted > 0 ? `${charted} confirmed in range` : "No confirmed orders yet"}
+              </span>
             }
           />
-          <div className="chart-grid relative h-80 px-6 pb-7 pt-8">
-            <div className="absolute inset-x-6 bottom-7 flex h-56 items-end gap-3">
-              {chartBars.map((height, index) => (
-                <div key={index} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="relative h-full w-full rounded-t-md bg-[#4442e3]/12">
-                    <div
-                      className="absolute bottom-0 left-0 right-0 rounded-t-md bg-[#4442e3] shadow-[0_8px_20px_rgba(68,66,227,0.2)]"
-                      style={{ height: `${height}%` }}
-                    />
-                    <div
-                      className="absolute bottom-0 left-[48%] right-[18%] rounded-t-md bg-blue-400"
-                      style={{ height: `${Math.max(18, height - 16)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-semibold text-slate-400">{index + 1}</span>
-                </div>
-              ))}
+          {peak === 0 ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-2 px-6 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                <Icon name="chart" className="h-6 w-6" />
+              </span>
+              <p className="text-sm font-semibold text-slate-800">Nothing to chart yet</p>
+              <p className="max-w-xs text-sm text-slate-500">
+                Confirm an order and its value appears here, bucketed by month.
+              </p>
             </div>
-            <div className="absolute left-6 top-7 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm">
-              {confirmed.length} confirmed orders in latest batch
+          ) : (
+            <div className="relative h-72 px-6 pb-7 pt-8">
+              <div className="absolute inset-x-6 bottom-9 flex h-48 items-end gap-4">
+                {months.map((m) => {
+                  const pct = peak > 0 ? Math.round((m.value / peak) * 100) : 0;
+                  return (
+                    <div key={m.label} className="flex flex-1 flex-col items-center justify-end gap-2">
+                      <span className="text-xs font-semibold text-slate-500">
+                        {m.value > 0 ? money(m.value) : ""}
+                      </span>
+                      <div
+                        className="w-full rounded-t-md bg-[#4442e3] shadow-[0_8px_20px_rgba(68,66,227,0.2)] transition-all"
+                        style={{ height: `${Math.max(pct, m.value > 0 ? 4 : 0)}%` }}
+                        title={`${m.label}: ${money(m.value)} across ${m.count} order${m.count === 1 ? "" : "s"}`}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="absolute inset-x-6 bottom-2 flex gap-4">
+                {months.map((m) => (
+                  <span key={m.label} className="flex-1 text-center text-xs font-semibold text-slate-400">
+                    {m.label}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </Card>
 
         <div className="space-y-6">
@@ -121,10 +193,10 @@ export default async function Dashboard() {
             <SectionHeader title="Quick actions" description="High-frequency fabrication workflows" />
             <div className="grid grid-cols-2 gap-3 p-4">
               {[
+                { href: "/designer", label: "Designer", icon: "spark" },
                 { href: "/quote", label: "New quote", icon: "quote" },
-                { href: "/products", label: "Catalog", icon: "products" },
                 { href: "/orders", label: "Orders", icon: "orders" },
-                { href: "/admin", label: "Admin", icon: "admin" },
+                { href: "/products", label: "Catalog", icon: "products" },
               ].map((action) => (
                 <Link
                   key={action.href}
@@ -143,22 +215,32 @@ export default async function Dashboard() {
           <Card className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase text-slate-500">System health</p>
+                <p className="text-xs font-semibold uppercase text-slate-500">Engine status</p>
                 <h2 className="mt-2 text-xl font-bold text-slate-950">
-                  {connected ? "All services nominal" : "Backend unavailable"}
+                  {connected ? "Engine reachable" : "Backend unavailable"}
                 </h2>
               </div>
               <span className={connected ? "mt-1 h-3 w-3 rounded-full bg-emerald-500" : "mt-1 h-3 w-3 rounded-full bg-red-500"} />
             </div>
-            <div className="mt-5 space-y-3">
-              {["Production API", "Pricing catalog", "Document generation"].map((service, index) => (
-                <div key={service} className="flex items-center justify-between gap-4 text-sm">
-                  <span className="font-medium text-slate-700">{service}</span>
-                  <span className={connected || index > 0 ? "text-emerald-600" : "text-red-600"}>
-                    {connected ? "Online" : index === 0 ? "Offline" : "Waiting"}
-                  </span>
-                </div>
-              ))}
+            {/* Observed facts only — each row is something this page actually
+                fetched, not a service we are guessing the state of. */}
+            <div className="mt-5 space-y-3 text-sm">
+              <StatusRow
+                label="Fabrication API"
+                ok={connected}
+                value={connected ? "Responding" : "Unreachable"}
+              />
+              <StatusRow
+                label="Catalog"
+                ok={Boolean(products)}
+                value={products ? `${products.pagination.total} product lines` : "Not loaded"}
+              />
+              <StatusRow
+                label="Documents generated"
+                ok={documents > 0}
+                value={documents > 0 ? `${documents} across recent orders` : "None yet"}
+                neutral={documents === 0}
+              />
             </div>
           </Card>
         </div>
@@ -180,9 +262,9 @@ export default async function Dashboard() {
               <tr>
                 <th className={thClass}>Order</th>
                 <th className={thClass}>Customer</th>
-                <th className={thClass}>Items</th>
+                <th className={thClass + " text-right"}>Items</th>
                 <th className={thClass}>Status</th>
-                <th className={thClass}>Total</th>
+                <th className={thClass + " text-right"}>Total</th>
                 <th className={thClass}>Created</th>
               </tr>
             </thead>
@@ -202,11 +284,11 @@ export default async function Dashboard() {
                       </Link>
                     </td>
                     <td className={tdClass}>{order.customerName}</td>
-                    <td className={tdClass}>{order._count?.items ?? "--"}</td>
+                    <td className={tdClass + " text-right"}>{order._count ? itemCount(order) : "--"}</td>
                     <td className={tdClass}>
                       <StatusBadge status={order.status} />
                     </td>
-                    <td className={tdClass}>{money(order.totalPrice)}</td>
+                    <td className={tdClass + " text-right font-semibold"}>{money(orderTotal(order))}</td>
                     <td className={tdClass}>{dateShort(order.createdAt)}</td>
                   </tr>
                 ))
@@ -215,6 +297,25 @@ export default async function Dashboard() {
           </table>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function StatusRow({
+  label,
+  ok,
+  value,
+  neutral = false,
+}: {
+  label: string;
+  ok: boolean;
+  value: string;
+  neutral?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="font-medium text-slate-700">{label}</span>
+      <span className={neutral ? "text-slate-500" : ok ? "text-emerald-600" : "text-red-600"}>{value}</span>
     </div>
   );
 }

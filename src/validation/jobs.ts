@@ -11,6 +11,12 @@ import type { QuoteOutput } from "../types.ts";
 import { validateExtractor } from "../tools/extract-topology.test.ts";
 import { validatePricing } from "../engine/pricing.test.ts";
 import { validateSvg } from "../engine/svg.test.ts";
+import { validateLimits } from "../engine/limits.test.ts";
+import { validateEdTable } from "../catalog/ed-table.test.ts";
+import { validateRules } from "../designer/rules.test.ts";
+import { validateOptionSystem } from "../designer/options.test.ts";
+import { validateDesigner } from "../designer/resolve.test.ts";
+import { validateBasket } from "../designer/basket.test.ts";
 import { validateSupplierPrices } from "./prices.test.ts";
 
 interface ExpectedBar {
@@ -818,6 +824,54 @@ function validateColourAndJoints(): void {
   expect("showJoints does NOT change pricing", joints.pricing.totals.grandTotal, plain.pricing.totals.grandTotal);
 }
 
+// Elevation variants (Designer phase 5). Additive like the joint overlay: asking
+// for them renders extra SVG and changes NOTHING else, and the schematic's
+// annotations are the same numbers the cutting list prints (both read the solved
+// rects — the schematic label rounds exactly as bars.ts#emitGlass does).
+function validateViews(): void {
+  console.log("\n==================================================");
+  console.log("Elevation views — internal + schematic (additive)");
+  console.log("==================================================");
+
+  const baseInput = {
+    orderNo: "TEST", customer: "Validation",
+    designId: "win-th-over-fixed-z", widthMm: 1200, heightMm: 1200,
+    systemId: "sunnyplast-70",
+  } as const;
+
+  const plain = solve({ ...baseInput });
+  const withViews = solve({ ...baseInput, views: ["internal", "schematic"] });
+
+  expect("default quote carries no extra views", plain.geometry.svgViews, undefined);
+  expect("views do NOT change the external SVG", withViews.geometry.svg, plain.geometry.svg);
+  expect("views do NOT change pricing", withViews.pricing.totals.grandTotal, plain.pricing.totals.grandTotal);
+  expect("views do NOT change the cut list", JSON.stringify(withViews.parts), JSON.stringify(plain.parts));
+  expect(
+    "views do NOT change the documents",
+    withViews.documents.cuttingList === plain.documents.cuttingList,
+    true,
+  );
+
+  const internal = withViews.geometry.svgViews?.internal ?? "";
+  const schematic = withViews.geometry.svgViews?.schematic ?? "";
+  expect("internal is mirrored about the window width", internal.includes("matrix(-1 0 0 1 1200 0)"), true);
+  expect("internal draws the sash handles", internal.includes('id="handles"'), true);
+  expect("schematic carries the annotation layer", schematic.includes('id="schematic"'), true);
+
+  // Every glass row the cutting list prints appears as a pane label, verbatim.
+  for (const g of plain.parts.glass) {
+    expect(
+      `schematic pane label ${g.widthMm} × ${g.heightMm} matches the cutting list`,
+      schematic.includes(`>${g.widthMm} × ${g.heightMm}</text>`),
+      true,
+    );
+  }
+  // Divider face width comes from the solved transom rect (Z transom, face 67).
+  const transomFace = plain.geometry.transoms[0]?.rect.h ?? 0;
+  expect("schematic annotates the transom face width", schematic.includes(`>${transomFace}</text>`), true);
+  expect("transom face is the catalog's 67", transomFace, 67);
+}
+
 // Load the catalog from PostgreSQL before solving, then run all jobs.
 (async () => {
   await loadCatalog();
@@ -834,9 +888,16 @@ function validateColourAndJoints(): void {
   validateCustomMode();
   validateWeldMath();
   validateColourAndJoints();
+  validateViews();
   validateExtractor(expect);
   validatePricing(expect);
   validateSvg(expect);
+  validateLimits(expect);
+  validateEdTable(expect);
+  validateRules(expect);
+  validateOptionSystem(expect);
+  validateDesigner(expect);
+  validateBasket(expect);
   validateSupplierPrices(expect);
 
   console.log("\n==================================================");

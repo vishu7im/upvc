@@ -18,5 +18,10 @@ export const DEFAULT_SETTINGS: Settings = {
     base: 30,       // £ flat per order (setup, glazing, packaging)
   },
   // Global welding-shrinkage default (mm per welded end); per-profile overrides it when > 0.
+  // PROVENANCE: calibrated from the Quotila reference jobs (85/88/90) — the
+  // sliding/French families override to 3 per profile (Jobs 44/48, 00000264).
+  // No edition of the fabrication manual states a weld allowance (verified
+  // against HAWDIO 21-7-2026.pdf, 2026-07-25 — migration findings X6); the
+  // calibrated jobs are the only source.
   weldAllowanceMm: 2.5,
 };

@@ -22,11 +22,34 @@ import {
   renderWorkPlanner,
   type PlannerLine,
 } from "../engine/documents.ts";
-import { DEFAULT_SETTINGS, getSystem } from "../catalog/index.ts";
+import { DEFAULT_SETTINGS, getFamily, getSystem } from "../catalog/index.ts";
+import { resolveLineItem } from "../designer/resolve.ts";
 import type {
+  LineItemDraft,
+  LineItemIssue,
+  ResolvedLineItem,
+} from "../designer/line-item-types.ts";
+import {
+  buildOrderLineItemsRouter,
+  liveCatalogSnapshot,
+} from "./lineitems.ts";
+import {
+  buildQuoteInput,
+  computeOrderBasket,
+  dec,
+  loadDiscount,
+  type OrderCommercialRow,
+} from "./order-basket.ts";
+import {
+  computeBasket,
+  discountRejection,
+  FITTING_TYPES,
+  type BasketTotals,
+} from "../designer/basket.ts";
+import type {
+  DocBasket,
   DocImage,
   EngineOverrides,
-  QuoteInput,
   Settings,
 } from "../types.ts";
 import {
@@ -141,18 +164,53 @@ ordersRouter.get(
   asyncHandler(async (req: AuthedRequest, res) => {
     const p = parsePagination(req.query);
     // OWN ⇒ only the caller's orders; ALL / Super Admin ⇒ every order.
-    const where = scopeFilter(req.auth!, "orders");
+    const scope = scopeFilter(req.auth!, "orders");
+    // Optional server-side search + status filter, so the list's controls work
+    // across the whole table rather than only the page in the browser.
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const status = typeof req.query.status === "string" ? req.query.status : "";
+    const where: Prisma.OrderWhereInput = {
+      ...scope,
+      ...(status === "draft" || status === "confirmed" ? { status } : {}),
+      ...(q
+        ? {
+            OR: [
+              { orderNo: { contains: q, mode: "insensitive" as const } },
+              { customerName: { contains: q, mode: "insensitive" as const } },
+              { reference: { contains: q, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
     const [data, total] = await Promise.all([
       prisma.order.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip: p.skip,
         take: p.take,
-        include: { _count: { select: { items: true, documents: true } } },
+        include: {
+          _count: { select: { items: true, designerItems: true, documents: true } },
+        },
       }),
       prisma.order.count({ where }),
     ]);
-    res.json(paginated(data, total, p));
+    // The list's money column is the BASKET grand total (extras + discount +
+    // tax), not the raw engine total — the same number the detail page and the
+    // Price Summary show. Confirmed orders replay their frozen snapshot; drafts
+    // are priced live. A row that cannot be priced degrades to null rather than
+    // failing the page.
+    const rows = await Promise.all(
+      data.map(async (o) => {
+        let basketTotal: number | null = dec(o.totalPrice);
+        try {
+          basketTotal = (await computeOrderBasket(o as unknown as OrderCommercialRow)).grandTotal;
+        } catch (err) {
+          console.error(`[orders] basket pricing failed for ${o.id}`, err);
+        }
+        return { ...o, basketTotal };
+      }),
+    );
+    res.json(paginated(rows, total, p));
   }),
 );
 
@@ -169,11 +227,34 @@ ordersRouter.get(
             product: { select: { name: true } },
           },
         },
+        designerItems: { orderBy: { position: "asc" } },
         documents: { select: { type: true, variant: true, createdAt: true } },
       },
     });
     if (!order) throw new HttpError(404, "Order not found");
-    res.json(order);
+    // Designer items ship draft + a light summary of the cached resolve — the
+    // full ResolvedLineItem (incl. SVG) is fetched via a re-resolve when needed.
+    const { designerItems, ...rest } = order;
+    // Live for drafts, frozen snapshot for confirmed orders (phase 6).
+    const basket = await computeOrderBasket(order as unknown as OrderCommercialRow);
+    res.json({
+      ...rest,
+      basket,
+      designerItems: designerItems.map((d) => {
+        const r = d.resolved as ResolvedLineItem | null;
+        return {
+          id: d.id,
+          position: d.position,
+          draft: d.draft,
+          catalogVersion: d.catalogVersion,
+          summary: r?.summary ?? null,
+          issues: r?.issues ?? [],
+          invalidSpec: r?.invalidSpec ?? false,
+          invalidDimensions: r?.invalidDimensions ?? false,
+          totals: r?.pricing?.totals ?? null,
+        };
+      }),
+    });
   }),
 );
 
@@ -307,6 +388,61 @@ ordersRouter.delete(
   }),
 );
 
+// ---- designer line items (Task 1 phase 2) ---------------------------
+// CRUD for persisted LineItemDrafts; coexists with the legacy items above.
+ordersRouter.use("/:id/line-items", buildOrderLineItemsRouter(ownDraftOrder));
+
+// ---- commercials: fitting / survey / delivery / discount / tax ------
+// Draft-only, like every other order mutation. The response carries fresh
+// BasketTotals so the UI never has to re-derive the arithmetic (phase 6).
+
+const commercialsSchema = z.object({
+  fittingType: z.enum(FITTING_TYPES as [string, ...string[]]).optional(),
+  fittingPrice: z.number().min(0).max(1_000_000).nullable().optional(),
+  surveyPrice: z.number().min(0).max(1_000_000).nullable().optional(),
+  deliveryCharge: z.number().min(0).max(1_000_000).nullable().optional(),
+  discountCode: z.string().max(40).nullable().optional(),
+  taxRatePct: z.number().min(0).max(100).nullable().optional(),
+});
+
+ordersRouter.put(
+  "/:id/commercials",
+  requirePermission("orders", "create"),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const order = await ownDraftOrder(req, req.params.id);
+    const body = validate(commercialsSchema, req.body);
+
+    // Validate the discount BEFORE storing it: a code that is unknown, expired
+    // or inactive is a 400 with the reason, not a silently-ignored field.
+    let code: string | null = null;
+    if (body.discountCode !== undefined && body.discountCode !== null) {
+      const trimmed = body.discountCode.trim().toUpperCase();
+      if (trimmed) {
+        const discount = await loadDiscount(trimmed);
+        if (!discount) throw new HttpError(400, `Unknown discount code: ${trimmed}`);
+        const reason = discountRejection(discount);
+        if (reason) throw new HttpError(400, reason);
+        code = trimmed;
+      }
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        ...(body.fittingType !== undefined ? { fittingType: body.fittingType } : {}),
+        ...(body.fittingPrice !== undefined ? { fittingPrice: body.fittingPrice } : {}),
+        ...(body.surveyPrice !== undefined ? { surveyPrice: body.surveyPrice } : {}),
+        ...(body.deliveryCharge !== undefined ? { deliveryCharge: body.deliveryCharge } : {}),
+        ...(body.discountCode !== undefined ? { discountCode: code } : {}),
+        ...(body.taxRatePct !== undefined ? { taxRatePct: body.taxRatePct } : {}),
+      },
+    });
+
+    const basket = await computeOrderBasket(updated as unknown as OrderCommercialRow);
+    res.json({ order: updated, basket });
+  }),
+);
+
 // ---- confirm: generate & persist all 7 documents -------------------
 
 ordersRouter.post(
@@ -322,16 +458,52 @@ ordersRouter.post(
       },
       orderBy: { id: "asc" },
     });
-    if (items.length === 0)
+    const designerRows = await prisma.designerLineItem.findMany({
+      where: { orderId: order.id },
+      orderBy: { position: "asc" },
+    });
+    if (items.length === 0 && designerRows.length === 0)
       throw new HttpError(400, "Order has no items to confirm");
 
-    const systemId = items[0].systemId;
+    // ---- designer items: re-resolve; ANY error-severity issue blocks ----
+    // (line-item-schema.md §5 — drafts may carry errors, confirm may not).
+    const snapshot = designerRows.length ? liveCatalogSnapshot() : null;
+    const designerSolved: {
+      row: (typeof designerRows)[number];
+      draft: LineItemDraft;
+      resolved: ResolvedLineItem;
+      output: NonNullable<ReturnType<typeof resolveLineItem>["output"]>;
+    }[] = [];
+    const blocked: { id: string; position: number; issues: LineItemIssue[] }[] = [];
+    for (const row of designerRows) {
+      const draft = row.draft as unknown as LineItemDraft;
+      const { resolved, output } = resolveLineItem(draft, snapshot!);
+      const errors = resolved.issues.filter((i) => i.severity === "error");
+      if (errors.length > 0 || !output) {
+        blocked.push({ id: row.id, position: row.position, issues: resolved.issues });
+      } else {
+        designerSolved.push({ row, draft, resolved, output });
+      }
+    }
+    if (blocked.length > 0) {
+      res.status(422).json({
+        error: "Order has designer line items with unresolved errors",
+        items: blocked,
+      });
+      return;
+    }
+
+    const systemId =
+      items[0]?.systemId ?? (designerRows[0].draft as unknown as LineItemDraft).systemId;
     const system = getSystem(systemId);
     if (!system) throw new HttpError(500, `System not loaded: ${systemId}`);
     const settings: Settings = DEFAULT_SETTINGS;
 
     const solved: ItemForAggregation[] = [];
     const plannerLines: PlannerLine[] = [];
+    // Basket lines are built from the SAME solves the documents use, so the
+    // snapshot cannot drift from the paperwork (phase 6).
+    const basketLines: Parameters<typeof computeBasket>[0] = [];
     // Match the product gallery/configurator preview in every generated document.
     // Fallback to engine SVG only for designs without a stored catalog preview.
     const images: DocImage[] = [];
@@ -357,6 +529,13 @@ ordersRouter.post(
         }),
       );
       solved.push({ output, qty: item.qty });
+      basketLines.push({
+        id: item.id,
+        kind: "legacy",
+        label: `${output.designName} — ${item.widthMm} × ${item.heightMm} mm`,
+        qty: item.qty,
+        netPrice: output.pricing.totals.netPrice,
+      });
       plannerLines.push({
         lineNo: i + 1,
         productName: item.product.name,
@@ -389,26 +568,118 @@ ordersRouter.post(
       );
     });
 
+    // Designer line items join the same aggregation stream: the resolver's
+    // engine output is shape-identical to a legacy item's solve() output, so
+    // the 7-document pipeline needs no per-kind branching (data-model.md §3).
+    designerSolved.forEach(({ row, draft, resolved, output }, j) => {
+      const lineNo = items.length + j + 1;
+      const qty = Math.max(1, draft.quantity ?? 1);
+      solved.push({ output, qty });
+      basketLines.push({
+        id: row.id,
+        kind: "designer",
+        label:
+          `${resolved.summary?.sizeLabel ?? `${draft.dimensions.widthMm} × ${draft.dimensions.heightMm} mm`}` +
+          `${draft.location ? ` — ${draft.location}` : ""}`,
+        qty,
+        netPrice: output.pricing.totals.netPrice,
+      });
+      plannerLines.push({
+        lineNo,
+        productName: getFamily(draft.familyKey)?.name ?? draft.familyKey,
+        designName: output.designName,
+        widthMm: draft.dimensions.widthMm,
+        heightMm: draft.dimensions.heightMm,
+        qty,
+        mode: "designer",
+        totalPrice: output.pricing.totals.grandTotal * qty,
+      });
+      images.push({
+        // Designer items always use the engine SVG — it reflects every edit,
+        // pinned glass and colour the draft carries (a catalog preview cannot).
+        svg: output.geometry.svg,
+        caption:
+          `${lineNo}. ${output.designName} — ${draft.dimensions.widthMm} × ${draft.dimensions.heightMm} mm` +
+          `${qty > 1 ? ` ×${qty}` : ""}${draft.location ? ` — ${draft.location}` : ""}`,
+      });
+      snapshotUpdates.push(
+        prisma.designerLineItem.update({
+          where: { id: row.id },
+          data: {
+            resolved: resolved as unknown as Prisma.InputJsonValue,
+            catalogVersion: resolved.catalogVersion,
+          },
+        }),
+      );
+    });
+
     // Order-level aggregation (multi-window).
     const agg = aggregateOrder(solved, system, settings);
+
+    // The commercial layer, frozen at confirm (phase 6): the customer keeps the
+    // numbers they agreed to even if a price list, a VAT rate or the discount
+    // code changes afterwards.
+    const basket: BasketTotals = computeBasket(
+      basketLines,
+      {
+        fittingType: order.fittingType,
+        fittingPrice: dec(order.fittingPrice),
+        surveyPrice: dec(order.surveyPrice),
+        deliveryCharge: dec(order.deliveryCharge),
+        discount: await loadDiscount(order.discountCode),
+        taxRatePct: dec(order.taxRatePct),
+      },
+      settings,
+      new Date(),
+      { aggregateNetPrice: agg.pricing.totals.netPrice },
+    );
     // Single-item orders carry that item's real W×H in the shared header;
     // genuine multi-window orders have no single dimension, so 0/0 ⇒ the header
     // renders "—" (each line's own W×H still shows in the preview-band captions).
+    const totalLines = items.length + designerSolved.length;
+    const onlyLineDims =
+      totalLines === 1
+        ? items.length === 1
+          ? { w: items[0].widthMm, h: items[0].heightMm }
+          : {
+              w: designerSolved[0].draft.dimensions.widthMm,
+              h: designerSolved[0].draft.dimensions.heightMm,
+            }
+        : { w: 0, h: 0 };
     const synth = buildQuoteInput(
       order.orderNo,
       order.customerName,
       order.reference,
       {
         designId: "",
-        widthMm: items.length === 1 ? items[0].widthMm : 0,
-        heightMm: items.length === 1 ? items[0].heightMm : 0,
+        widthMm: onlyLineDims.w,
+        heightMm: onlyLineDims.h,
         systemId,
       },
     );
-    const label = `${items.length} line(s)`;
+    const label = `${totalLines} line(s)`;
     const sysName = system.name;
 
     const brand = settings.branding;
+    // Only print the commercial block when the order actually carries
+    // commercial data; a plain order's documents stay byte-identical to
+    // pre-phase-6 output (phase-6 acceptance §5).
+    const docBasket: DocBasket | undefined =
+      basket.discount || basket.extras || basket.itemsAdjustment
+        ? {
+            currency: basket.currency,
+            itemsSubtotal: basket.itemsSubtotal,
+            itemsAdjustment: basket.itemsAdjustment,
+            discount: basket.discount,
+            discountCode: basket.discountCode,
+            fitting: basket.fitting,
+            survey: basket.survey,
+            delivery: basket.delivery,
+            taxRatePct: basket.taxRatePct,
+            tax: basket.tax,
+            grandTotal: basket.grandTotal,
+          }
+        : undefined;
     // The 3 length-bearing docs (Work Order, Cutting List, Work Planner) are
     // rendered TWICE: a "normal" copy (finished sizes) and a "welded" copy (sizes
     // with welding-shrinkage compensation). The pricing/summary docs carry no cut
@@ -508,6 +779,9 @@ ordersRouter.post(
           agg.pricing,
           brand,
           images,
+          undefined,
+          undefined,
+          docBasket,
         ),
       },
       {
@@ -525,6 +799,7 @@ ordersRouter.post(
           agg.pricing.currency,
           brand,
           images,
+          docBasket,
         ),
       },
     ];
@@ -552,10 +827,14 @@ ordersRouter.post(
       prisma.order.update({
         where: { id: order.id },
         // Denormalise the order grand total (M5) so the orders list can show a
-        // price without re-solving every item.
+        // price without re-solving every item. Since phase 6 that total is the
+        // BASKET grand total (extras + discount + tax) — what the customer
+        // actually pays — and the full breakdown is frozen alongside it.
         data: {
           status: "confirmed",
-          totalPrice: agg.pricing.totals.grandTotal,
+          totalPrice: basket.grandTotal,
+          discountAmount: basket.discount,
+          basketTotals: basket as unknown as Prisma.InputJsonValue,
         },
       }),
     ]);
@@ -565,6 +844,7 @@ ordersRouter.post(
       status: "confirmed",
       documents: docRows.map((d) => ({ type: d.type, variant: d.variant })),
       totals: agg.pricing.totals,
+      basket,
     });
   }),
 );
@@ -677,38 +957,6 @@ async function hydrateDocumentPreviews(orderId: string, html: string): Promise<s
   });
 }
 
-function buildQuoteInput(
-  orderNo: string,
-  customer: string,
-  reference: string | null,
-  rest: {
-    designId: string;
-    widthMm: number;
-    heightMm: number;
-    systemId: string;
-    mode?: "default" | "custom";
-    overrides?: EngineOverrides | null;
-    splitRatios?: Record<string, number> | null;
-    frameKey?: string | null;
-    cillKey?: string | null;
-    colourKeyInside?: string | null;
-    colourKeyOutside?: string | null;
-  },
-): QuoteInput {
-  return {
-    orderNo,
-    customer,
-    reference: reference ?? undefined,
-    designId: rest.designId,
-    widthMm: rest.widthMm,
-    heightMm: rest.heightMm,
-    systemId: rest.systemId,
-    mode: rest.mode,
-    overrides: rest.overrides ?? undefined,
-    splitRatios: rest.splitRatios ?? undefined,
-    frameKey: rest.frameKey ?? undefined,
-    cillKey: rest.cillKey ?? undefined,
-    colourKey: rest.colourKeyInside ?? undefined,
-    colourKeyOutside: rest.colourKeyOutside ?? undefined,
-  };
-}
+// `buildQuoteInput` lives in ./order-basket.ts — the confirm path, the
+// add-item validation and the basket pricing all price an item through the
+// same builder, so they cannot drift apart.

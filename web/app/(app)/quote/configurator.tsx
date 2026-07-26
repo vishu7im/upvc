@@ -158,6 +158,9 @@ export default function Configurator(props: ConfiguratorProps) {
       cillKey: cillKey || undefined,
       splitRatios: Object.keys(splitRatios).length ? splitRatios : undefined,
       showJoints: showJoints || undefined,
+      // Presentation style for the on-screen preview only — the documents this
+      // quote can generate still embed the flat drawing.
+      svgStyle: "realistic",
     })
       .then((r) => {
         setResult(r);

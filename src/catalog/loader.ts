@@ -33,6 +33,13 @@ import type {
   CellNode,
   DocBranding,
 } from "../types.ts";
+import type {
+  OptionChoice,
+  OptionDef,
+  OptionGroup,
+  OptionSystem,
+  ProductFamilyDescriptor,
+} from "../designer/option-types.ts";
 import { prisma } from "../db/client.ts";
 import { getObject } from "../services/storage.ts";
 
@@ -63,6 +70,13 @@ type DbSystemWithCatalog = Prisma.ProfileSystemGetPayload<{
 // ---- In-memory caches (populated by loadCatalog) --------------------
 let systemsCache: Record<string, ProfileSystem> = {};
 let designsCache: Design[] = [];
+// Designer platform (phase 1). Same synchronous-accessor pattern as the
+// catalog: read once at bootstrap, served from memory, refreshed by any
+// admin write. No Decimal conversion needed — these tables carry no money.
+let familiesCache: ProductFamilyDescriptor[] = [];
+let optionGroupsCache: OptionGroup[] = [];
+let optionDefsCache: OptionDef[] = [];
+let optionChoicesCache: OptionChoice[] = [];
 
 // Live binding: re-exported by index.ts and read by solve() at call time.
 // Reassigned inside loadCatalog(); ESM live bindings propagate the update.
@@ -77,6 +91,15 @@ export let DEFAULT_SETTINGS: Settings = {
 };
 
 let loaded = false;
+
+// Provenance stamp for anything cached against catalog state (Designer
+// resolves record it as `catalogVersion` — line-item-schema.md §3). Bumped on
+// every full load and on every partial refresh, since either can change prices.
+let catalogVersion = "";
+
+function bumpCatalogVersion(): void {
+  catalogVersion = new Date().toISOString();
+}
 
 /** Load the entire catalog from Postgres into memory. Idempotent. */
 export async function loadCatalog(): Promise<void> {
@@ -120,9 +143,72 @@ export async function loadCatalog(): Promise<void> {
     };
   }
 
+  await loadDesignerSnapshot();
+
   systemsCache = nextSystems;
   designsCache = nextDesigns;
   loaded = true;
+  bumpCatalogVersion();
+}
+
+/**
+ * Load the Designer platform tables (families + option system) into memory.
+ * Split out so an admin option write can refresh just this slice.
+ *
+ * The DB rows are already the exact in-memory shapes (the JSONB columns hold
+ * the sub-objects declared in src/designer/option-types.ts), so this is a
+ * straight projection — the only conversions are `null` → `undefined` so an
+ * absent optional field is absent rather than explicitly null.
+ */
+export async function loadDesignerSnapshot(): Promise<void> {
+  const [dbFamilies, dbGroups, dbDefs, dbChoices] = await Promise.all([
+    prisma.productFamily.findMany({ orderBy: { key: "asc" } }),
+    prisma.optionGroup.findMany({ orderBy: { order: "asc" } }),
+    prisma.optionDef.findMany({ orderBy: { order: "asc" } }),
+    prisma.optionChoice.findMany({ orderBy: { order: "asc" } }),
+  ]);
+
+  familiesCache = dbFamilies.map((f) => f.descriptor as unknown as ProductFamilyDescriptor);
+
+  optionGroupsCache = dbGroups.map((g) => ({
+    key: g.key,
+    name: g.name,
+    order: g.order,
+    ...(g.icon ? { icon: g.icon } : {}),
+    defaultCollapsed: g.defaultCollapsed,
+    scope: g.scope as OptionGroup["scope"],
+  }));
+
+  optionDefsCache = dbDefs.map((o) => ({
+    key: o.key,
+    groupKey: o.groupKey,
+    name: o.name,
+    order: o.order,
+    display: o.display as OptionDef["display"],
+    required: o.required,
+    scope: o.scope as unknown as OptionDef["scope"],
+    ...(o.filters ? { filters: o.filters as unknown as OptionDef["filters"] } : {}),
+    ...(o.visibility ? { visibility: o.visibility as unknown as OptionDef["visibility"] } : {}),
+    ...(o.validation ? { validation: o.validation as unknown as OptionDef["validation"] } : {}),
+    ...(o.presentation ? { presentation: o.presentation as unknown as OptionDef["presentation"] } : {}),
+    pricingMode: o.pricingMode as OptionDef["pricingMode"],
+    ...(o.action ? { action: o.action as unknown as OptionDef["action"] } : {}),
+    familyKeys: o.familyKeys,
+  }));
+
+  optionChoicesCache = dbChoices.map((c) => ({
+    key: c.key,
+    optionKey: c.optionKey,
+    label: c.label,
+    order: c.order,
+    isDefault: c.isDefault,
+    ...(c.filterKeys.length ? { filterKeys: c.filterKeys } : {}),
+    ...(c.image ? { image: c.image as unknown as OptionChoice["image"] } : {}),
+    ...(c.swatchHex ? { swatchHex: c.swatchHex } : {}),
+    ...(c.partKey ? { partKey: c.partKey } : {}),
+    ...(c.engineEffect ? { engineEffect: c.engineEffect as unknown as OptionChoice["engineEffect"] } : {}),
+    ...(c.visibility ? { visibility: c.visibility as unknown as OptionChoice["visibility"] } : {}),
+  }));
 }
 
 /** Refresh one profile system from Postgres without reloading every design/SVG. */
@@ -140,6 +226,7 @@ export async function refreshSystemCatalog(systemId: string): Promise<ProfileSys
   }
   const system = buildProfileSystem(dbSystem);
   systemsCache = { ...systemsCache, [systemId]: system };
+  bumpCatalogVersion();
   return system;
 }
 
@@ -267,6 +354,9 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
       priceUpliftPct: num(c.priceUpliftPct),
       isBase: c.isBase,
       ...(c.hex ? { hex: c.hex } : {}),
+      // Only the one texture the renderer knows; anything else stays absent
+      // rather than being passed through to a filter that does not exist.
+      ...(c.texture === "woodgrain" ? { texture: "woodgrain" as const } : {}),
     };
   }
 
@@ -376,4 +466,67 @@ export function listSystems(): ProfileSystem[] {
 export function listDesigns(): Design[] {
   assertLoaded();
   return designsCache;
+}
+
+/**
+ * Provenance stamp of the in-memory catalog (ISO timestamp of the last load or
+ * refresh). Stored on Designer resolves as `catalogVersion` so a cached resolve
+ * can be detected stale after any catalog write.
+ */
+export function getCatalogVersion(): string {
+  assertLoaded();
+  return catalogVersion;
+}
+
+// ---- Designer platform accessors ------------------------------------
+
+export function getFamily(familyKey: string): ProductFamilyDescriptor | undefined {
+  assertLoaded();
+  return familiesCache.find((f) => f.familyKey === familyKey);
+}
+
+export function listFamilies(): ProductFamilyDescriptor[] {
+  assertLoaded();
+  return familiesCache;
+}
+
+/**
+ * The option system a family shows: its groups (in the family's declared order)
+ * with their options and each option's choices nested inside.
+ *
+ * Filtering is by `OptionDef.familyKeys` — the denormalised column that exists
+ * precisely so this is one pass over the cache with no joins. Groups the family
+ * declares but which end up with no visible option are dropped rather than
+ * rendered empty. Unknown family ⇒ undefined (the caller 404s).
+ *
+ * MEMBERSHIP comes from the family (`optionGroupKeys`), but ORDER comes from
+ * each group's own `order` — that field is owner-owned, so an admin who
+ * reorders the inspector must actually see the inspector reorder.
+ */
+export function getOptionSystem(familyKey: string): OptionSystem | undefined {
+  assertLoaded();
+  const family = familiesCache.find((f) => f.familyKey === familyKey);
+  if (!family) return undefined;
+
+  const choicesByOption = new Map<string, OptionChoice[]>();
+  for (const c of optionChoicesCache) {
+    const list = choicesByOption.get(c.optionKey);
+    if (list) list.push(c);
+    else choicesByOption.set(c.optionKey, [c]);
+  }
+
+  const declared = new Set(family.optionGroupKeys);
+  const groups = optionGroupsCache
+    .filter((g) => declared.has(g.key))
+    .slice()
+    .sort((a, b) => a.order - b.order || a.key.localeCompare(b.key))
+    .map((g) => ({
+      ...g,
+      options: optionDefsCache
+        .filter((o) => o.groupKey === g.key && o.familyKeys.includes(familyKey))
+        .map((o) => ({ ...o, choices: choicesByOption.get(o.key) ?? [] })),
+    }))
+    .filter((g) => g.options.length > 0);
+
+  return { groups };
 }

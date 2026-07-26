@@ -8,9 +8,11 @@
 import type {
   ApprovalRequest,
   ApprovalsInbox,
+  LineItemDraft,
   LoginUser,
   OrderSummary,
   QuoteResult,
+  ResolvedLineItem,
   RoleSummary,
   UserDetail,
   UserRow,
@@ -20,6 +22,13 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /**
+     * The parsed error body, when the API sent one. Some failures are
+     * structured rather than a sentence — confirm returns 422 with the
+     * per-item issues that blocked it — and the UI needs those to point at the
+     * line that has to be fixed.
+     */
+    public payload?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -31,7 +40,7 @@ async function parse<T>(res: Response): Promise<T> {
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) {
     const message = (data && (data.error as string)) || res.statusText || "Request failed";
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, data);
   }
   return data as T;
 }
@@ -213,6 +222,12 @@ export interface QuoteRequest {
   splitRatios?: Record<string, number>;
   /** Draw the inner-joint overlay (45° mitres + T/Z markers) on the preview SVG. */
   showJoints?: boolean;
+  /**
+   * How the preview is drawn. "realistic" is the live configurator's
+   * presentation style; the SVG embedded in the DOCUMENTS stays flat either
+   * way, so paperwork is unaffected.
+   */
+  svgStyle?: "flat" | "realistic";
 }
 
 /** Run the engine for a live preview (public endpoint; no order persisted). */
@@ -246,6 +261,55 @@ export function deleteOrder(orderId: string): Promise<void> {
 
 export function confirmOrder(orderId: string): Promise<unknown> {
   return apiSend(`/api/orders/${orderId}/confirm`, "POST");
+}
+
+// ---------- Designer line items (D2 API, D3 UI) ----------------------
+
+/**
+ * Stateless resolve — the designer's live preview. Public on the engine (like
+ * /api/quote): an invalid-but-well-formed draft comes back 200 with error
+ * issues inside, so only a malformed body throws.
+ */
+export function resolveLineItem(
+  draft: LineItemDraft,
+  /**
+   * Extra elevations to render (phase 5). A REQUEST option, not draft data:
+   * the engine's draft schema drops it, so the view being looked at is never
+   * persisted on the item.
+   */
+  views?: ("internal" | "schematic")[],
+  /**
+   * How those elevations are DRAWN. Same request-only discipline as `views`:
+   * "realistic" is the live configurator's presentation style, and the engine
+   * strips it from the draft so documents always render flat.
+   */
+  style?: "flat" | "realistic",
+): Promise<ResolvedLineItem> {
+  const body = {
+    ...draft,
+    ...(views?.length ? { views } : {}),
+    ...(style ? { style } : {}),
+  };
+  return apiSend<ResolvedLineItem>("/api/line-items/resolve", "POST", body);
+}
+
+export function addDesignerLineItem(
+  orderId: string,
+  draft: LineItemDraft,
+): Promise<{ id: string; position: number; resolved: ResolvedLineItem }> {
+  return apiSend(`/api/orders/${orderId}/line-items`, "POST", draft);
+}
+
+export function updateDesignerLineItem(
+  orderId: string,
+  itemId: string,
+  draft: LineItemDraft,
+): Promise<{ id: string; position: number; resolved: ResolvedLineItem }> {
+  return apiSend(`/api/orders/${orderId}/line-items/${itemId}`, "PUT", draft);
+}
+
+export function deleteDesignerLineItem(orderId: string, itemId: string): Promise<void> {
+  return apiSend<void>(`/api/orders/${orderId}/line-items/${itemId}`, "DELETE");
 }
 
 // ---------- Admin: settings + catalog (U5) ---------------------------

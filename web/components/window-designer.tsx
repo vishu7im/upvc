@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { normalizeSvgForPreview } from "@/lib/svg-preview";
-import type { QuoteGeometry, Rect } from "@/lib/types";
+import type { ComponentRef, QuoteGeometry, Rect } from "@/lib/types";
 
 // The engine SVG (src/engine/svg.ts) is drawn with viewBox "-20 -20 (w+40) (h+40)"
 // and the window frame at [0,0,w,h]. We mirror that pad here so the overlay's
@@ -13,8 +13,10 @@ const PROFILE_VIEWBOX_PAD_MM = 20;
 const CILL_OVERHANG_MM = 30;
 const MIN_FRAME_MM = 300;
 const MIN_SPAN_MM = 120;
-const LABEL_WIDTH_PX = 76;
+const LABEL_WIDTH_PX = 84;
 const LABEL_HEIGHT_PX = 28;
+/** Drafting hairline grey — the annotation layer never competes with the drawing. */
+const DIM_LINE = "#b9bfc9";
 // Fixed pixel offsets for dimension lines (never derived from values/nesting, so
 // they cannot feed back into the profile's scale). Internal spans step outward
 // per nesting level so nested dimensions don't collide.
@@ -85,6 +87,30 @@ export interface WindowDesignerProps {
   onHeightChange: (heightMm: number) => void;
   /** Commit an internal split to a full-window fraction (multi-span editing). */
   onSplitRatioChange: (pathId: string, ratio: number) => void;
+  /**
+   * Designer component-selection mode (D4). When `components` is supplied the
+   * canvas hit-tests the resolver's addressable components and reports clicks
+   * to the parent, which owns the selection; the legacy per-cell properties
+   * popover is suppressed because the inspector shows the same information in
+   * a scoped, editable form.
+   *
+   * OMITTED ⇒ the pre-D4 behaviour, unchanged — that is what keeps the legacy
+   * /quote configurator (which passes none of these) byte-identical.
+   */
+  components?: ComponentRef[];
+  selectedComponentId?: string | null;
+  onSelectComponent?: (componentId: string | null) => void;
+  /**
+   * The drawing underneath is the INTERNAL elevation (D5) — the engine mirrors
+   * it horizontally about the window centreline, so every mm rect this overlay
+   * places must be mirrored the same way to stay on top of what it labels.
+   *
+   * Editing affordances (dimension lines, divider drag handles) are suppressed
+   * while mirrored: a dragged position would have to be un-mirrored on the way
+   * back to `splitRatios`, and the phase puts measuring in the External and
+   * Schematic views (which are NOT mirrored, so they keep the full editor).
+   */
+  mirrored?: boolean;
 }
 
 export default function WindowDesigner({
@@ -95,13 +121,17 @@ export default function WindowDesigner({
   onWidthChange,
   onHeightChange,
   onSplitRatioChange,
+  components,
+  selectedComponentId = null,
+  onSelectComponent,
+  mirrored = false,
 }: WindowDesignerProps) {
-  const markerId = `dimension-arrow-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const stageRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<SVGSVGElement | null>(null);
   const stageSize = useElementSize(stageRef);
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [hoveredPanelId, setHoveredPanelId] = useState<string | null>(null);
+  const [hoveredComponentId, setHoveredComponentId] = useState<string | null>(null);
   const [hoveredSplitId, setHoveredSplitId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [editingDimension, setEditingDimension] = useState<{ id: string; value: string } | null>(null);
@@ -179,10 +209,32 @@ export default function WindowDesigner({
 
   const selectedPanel = selectedPanelId ? cells.find((cell) => cell.pathId === selectedPanelId) ?? null : null;
 
+  // Component-selection mode (D4). Sorted BIGGEST FIRST so nested components
+  // (the glass inside a sash, a divider between two cells) paint last and win
+  // the click — the smallest thing under the cursor is what you meant.
+  const componentLayer = useMemo(
+    () =>
+      components
+        ? [...components].sort((a, b) => b.rect.w * b.rect.h - a.rect.w * a.rect.h)
+        : null,
+    [components],
+  );
+  const selectedComponent = componentLayer?.find((c) => c.componentId === selectedComponentId) ?? null;
+  // Divider handles brighten for the selected region in whichever mode is live.
+  const selectionPath = componentLayer ? selectedComponent?.path ?? null : selectedPanelId;
+
   const dimensions = useMemo(
     () => buildScreenDimensions(splits, displayPositions, solvedPositions, outer, metrics, heightMm),
     [displayPositions, heightMm, metrics, outer, solvedPositions, splits],
   );
+
+  /**
+   * mm rect → stage px, mirrored first when the drawing underneath is the
+   * internal elevation. The engine mirrors about x = outer.w (its viewBox is
+   * symmetric about the centreline), so this is the identical transform.
+   */
+  const toScreen = (r: Rect): Rect =>
+    rectToScreen(mirrored ? { ...r, x: outer.w - (r.x + r.w) } : r, metrics);
 
   function parentBoundsOf(split: SolvedSplit): Rect {
     return boundsForPath(split.pathId, splits, solvedPositions, outer);
@@ -303,24 +355,95 @@ export default function WindowDesigner({
         onPointerUp={finishDragging}
         onPointerCancel={finishDragging}
       >
-        <defs>
-          <marker
-            id={markerId}
-            markerWidth="7"
-            markerHeight="7"
-            refX="3.5"
-            refY="3.5"
-            orient="auto-start-reverse"
-            markerUnits="userSpaceOnUse"
-          >
-            <path d="M 0 0 L 7 3.5 L 0 7 z" fill="#7b8490" />
-          </marker>
-        </defs>
+        {/* Component hit-areas (D4). Click empty space to clear the selection. */}
+        {componentLayer && (
+          <g>
+            <rect
+              x={0}
+              y={0}
+              width={metrics.stage.width}
+              height={metrics.stage.height}
+              fill="transparent"
+              onClick={() => onSelectComponent?.(null)}
+            />
+            {componentLayer.map((component) => {
+              const rect = toScreen(component.rect);
+              if (rect.w <= 0 || rect.h <= 0) return null;
+              const selected = component.componentId === selectedComponentId;
+              const hovered = component.componentId === hoveredComponentId;
+              return (
+                <g
+                  key={component.componentId}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectComponent?.(component.componentId);
+                  }}
+                  onMouseEnter={() => setHoveredComponentId(component.componentId)}
+                  onMouseLeave={() =>
+                    setHoveredComponentId((current) =>
+                      current === component.componentId ? null : current,
+                    )
+                  }
+                  className="cursor-pointer"
+                >
+                  <title>{component.label}</title>
+                  <rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} fill="transparent" />
+                  {(hovered || selected) && (
+                    <rect
+                      x={rect.x}
+                      y={rect.y}
+                      width={rect.w}
+                      height={rect.h}
+                      // Never opaque — the fabrication drawing must stay readable
+                      // underneath the selection (ux-design-language.md §2).
+                      fill="#4442e3"
+                      fillOpacity={selected ? 0.16 : 0.07}
+                      stroke="#ffffff"
+                      strokeWidth={selected ? 4 : 3}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  )}
+                  {(hovered || selected) && (
+                    <rect
+                      x={rect.x}
+                      y={rect.y}
+                      width={rect.w}
+                      height={rect.h}
+                      fill="none"
+                      stroke="#4442e3"
+                      strokeWidth={selected ? 2 : 1.5}
+                      strokeDasharray={selected ? undefined : "5 4"}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  )}
+                  {hovered && !selected && (
+                    <foreignObject
+                      x={clampLabelX(rect.x + rect.w / 2, metrics) - 90}
+                      y={clampLabelY(rect.y + rect.h / 2, metrics) - 12}
+                      width={180}
+                      height={24}
+                      pointerEvents="none"
+                    >
+                      <div className="flex h-[24px] w-[180px] items-center justify-center">
+                        <span className="truncate rounded bg-slate-900/85 px-2 py-0.5 text-[11px] font-semibold text-white">
+                          {component.label}
+                        </span>
+                      </div>
+                    </foreignObject>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        )}
 
         {/* Panel hit-areas + selection/hover highlight (over the real profile). */}
+        {!componentLayer && (
         <g>
           {cells.map((cell) => {
-            const rect = rectToScreen(cell.outer, metrics);
+            const rect = toScreen(cell.outer);
             const selected = cell.pathId === selectedPanelId;
             const hovered = cell.pathId === hoveredPanelId;
             return (
@@ -353,14 +476,15 @@ export default function WindowDesigner({
             );
           })}
         </g>
+        )}
 
-        {/* Dimension lines + editable labels. */}
+        {/* Dimension lines + editable labels (External / Schematic only). */}
+        {!mirrored && (
         <g>
           {dimensions.map((dimension) => (
             <DimensionLine
               key={dimension.id}
               dimension={dimension}
-              markerId={markerId}
               editing={editingDimension?.id === dimension.id ? editingDimension : null}
               onEdit={(value) => setEditingDimension({ id: dimension.id, value })}
               onEditingValueChange={(value) => setEditingDimension({ id: dimension.id, value })}
@@ -369,8 +493,10 @@ export default function WindowDesigner({
             />
           ))}
         </g>
+        )}
 
         {/* Drag handles on dividers (revealed on hover / when a bounded panel is selected). */}
+        {!mirrored && (
         <g>
           {splits.map((split) => {
             const center = displayPositions[split.pathId] ?? split.centerMm;
@@ -384,7 +510,7 @@ export default function WindowDesigner({
             const cy = rect.y + rect.h / 2;
             const hovered = hoveredSplitId === split.pathId;
             const dragging = drag?.pathId === split.pathId;
-            const relatedToSelection = selectedPanelId ? isBoundingSplit(split.pathId, selectedPanelId) : false;
+            const relatedToSelection = selectionPath ? isBoundingSplit(split.pathId, selectionPath) : false;
             const active = hovered || dragging || relatedToSelection;
             const handleW = split.orientation === "horizontal" ? 64 : 24;
             const handleH = split.orientation === "horizontal" ? 24 : 64;
@@ -436,9 +562,10 @@ export default function WindowDesigner({
             );
           })}
         </g>
+        )}
 
         {/* Sliding patio: per-panel width labels + draggable boundary handles. */}
-        {isSliding && slidingDaylight && (
+        {!mirrored && isSliding && slidingDaylight && (
           <g>
             {/* Per-panel width labels (read-only) below the frame. */}
             {cells.map((cell) => {
@@ -453,20 +580,19 @@ export default function WindowDesigner({
                     y1={lineY}
                     x2={panel.x + panel.w}
                     y2={lineY}
-                    stroke="#7b8490"
-                    strokeWidth="1.4"
-                    markerStart={`url(#${markerId})`}
-                    markerEnd={`url(#${markerId})`}
+                    stroke={DIM_LINE}
+                    strokeWidth="1"
+                    vectorEffect="non-scaling-stroke"
                   />
-                  <line x1={panel.x} y1={lineY - 8} x2={panel.x} y2={lineY + 8} stroke="#7b8490" strokeWidth="1.2" />
-                  <line x1={panel.x + panel.w} y1={lineY - 8} x2={panel.x + panel.w} y2={lineY + 8} stroke="#7b8490" strokeWidth="1.2" />
+                  <line x1={panel.x} y1={lineY - 7} x2={panel.x} y2={lineY + 7} stroke={DIM_LINE} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                  <line x1={panel.x + panel.w} y1={lineY - 7} x2={panel.x + panel.w} y2={lineY + 7} stroke={DIM_LINE} strokeWidth="1" vectorEffect="non-scaling-stroke" />
                   <foreignObject
                     x={labelX - LABEL_WIDTH_PX / 2}
                     y={clampLabelY(lineY, metrics) - LABEL_HEIGHT_PX / 2}
                     width={LABEL_WIDTH_PX}
                     height={LABEL_HEIGHT_PX}
                   >
-                    <div className="flex h-[28px] w-[76px] items-center justify-center rounded border border-slate-300 bg-white px-2 text-center font-mono text-[12px] font-semibold leading-none text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.14)]">
+                    <div className="flex h-[28px] w-[84px] items-center justify-center rounded-full border border-slate-200 bg-white px-2 text-center font-mono text-[12px] font-semibold leading-none text-slate-600 shadow-[var(--shadow-sm)]">
                       {roundMm(widthMmValue)}
                     </div>
                   </foreignObject>
@@ -525,7 +651,10 @@ export default function WindowDesigner({
         )}
       </svg>
 
-      {selectedPanel && (
+      {/* Legacy per-cell properties popover. In component-selection mode the
+          inspector shows the same facts in an EDITABLE, scoped form, so showing
+          both would be two competing sources of truth. */}
+      {!componentLayer && selectedPanel && (
         <div className="absolute bottom-3 left-3 w-[min(280px,calc(100%-24px))] rounded-md border border-slate-200 bg-white/95 p-3 text-sm shadow-[0_16px_34px_rgba(15,23,42,0.14)] backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -571,7 +700,6 @@ export default function WindowDesigner({
 
 function DimensionLine({
   dimension,
-  markerId,
   editing,
   onEdit,
   onEditingValueChange,
@@ -579,7 +707,6 @@ function DimensionLine({
   onCancel,
 }: {
   dimension: DimensionSpec;
-  markerId: string;
   editing: { id: string; value: string } | null;
   onEdit: (value: string) => void;
   onEditingValueChange: (value: string) => void;
@@ -590,25 +717,27 @@ function DimensionLine({
 
   return (
     <g>
+      {/* A drafting leader line: hairline run with a perpendicular tick at each
+          end. Thin and grey on purpose — the drawing is the subject, the
+          measurement is an annotation over it. */}
       <line
         x1={dimension.x1}
         y1={dimension.y1}
         x2={dimension.x2}
         y2={dimension.y2}
-        stroke="#7b8490"
-        strokeWidth="1.4"
-        markerStart={`url(#${markerId})`}
-        markerEnd={`url(#${markerId})`}
+        stroke={DIM_LINE}
+        strokeWidth="1"
+        vectorEffect="non-scaling-stroke"
       />
       {dimension.axis === "width" ? (
         <>
-          <line x1={dimension.x1} y1={dimension.y1 - 8} x2={dimension.x1} y2={dimension.y1 + 8} stroke="#7b8490" strokeWidth="1.2" />
-          <line x1={dimension.x2} y1={dimension.y2 - 8} x2={dimension.x2} y2={dimension.y2 + 8} stroke="#7b8490" strokeWidth="1.2" />
+          <line x1={dimension.x1} y1={dimension.y1 - 7} x2={dimension.x1} y2={dimension.y1 + 7} stroke={DIM_LINE} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <line x1={dimension.x2} y1={dimension.y2 - 7} x2={dimension.x2} y2={dimension.y2 + 7} stroke={DIM_LINE} strokeWidth="1" vectorEffect="non-scaling-stroke" />
         </>
       ) : (
         <>
-          <line x1={dimension.x1 - 8} y1={dimension.y1} x2={dimension.x1 + 8} y2={dimension.y1} stroke="#7b8490" strokeWidth="1.2" />
-          <line x1={dimension.x2 - 8} y1={dimension.y2} x2={dimension.x2 + 8} y2={dimension.y2} stroke="#7b8490" strokeWidth="1.2" />
+          <line x1={dimension.x1 - 7} y1={dimension.y1} x2={dimension.x1 + 7} y2={dimension.y1} stroke={DIM_LINE} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <line x1={dimension.x2 - 7} y1={dimension.y2} x2={dimension.x2 + 7} y2={dimension.y2} stroke={DIM_LINE} strokeWidth="1" vectorEffect="non-scaling-stroke" />
         </>
       )}
 
@@ -617,6 +746,7 @@ function DimensionLine({
         y={dimension.labelY - LABEL_HEIGHT_PX / 2}
         width={LABEL_WIDTH_PX}
         height={LABEL_HEIGHT_PX}
+        style={{ overflow: "visible" }}
       >
         {editing ? (
           <DimensionInput
@@ -630,8 +760,13 @@ function DimensionLine({
             type="button"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={() => onEdit(String(roundMm(dimension.valueMm)))}
-            className="flex h-[28px] min-h-[28px] w-[76px] min-w-[60px] items-center justify-center rounded border border-slate-300 bg-white px-2 text-center font-mono text-[12px] font-semibold leading-none text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.14)]"
+            title="Click to edit"
+            className="group flex h-[28px] min-h-[28px] w-[84px] min-w-[64px] items-center justify-center gap-1 rounded-full border border-slate-200 bg-white px-2 text-center font-mono text-[12px] font-semibold leading-none text-amber-600 shadow-[var(--shadow-sm)] transition hover:border-[#4442e3]/50 hover:text-[#4442e3]"
           >
+            <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-slate-400 transition group-hover:text-[#4442e3]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
             {valueText}
           </button>
         )}
@@ -671,7 +806,7 @@ function DimensionInput({
         if (event.key === "Enter") onCommit(value);
         if (event.key === "Escape") onCancel();
       }}
-      className="h-[28px] w-[76px] min-w-[60px] rounded border border-blue-400 bg-white px-2 text-center font-mono text-[12px] font-semibold leading-none text-slate-950 shadow-[0_6px_14px_rgba(15,23,42,0.16)] outline-none"
+      className="h-[28px] w-[84px] min-w-[64px] rounded-full border border-[#4442e3] bg-white px-2 text-center font-mono text-[12px] font-semibold leading-none text-slate-950 shadow-[var(--shadow-md)] outline-none"
     />
   );
 }

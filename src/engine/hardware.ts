@@ -37,15 +37,28 @@ const TUNING = {
 export function computeHardware(
   geom: SolvedGeometry,
   system: ProfileSystem,
+  /**
+   * Slot-keyed substitutions (Designer phase 2): slot name → catalog hardware
+   * partKey to fit instead of the calibrated default. Only genuine 1:1 slots
+   * accept an override — the casement/door "handle", and the door leaf's
+   * fixed-quantity "lock" / "cylinder" / "hinge". Size-SELECTED gear
+   * (espagnolette, friction stay) is never overridable (questions.md Q19).
+   * Absent ⇒ byte-identical.
+   */
+  overrides?: Record<string, string>,
 ): HardwarePiece[] {
   const tally = new Map<string, { name: string; qty: number; why: string[] }>();
-  const add = (key: string, qty: number, reason: string) => {
-    const hw = system.hardware[key];
+  const add = (key: string, qty: number, reason: string, slot?: string) => {
+    const effectiveKey =
+      slot && overrides?.[slot] && system.hardware[overrides[slot]]
+        ? overrides[slot]
+        : key;
+    const hw = system.hardware[effectiveKey];
     if (!hw) return;
-    const slot = tally.get(hw.code) ?? { name: hw.name, qty: 0, why: [] };
-    slot.qty += qty;
-    slot.why.push(reason);
-    tally.set(hw.code, slot);
+    const entry = tally.get(hw.code) ?? { name: hw.name, qty: 0, why: [] };
+    entry.qty += qty;
+    entry.why.push(reason);
+    tally.set(hw.code, entry);
   };
 
   for (const cell of geom.cells) {
@@ -63,7 +76,7 @@ export function computeHardware(
 
     if (c === "casement-top") {
       // Top-hung: espag on bottom (horizontal), hinges on sides (vertical).
-      add("hw-handle-inline", 1, "casement handle");
+      add("hw-handle-inline", 1, "casement handle", "handle");
       const espagKey = pickEspag(sashW);
       add(espagKey, 1, `espag for top-hung sash width=${sashW}`);
       const hingeKey = pickFrictionHinge(sashH);
@@ -73,7 +86,7 @@ export function computeHardware(
       add("hw-runup-block", 2, "top-hung run-up blocks");
     } else if (c === "casement-side-left" || c === "casement-side-right") {
       // Side-hung: espag on side (vertical), hinges on head/sill (horizontal).
-      add("hw-handle-inline", 1, "casement handle");
+      add("hw-handle-inline", 1, "casement handle", "handle");
       const espagKey = pickEspag(sashH);
       add(espagKey, 1, `espag for side-hung sash height=${sashH}`);
       const hingeKey = pickFrictionHinge(sashW);
@@ -95,17 +108,20 @@ export function computeHardware(
       add("hw-tt-hinge-set", 1, "tilt & turn hinge set (corner + top stay)");
       add("hw-tt-restrictor", 1, "tilt & turn restrictor");
     } else if (c === "door-right") {
-      add("hw-door-handle", 1, "door handle");
-      add("hw-flag-hinge-white", 3, "3 flag hinges");
-      add("hw-door-lock", 1, "door lock");
-      add("hw-cylinder-brass", 1, "cylinder");
+      // The door set is FIXED-QUANTITY per leaf (nothing here is size-selected),
+      // so lock/cylinder/hinge are genuine 1:1 substitution slots like the
+      // handle — a Designer choice swaps the part and changes no geometry.
+      add("hw-door-handle", 1, "door handle", "handle");
+      add("hw-flag-hinge-white", 3, "3 flag hinges", "hinge");
+      add("hw-door-lock", 1, "door lock", "lock");
+      add("hw-cylinder-brass", 1, "cylinder", "cylinder");
       add("hw-keep-rh", 1, "R/H keep set");
       add("hw-runup-block", 1, "door run-up block");
     } else if (c === "door-left") {
-      add("hw-door-handle", 1, "door handle");
-      add("hw-flag-hinge-white", 3, "3 flag hinges");
-      add("hw-door-lock", 1, "door lock");
-      add("hw-cylinder-brass", 1, "cylinder");
+      add("hw-door-handle", 1, "door handle", "handle");
+      add("hw-flag-hinge-white", 3, "3 flag hinges", "hinge");
+      add("hw-door-lock", 1, "door lock", "lock");
+      add("hw-cylinder-brass", 1, "cylinder", "cylinder");
       add("hw-keep-lh", 1, "L/H keep set");
       add("hw-runup-block", 1, "door run-up block");
     } else if (c === "french-door-master" || c === "french-door-slave") {
@@ -118,7 +134,7 @@ export function computeHardware(
       add("hw-cavity-lock-block", 4, "4 cavity locking blocks per French leaf");
       add("hw-flag-hinge-white", 3, "3 flag hinges per French leaf (approx)");
       if (c === "french-door-master") {
-        add("hw-door-handle", 1, "French master-leaf handle (doc header)");
+        add("hw-door-handle", 1, "French master-leaf handle (doc header)", "handle");
         add("hw-door-lock", 1, "French master-leaf lock (approx)");
         add("hw-cylinder-brass", 1, "French cylinder (doc header)");
       } else {
@@ -134,7 +150,7 @@ export function computeHardware(
         add("hw-fixed-panel-support", 7, "7 fixed-panel supports per fixed panel");
       } else {
         // sliding-slide-left / sliding-slide-right — per SLIDING panel.
-        add("hw-patio-handle-white", 1, "patio handle");
+        add("hw-patio-handle-white", 1, "patio handle", "handle");
         // Dedicated patio cylinder (GLIS-12) — NOT the door brass cylinder, which
         // is a different (door) price. Keeps sliding pricing off the door line.
         add("hw-patio-cylinder", 1, "patio cylinder");

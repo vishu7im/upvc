@@ -13,7 +13,7 @@
 //   npm run db:seed
 // =====================================================================
 
-import { PrismaClient, PartKind, type Prisma } from "@prisma/client";
+import { PrismaClient, PartKind, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -25,6 +25,9 @@ import { renderSvg } from "../src/engine/svg.ts";
 import { DERIVED } from "../src/catalog/derived-topologies.generated.ts";
 import { SLIDING_DESIGNS } from "../src/catalog/sliding-designs.ts";
 import { DEFAULT_SETTINGS } from "../src/catalog/settings.ts";
+import { FAMILIES, buildOptionSystem } from "../src/catalog/families/index.ts";
+import { assertValidRule } from "../src/designer/rules.ts";
+import { assertOptionSystemIntegrity } from "../src/designer/option-integrity.ts";
 import { syncRbac } from "../src/rbac/sync.ts";
 import { DEFAULT_ORG } from "../src/rbac/registry.ts";
 import type { Design, ProfileSystem } from "../src/types.ts";
@@ -203,7 +206,9 @@ async function seedSystem(
   // 6. Colours / finishes (M5 + U7) — base white at 0% uplift; the rest ship a
   // display hex but 0% uplift (owner sets real upcharges via the admin editor).
   // update = structural fields only (uplift %s preserved across re-seed); create
-  // seeds the full row incl. hex.
+  // seeds the full row incl. hex. `texture` is owner-owned the same way: the
+  // seed source never carries it, so a reseed cannot clear a finish the owner
+  // has tagged as woodgrain.
   for (const [key, c] of Object.entries(sys.colours)) {
     const {
       costUpliftPct: _costUpliftPct,
@@ -359,6 +364,9 @@ async function main() {
   await applyDerivedTopologies();
   await applySlidingTopologies();
 
+  // Designer platform (Task 1 phase 1): family descriptors + option system.
+  await applyDesignerOptionSystem();
+
   // RBAC foundation (org, actions, modules, roles, default grids) from the
   // registry — idempotent, inserts-only for grids (owner-edited grids kept).
   // Mirrors the Phase-1 migration backfill so fresh + migrated installs match.
@@ -373,7 +381,7 @@ async function main() {
   // Quick summary so the operator can eyeball the counts.
   const [
     systems, parts, glass, gaskets, hardware, colours, rmap, settings,
-    products, designs, quotable, users,
+    products, designs, quotable, users, families, optionDefs, optionChoices,
   ] = await Promise.all([
     prisma.profileSystem.count(),
     prisma.profilePart.count(),
@@ -387,9 +395,15 @@ async function main() {
     prisma.design.count(),
     prisma.design.count({ where: { quotable: true } }),
     prisma.user.count(),
+    prisma.productFamily.count(),
+    prisma.optionDef.count(),
+    prisma.optionChoice.count(),
   ]);
   console.log("Seed complete:");
-  console.table({ systems, parts, glass, gaskets, hardware, colours, rmap, settings, products, designs, quotable, users });
+  console.table({
+    systems, parts, glass, gaskets, hardware, colours, rmap, settings,
+    products, designs, quotable, users, families, optionDefs, optionChoices,
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -566,6 +580,159 @@ async function applySlidingTopologies() {
     }
   }
   console.log(`Applied ${applied} sliding-patio topologies (quotable).`);
+}
+
+// ---------------------------------------------------------------------
+// DESIGNER PLATFORM (Task 1 / windows-module phase 1)
+// ---------------------------------------------------------------------
+
+/**
+ * Every catalog key a choice's `partKey` is allowed to point at, read from the
+ * DB (not from the TS source) so this validates the catalog that will actually
+ * be served. A dangling partKey silently prices to 0, which breaks
+ * auditability — so it is a hard seed failure, never a warning
+ * (Spec/00-architecture/data-model.md §5).
+ */
+async function loadCatalogKeys(systemId: string): Promise<Set<string>> {
+  const [parts, glass, gaskets, hardware, cills, colours] = await Promise.all([
+    prisma.profilePart.findMany({ where: { systemId }, select: { partKey: true } }),
+    prisma.glass.findMany({ where: { systemId }, select: { partKey: true } }),
+    prisma.gasket.findMany({ where: { systemId }, select: { partKey: true } }),
+    prisma.hardware.findMany({ where: { systemId }, select: { partKey: true } }),
+    prisma.cill.findMany({ where: { systemId }, select: { partKey: true } }),
+    prisma.colourOption.findMany({ where: { systemId }, select: { key: true } }),
+  ]);
+  return new Set([
+    ...parts.map((r) => r.partKey),
+    ...glass.map((r) => r.partKey),
+    ...gaskets.map((r) => r.partKey),
+    ...hardware.map((r) => r.partKey),
+    ...cills.map((r) => r.partKey),
+    ...colours.map((r) => r.key),
+  ]);
+}
+
+/**
+ * Family descriptors + the option system.
+ *
+ * Idempotent upserts by key, no interactive transaction (pooler-safe). The
+ * OWNER-OWNED fields — `presentation`, `order`/`sort_order` and
+ * `defaultCollapsed` — are written on CREATE only and never rewritten on
+ * update, exactly like cost/price/weight on catalog parts: an admin who
+ * reorders a group or rewrites its help text keeps that across deploys.
+ */
+async function applyDesignerOptionSystem() {
+  const seed = buildOptionSystem(SUNNYPLAST_70);
+  const catalogKeys = await loadCatalogKeys(SYSTEM_ID);
+  assertOptionSystemIntegrity(seed, catalogKeys);
+
+  const seededGroupKeys = new Set(seed.groups.map((g) => g.key));
+  for (const f of FAMILIES) {
+    for (const c of f.constraints) assertValidRule(c.assert, `family ${f.familyKey} constraint ${c.id}`);
+    for (const key of f.optionGroupKeys) {
+      if (!seededGroupKeys.has(key)) {
+        throw new Error(`Family "${f.familyKey}" lists option group "${key}", which no seed defines`);
+      }
+    }
+    await prisma.productFamily.upsert({
+      where: { key: f.familyKey },
+      update: { name: f.name, status: f.status, descriptor: f as unknown as Prisma.InputJsonValue },
+      create: {
+        key: f.familyKey,
+        name: f.name,
+        status: f.status,
+        descriptor: f as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
+
+  for (const g of seed.groups) {
+    await prisma.optionGroup.upsert({
+      where: { key: g.key },
+      // order + defaultCollapsed are owner-owned ⇒ absent from update.
+      update: { name: g.name, icon: g.icon ?? null, scope: g.scope },
+      create: {
+        key: g.key,
+        name: g.name,
+        order: g.order,
+        icon: g.icon ?? null,
+        defaultCollapsed: g.defaultCollapsed,
+        scope: g.scope,
+      },
+    });
+  }
+
+  const json = (v: unknown): Prisma.InputJsonValue | undefined =>
+    v === undefined ? undefined : (v as Prisma.InputJsonValue);
+
+  for (const o of seed.options) {
+    const structural = {
+      groupKey: o.groupKey,
+      name: o.name,
+      display: o.display,
+      required: o.required,
+      scope: json(o.scope)!,
+      filters: json(o.filters) ?? Prisma.DbNull,
+      visibility: json(o.visibility) ?? Prisma.DbNull,
+      validation: json(o.validation) ?? Prisma.DbNull,
+      pricingMode: o.pricingMode,
+      action: json(o.action) ?? Prisma.DbNull,
+      familyKeys: o.familyKeys,
+    };
+    await prisma.optionDef.upsert({
+      where: { key: o.key },
+      // order + presentation are owner-owned ⇒ absent from update.
+      update: structural,
+      create: {
+        key: o.key,
+        order: o.order,
+        presentation: json(o.presentation) ?? Prisma.DbNull,
+        ...structural,
+      },
+    });
+  }
+
+  for (const c of seed.choices) {
+    const structural = {
+      optionKey: c.optionKey,
+      label: c.label,
+      isDefault: c.isDefault,
+      filterKeys: c.filterKeys ?? [],
+      image: json(c.image) ?? Prisma.DbNull,
+      swatchHex: c.swatchHex ?? null,
+      partKey: c.partKey ?? null,
+      engineEffect: json(c.engineEffect) ?? Prisma.DbNull,
+      visibility: json(c.visibility) ?? Prisma.DbNull,
+    };
+    await prisma.optionChoice.upsert({
+      where: { key: c.key },
+      update: structural, // order is owner-owned
+      create: { key: c.key, order: c.order, ...structural },
+    });
+  }
+
+  // Drop rows the seed no longer defines, scoped to the families we own here:
+  // a colour removed from the catalog must not linger as a selectable choice.
+  // (Deleting an option cascades to its choices.) Options belonging to other
+  // families are untouched.
+  const ownedFamilies = FAMILIES.map((f) => f.familyKey);
+  const staleOptions = await prisma.optionDef.deleteMany({
+    where: { familyKeys: { hasSome: ownedFamilies }, key: { notIn: seed.options.map((o) => o.key) } },
+  });
+  const staleChoices = await prisma.optionChoice.deleteMany({
+    where: {
+      optionKey: { in: seed.options.map((o) => o.key) },
+      key: { notIn: seed.choices.map((c) => c.key) },
+    },
+  });
+
+  console.log(
+    `Designer: ${FAMILIES.length} family descriptor(s), ${seed.groups.length} groups, ` +
+      `${seed.options.length} options, ${seed.choices.length} choices` +
+      (staleOptions.count || staleChoices.count
+        ? ` (pruned ${staleOptions.count} stale options, ${staleChoices.count} stale choices)`
+        : ""),
+  );
 }
 
 /**

@@ -18,4 +18,10 @@ export {
   listSystems,
   listDesigns,
   DEFAULT_SETTINGS,
+  // Designer platform (product families + JSON option system).
+  loadDesignerSnapshot,
+  getFamily,
+  listFamilies,
+  getOptionSystem,
+  getCatalogVersion,
 } from "./loader.ts";

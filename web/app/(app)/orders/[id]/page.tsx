@@ -6,7 +6,7 @@ import { can } from "@/lib/permissions";
 import type { OrderDetail } from "@/lib/types";
 import { money, dateShort, docLabel } from "@/lib/format";
 import { StatusBadge } from "../page";
-import { RemoveItemButton, ConfirmOrderButton } from "./order-actions";
+import { RemoveItemButton, RemoveDesignerItemButton, ConfirmOrderButton } from "./order-actions";
 import { DocumentViewer } from "./document-viewer";
 import {
   Badge,
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import DeleteOrderButton from "../delete-order-button";
+import PricingPanel, { BasketSummary } from "./pricing-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }
 
   const isDraft = order.status === "draft";
+  // Money on this page comes from ONE place: the server's BasketTotals
+  // (src/designer/basket.ts), which is also what the Price Summary prints.
+  const basket = order.basket;
+  const currency = basket?.currency ?? "GBP";
+  const basketTotal = basket ? basket.grandTotal : order.totalPrice;
+  // Per-line money also comes from the basket, so a row and the ledger below it
+  // can never show different arithmetic.
+  const lineTotal = (id: string) =>
+    basket?.lines.find((l) => l.id === id)?.lineNetPrice ?? null;
+  // Designer line items (D2) and legacy items coexist on one order; both count
+  // towards "is this order confirmable".
+  const designerItems = order.designerItems ?? [];
+  const totalLines = order.items.length + designerItems.length;
 
   // The confirm step stores up to two rows per doc type (normal + welded for the
   // length-bearing docs). Collapse to one card per type, carrying its variants.
@@ -95,8 +109,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         meta={
           <>
             <StatusBadge status={order.status} />
-            <Badge tone="slate">{order.items.length} {order.items.length === 1 ? "item" : "items"}</Badge>
-            <Badge tone={isDraft ? "amber" : "green"}>{money(order.totalPrice)}</Badge>
+            <Badge tone="slate">{totalLines} {totalLines === 1 ? "item" : "items"}</Badge>
+            <Badge tone={isDraft ? "amber" : "green"}>{money(basketTotal, currency)}</Badge>
           </>
         }
       />
@@ -109,8 +123,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase text-slate-500">Order value</p>
-          <p className="mt-2 text-xl font-bold text-slate-950">{money(order.totalPrice)}</p>
-          <p className="mt-1 text-sm text-slate-500">Snapshot total from engine pricing</p>
+          <p className="mt-2 text-xl font-bold text-slate-950">{money(basketTotal, currency)}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {isDraft ? "Live total incl. extras, discount and VAT" : "Frozen at confirmation"}
+          </p>
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase text-slate-500">Documents</p>
@@ -131,23 +147,30 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <th className={thClass}>Size</th>
                   <th className={thClass + " text-right"}>Qty</th>
                   <th className={thClass}>Mode</th>
+                  <th className={thClass + " text-right"}>Line total</th>
                   {isDraft && <th className={thClass} />}
                 </tr>
               </thead>
               <tbody>
                 {order.items.length === 0 ? (
                   <tr>
-                    <td colSpan={isDraft ? 6 : 5} className="px-4 py-10">
-                      <EmptyState
-                        icon="products"
-                        title="No items yet"
-                        description="Add a configured design from the product gallery before confirming this order."
-                        action={
-                          <ButtonLink href={`/products?orderId=${order.id}`} icon="plus">
-                            Add item
-                          </ButtonLink>
-                        }
-                      />
+                    <td colSpan={isDraft ? 7 : 6} className="px-4 py-10">
+                      {designerItems.length > 0 ? (
+                        <p className="text-center text-sm text-slate-500">
+                          This order&apos;s items were configured in the studio — see below.
+                        </p>
+                      ) : (
+                        <EmptyState
+                          icon="products"
+                          title="No items yet"
+                          description="Add a configured design from the product gallery before confirming this order."
+                          action={
+                            <ButtonLink href={`/products?orderId=${order.id}`} icon="plus">
+                              Add item
+                            </ButtonLink>
+                          }
+                        />
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -172,6 +195,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       <td className={tdClass}>
                         <Badge tone="slate">{item.mode}</Badge>
                       </td>
+                      <td className={tdClass + " text-right font-semibold"}>
+                        {money(lineTotal(item.id), currency)}
+                      </td>
                       {isDraft && (
                         <td className={tdClass + " text-right"}>
                           <RemoveItemButton orderId={order.id} itemId={item.id} />
@@ -186,6 +212,119 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </div>
       </Card>
 
+      {designerItems.length > 0 && (
+        <Card className="mt-6 overflow-hidden">
+          <SectionHeader
+            title="Designer line items"
+            description="Configured in the studio — reopen one to change its measurements or specification"
+          />
+          <div className={tableWrapClass + " rounded-none border-x-0 border-b-0"}>
+            <div className="overflow-x-auto">
+              <table className={tableClass}>
+                <thead>
+                  <tr>
+                    <th className={thClass}>Item</th>
+                    <th className={thClass}>Size</th>
+                    <th className={thClass}>Specification</th>
+                    <th className={thClass + " text-right"}>Qty</th>
+                    <th className={thClass + " text-right"}>Total</th>
+                    <th className={thClass} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {designerItems.map((item) => {
+                    const errors = item.issues.filter((i) => i.severity === "error").length;
+                    const qty = item.draft.quantity ?? 1;
+                    return (
+                      <tr key={item.id} className="transition hover:bg-slate-50">
+                        <td className={tdClass}>
+                          <div className="font-semibold text-slate-950">
+                            {item.summary?.locationLabel || `Item ${item.position}`}
+                          </div>
+                          <div className="text-xs font-medium text-slate-500">{item.draft.familyKey}</div>
+                        </td>
+                        <td className={tdClass}>
+                          <span className="font-mono text-sm text-slate-800">
+                            {item.summary?.sizeLabel ?? "—"} mm
+                          </span>
+                        </td>
+                        <td className={tdClass}>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {item.summary?.colourLabel && <Badge tone="slate">{item.summary.colourLabel}</Badge>}
+                            <Badge tone="slate">
+                              {item.summary?.leafCount ?? 0}{" "}
+                              {item.summary?.leafCount === 1 ? "leaf" : "leaves"}
+                            </Badge>
+                            {errors > 0 && <Badge tone="red">{errors} to fix</Badge>}
+                          </div>
+                        </td>
+                        <td className={tdClass + " text-right font-semibold"}>{qty}</td>
+                        <td className={tdClass + " text-right font-semibold"}>
+                          {item.totals ? money(item.totals.grandTotal * qty) : "—"}
+                        </td>
+                        <td className={tdClass + " text-right"}>
+                          {isDraft && (
+                            <div className="flex items-center justify-end gap-1">
+                              <Link
+                                href={`/designer?family=${encodeURIComponent(item.draft.familyKey)}&design=${encodeURIComponent(item.draft.designId)}&system=${encodeURIComponent(item.draft.systemId)}&orderId=${order.id}&itemId=${item.id}`}
+                                className="inline-flex h-8 items-center rounded-md px-2 text-sm font-semibold text-[#4442e3] transition hover:bg-[#e7e6ff]"
+                              >
+                                Edit
+                              </Link>
+                              <RemoveDesignerItemButton orderId={order.id} itemId={item.id} />
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {basket && (
+        <div className="mt-6">
+          {isDraft ? (
+            <PricingPanel order={order} editable />
+          ) : (
+            <Card className="overflow-hidden">
+              <SectionHeader
+                title="Order summary"
+                description="Frozen at confirmation — the numbers on the customer's paperwork."
+              />
+              <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+                <dl className="grid grid-cols-2 gap-4 self-start text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-xs font-semibold uppercase text-slate-500">Fitting</dt>
+                    <dd className="mt-1 font-semibold text-slate-900">
+                      {basket.fittingType === "none"
+                        ? "Supply only"
+                        : basket.fittingType === "fit"
+                          ? "Supply & fit"
+                          : "Fit + survey"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase text-slate-500">Discount</dt>
+                    <dd className="mt-1 font-semibold text-slate-900">
+                      {basket.discountCode ?? "None"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase text-slate-500">VAT rate</dt>
+                    <dd className="mt-1 font-semibold text-slate-900">{basket.taxRatePct}%</dd>
+                  </div>
+                </dl>
+                <BasketSummary basket={basket} currency={currency} />
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
       {isDraft && (
         <Card className="mt-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -194,7 +333,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               Confirming locks the order and generates the production document set.
             </p>
           </div>
-          <ConfirmOrderButton orderId={order.id} disabled={order.items.length === 0} />
+          <ConfirmOrderButton orderId={order.id} disabled={totalLines === 0} />
         </Card>
       )}
 

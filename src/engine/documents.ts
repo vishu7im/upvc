@@ -6,7 +6,7 @@
 // Puppeteer or Playwright — the HTML is already print-ready.
 // =====================================================================
 
-import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, DocColour, BarPiece } from "../types.ts";
+import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, DocColour, DocBasket, BarPiece } from "../types.ts";
 
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #28323c; margin: 32px; }
@@ -350,6 +350,40 @@ export function renderBom(
   `, branding);
 }
 
+/**
+ * The order-level commercial block (phase 6). Rendered ONLY when a basket is
+ * supplied; absent ⇒ "" so the pre-phase-6 Price Summary is byte-identical.
+ * Zero-value extras are omitted line by line — a quote with no delivery charge
+ * should not print "Delivery £0.00".
+ */
+function basketBlock(b?: DocBasket): string {
+  if (!b) return "";
+  const c = b.currency === "GBP" ? "£" : b.currency + " ";
+  const money = (n: number) => `${n < 0 ? "−" : ""}${c}${Math.abs(n).toFixed(2)}`;
+  const row = (label: string, value: number, cls = "") =>
+    `<tr${cls ? ` class="${cls}"` : ""}><td>${label}</td><td class="right">${money(value)}</td></tr>`;
+
+  const rows = [
+    row("Items (net)", b.itemsSubtotal),
+    b.itemsAdjustment ? row("Order-level pricing adjustment", b.itemsAdjustment) : "",
+    b.discount
+      ? row(`Discount${b.discountCode ? ` (${esc(b.discountCode)})` : ""}`, -b.discount)
+      : "",
+    b.fitting ? row("Fitting", b.fitting) : "",
+    b.survey ? row("Survey", b.survey) : "",
+    b.delivery ? row("Delivery", b.delivery) : "",
+    row(`Tax (VAT ${b.taxRatePct}%)`, b.tax),
+    row("ORDER TOTAL", b.grandTotal, "grand"),
+  ]
+    .filter(Boolean)
+    .join("");
+
+  return `
+    <div class="section-title">Order Summary</div>
+    <table class="totals"><tbody>${rows}</tbody></table>
+  `;
+}
+
 // ---------- PRICE SUMMARY -------------------------------------------
 export function renderPriceSummary(
   input: QuoteInput,
@@ -360,9 +394,19 @@ export function renderPriceSummary(
   images?: DocImage[],
   cill?: DocCill,
   colour?: DocColour,
+  basket?: DocBasket,
 ): string {
   const T = pricing.totals;
   const c = pricing.currency === "GBP" ? "£" : pricing.currency + " ";
+  // With a basket the engine block is the FABRICATION breakdown and the basket
+  // block carries the customer-facing total, so the engine's own tax/grand-total
+  // rows would print a second, contradictory total. They are replaced by the
+  // basket's. Without a basket, nothing changes (byte-identical).
+  const engineTail = basket
+    ? ""
+    : `
+        <tr><td>Tax (VAT)</td><td class="right">${c}${T.tax.toFixed(2)}</td></tr>
+        <tr class="grand"><td>GRAND TOTAL</td><td class="right">${c}${T.grandTotal.toFixed(2)}</td></tr>`;
   return wrap("Price Summary", `
     ${header(input, "PRICE SUMMARY", systemName, designName, branding, images, cill, colour)}
 
@@ -373,11 +417,9 @@ export function renderPriceSummary(
         <tr><td>Labour</td><td class="right">${c}${T.labour.toFixed(2)}</td></tr>
         <tr><td><b>Factory Cost</b></td><td class="right"><b>${c}${T.factoryCost.toFixed(2)}</b></td></tr>
         <tr><td>Markup</td><td class="right">${c}${T.markup.toFixed(2)}</td></tr>
-        <tr><td><b>Net Price</b></td><td class="right"><b>${c}${T.netPrice.toFixed(2)}</b></td></tr>
-        <tr><td>Tax (VAT)</td><td class="right">${c}${T.tax.toFixed(2)}</td></tr>
-        <tr class="grand"><td>GRAND TOTAL</td><td class="right">${c}${T.grandTotal.toFixed(2)}</td></tr>
+        <tr><td><b>Net Price</b></td><td class="right"><b>${c}${T.netPrice.toFixed(2)}</b></td></tr>${engineTail}
       </tbody>
-    </table>
+    </table>${basketBlock(basket)}
   `, branding);
 }
 
@@ -503,6 +545,7 @@ export function renderPlannerList(
   currency: string,
   branding?: DocBranding,
   images?: DocImage[],
+  basket?: DocBasket,
 ): string {
   const c = currency === "GBP" ? "£" : currency + " ";
   const rows = lines.map((l) => `
@@ -524,7 +567,7 @@ export function renderPlannerList(
       <thead><tr><th>#</th><th>Product</th><th>Design</th><th class="right">Size (mm)</th><th class="right">Qty</th><th>Mode</th><th class="right">Line Total</th></tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr><td colspan="6" class="right"><b>Order Total</b></td><td class="right"><b>${c}${grand.toFixed(2)}</b></td></tr></tfoot>
-    </table>
+    </table>${basketBlock(basket)}
   `, branding);
 }
 

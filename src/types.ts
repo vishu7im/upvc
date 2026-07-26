@@ -172,6 +172,13 @@ export interface ColourOption {
    * the resolved tier, pricing falls back to base × the %-uplift.
    */
   tier?: "1p" | "2p";
+  /**
+   * Surface texture of the finish, for the realistic preview only. Catalog data
+   * (supplier fact) — NEVER inferred from `hex`, since nothing about a colour
+   * value says whether the foil is grained. Absent ⇒ rendered smooth, and no
+   * document or price is affected either way.
+   */
+  texture?: "woodgrain";
 }
 
 /**
@@ -283,6 +290,27 @@ export interface DocColour {
   inside: string;
   /** Outside colour name when a dual-colour finish was chosen (absent ⇒ single colour). */
   outside?: string;
+}
+
+/**
+ * The order-level commercial block for documents (Designer phase 6): extras,
+ * discount, tax and the customer-facing grand total. Plain DATA, like
+ * `DocBranding` — the engine computes none of it (`src/designer/basket.ts`
+ * does) and stays pure. Omitted ⇒ no basket block, byte-identical output.
+ */
+export interface DocBasket {
+  currency: string;
+  itemsSubtotal: number;
+  /** Order-level pricing adjustment vs. the sum of the lines (0 ⇒ not shown). */
+  itemsAdjustment?: number;
+  discount: number;
+  discountCode?: string | null;
+  fitting: number;
+  survey: number;
+  delivery: number;
+  taxRatePct: number;
+  tax: number;
+  grandTotal: number;
 }
 
 /** Project-level financial & display settings (Phase 1: GBP, 20% tax, 75% markup, 10% wastage). */
@@ -618,6 +646,13 @@ export interface EngineOverrides {
   reinforcement?: Record<string, Partial<Pick<Reinforcement, "endClearance" | "weldAllowanceMm">>>;
 }
 
+/**
+ * Elevation variants the engine can render in addition to the default external
+ * preview (Designer phase 5): the internal (mirrored, handled) elevation and
+ * the annotated technical drawing.
+ */
+export type QuoteView = "internal" | "schematic";
+
 export interface QuoteInput {
   orderNo: string;
   customer: string;
@@ -682,6 +717,40 @@ export interface QuoteInput {
    * ⇒ no overlay, so a quote without it is byte-identical to pre-existing quotes.
    */
   showJoints?: boolean;
+  /**
+   * Extra elevation variants to render alongside the default external preview
+   * (Designer phase 5). Purely visual, like `showJoints`: they are rendered
+   * from the SAME solved geometry with the same colour/joint options and land
+   * in `QuoteOutput.geometry.svgViews`. Omitted/empty ⇒ no extra render and no
+   * extra field, so a quote without it is byte-identical to pre-existing quotes.
+   */
+  views?: QuoteView[];
+  /**
+   * How the PREVIEW is drawn. "realistic" turns on the presentation style
+   * (bevelled mitred faces, moulded bead, glazed glass, soft shadow) for
+   * `geometry.svg` and `geometry.svgViews` — the live configurators only.
+   * The SVG embedded in the DOCUMENTS stays flat regardless, so paperwork is
+   * byte-identical with or without this field. Omitted / "flat" ⇒ unchanged.
+   */
+  svgStyle?: "flat" | "realistic";
+  /**
+   * Per-quote hardware slot substitutions (Designer phase 2). Keyed by the
+   * engine's conceptual hardware SLOT (today: "handle"); the value is the
+   * catalog hardware partKey to fit in that slot instead of the calibrated
+   * default. Only 1:1 slots are substitutable — size-SELECTED gear (espag,
+   * friction stay) is never a slot (questions.md Q19). Unknown keys throw.
+   * Omitted ⇒ the calibrated defaults, byte-identical to pre-existing quotes.
+   */
+  hardwareOverrides?: Record<string, string>;
+  /**
+   * Per-quote topology override (Designer phase 2). When present, the design is
+   * cloned with THIS cell tree instead of its stored topology — the seam through
+   * which the designer's topology edits (add transom/mullion/midrail, sash-kind
+   * and component conversions, per-cell glass pinning) reach the engine. Same
+   * clone-on-override pattern as `glassKey`/`frameKey`; the stored design is
+   * never mutated. Omitted ⇒ the design's own topology, byte-identical.
+   */
+  topologyOverride?: CellNode;
 }
 
 export interface QuoteOutput {
@@ -699,6 +768,11 @@ export interface QuoteOutput {
     cill?: { rect: Rect; code: string; name: string; projectionMm: number };
     /** Generated SVG markup (mm coordinate system). */
     svg: string;
+    /**
+     * The extra elevation variants asked for via `QuoteInput.views`, in the
+     * same mm coordinate system as `svg`. Absent unless requested.
+     */
+    svgViews?: Partial<Record<QuoteView, string>>;
   };
 
   parts: SolvedParts;

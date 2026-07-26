@@ -51,6 +51,14 @@ export const SUNNYPLAST_70: ProfileSystem = {
   // sizes × three finishes (White / Foiled-on-White / Foiled), codes from
   // collections/part-list/stockitems.json. Cost/price/weight ship at 0 (golden
   // rule); the owner fills them via the admin catalog CRUD / CSV import.
+  //
+  // Cill REINFORCEMENT (recorded, not modelled): the manual's Window Cills page
+  // (HAWDIO 21-7-2026.pdf printed p12 / PDF 13) shows every cill (95/150/180)
+  // taking a 41.3×17.4 box steel (drawn uncoded on the Steel Reinforcements
+  // page p17), and the 95mm cill ALSO accepting the 35×15 SPQ-2-83997
+  // ("reinf-35x15" below) as an alternative. No calibrated job cuts cill steel,
+  // so cill reinforcement is not part of any cut list — data only, revisit if a
+  // production doc ever itemises it.
   cills: {
     "cill-95-white":         { key: "cill-95-white",         code: "GL-1-00095",         name: "95mm Cill — White",            projectionMm: 95,  cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
     "cill-95-foiled-white":  { key: "cill-95-foiled-white",  code: "GL-2-00095-1P-FCA",  name: "95mm Cill — Foiled on White",  projectionMm: 95,  cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
@@ -256,6 +264,26 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Structural T/Z – (Standard)",
     },
+    // "T" Mullion 70mm — NEW in the re-issued manual (HAWDIO 21-7-2026.pdf,
+    // Profile Portfolio printed p11 / PDF 12: profile SPQ-050-30252, section
+    // 75 wide × 70 deep; wind-loading EI printed p74, bare/unreinforced only).
+    // Added by migration phase-2 as a catalog part ONLY: no glass-deduction
+    // set exists for it (the deduction pages cover SPQ-5-30252 / SPQ-005-30252
+    // only), so NO design references this key and no reinforcementMap entry
+    // exists — do not wire it into topology defaults until a deduction source
+    // or calibrated job arrives. Not in the M5.5 price lists (flagged for the
+    // next price-list revision) ⇒ cost/price 0.
+    "mullion-75": {
+      code: "SPQ-050-30252",
+      name: "T Mullion 70mm",
+      faceWidth: 75,            // HAWDIO p11 (PDF 12): section width 75±0.3
+      jointType: "T",
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Structural T/Z – (Standard)",
+    },
     // French mullion (STULP 70) — calibrated Job 00000264. jointType "S" =
     // square-cut, NO welded horns: Ext == Int == the daylight height it spans
     // (printed 2004 [ ] = 2100 − 2×48 on every doc; no weld addition). Face 48
@@ -397,6 +425,39 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Reinf - (steel)",
     },
+    // NEW steels from the re-issued manual (HAWDIO 21-7-2026.pdf, Steel
+    // Reinforcements printed p17 / PDF 18) — added by migration phase-2 as
+    // catalog parts ONLY. Deliberately NOT in reinforcementMap: no manual page
+    // assigns either to a host profile yet (golden rule — never guess a
+    // mapping). Likely roles, for when a calibrated source assigns them:
+    //   35×15 (SPQ-2-83997) — the cill-95 ALTERNATIVE reinforcement: the
+    //     Window Cills page (printed p12 / PDF 13) shows a 35×15 box fitting
+    //     the 95mm cill alongside the standard 41.3×17.4 cill steel.
+    //   25×10 (SPQ-2-83998) — the frame-extension steel: the Add Ons page
+    //     (printed p13 / PDF 14) shows a 25×10 box fitting the 25mm frame
+    //     extension profile SPQ-2-75252.
+    "reinf-35x15": {
+      code: "SPQ-2-83997",
+      name: "35 x 15 Steel Reinforcement",
+      faceWidth: 0,
+      endClearance: 0,
+      weldAllowanceMm: 0,       // internal steel insert, not welded
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Reinf - (steel)",
+    },
+    "reinf-25x10": {
+      code: "SPQ-2-83998",
+      name: "25 x 10 Steel Reinforcement",
+      faceWidth: 0,
+      endClearance: 0,
+      weldAllowanceMm: 0,       // internal steel insert, not welded
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Reinf - (steel)",
+    },
     // Sliding patio reinforcement — authentic codes from Jobs 44/48 (Andrei UK;
     // SUPERSEDES the Job 104 rule of barInt − 10). UNLIKE casement/door
     // (endClearance 0), the sliding steel runs 15mm PAST the bar Int at each
@@ -428,12 +489,14 @@ export const SUNNYPLAST_70: ProfileSystem = {
     },
   },
 
-  // ---------- AUXILIARY PROFILES (tracks / cover caps) ---------------
-  // Sliding-patio-only cut items, calibrated Jobs 44/48 (Andrei UK) — the
-  // length rules live in bars.ts#emitSlidingAuxBars (engine, with per-formula
-  // calibration comments); this Record is the priced part data only. All are
-  // square-cut, never welded. cost/price 0 pending supplier numbers (golden
-  // rule — enter via the admin catalog CRUD / CSV import).
+  // ---------- AUXILIARY PROFILES (tracks / cover caps / add-ons) ------
+  // The first block are sliding-patio cut items, calibrated Jobs 44/48
+  // (Andrei UK) — the length rules live in bars.ts#emitSlidingAuxBars (engine,
+  // with per-formula calibration comments); this Record is the priced part
+  // data only. All are square-cut, never welded. cost/price 0 pending supplier
+  // numbers (golden rule — enter via the admin catalog CRUD / CSV import).
+  // NB emitSlidingAuxBars emits by EXPLICIT key — entries it doesn't name
+  // (the add-on / bay-pole block below) are never cut into any quote.
   auxiliaries: {
     "aux-track-alu": {
       code: "AD16014",
@@ -468,6 +531,50 @@ export const SUNNYPLAST_70: ProfileSystem = {
     "aux-cap-sash-pvc": {
       code: "SPQ-GL-20253",
       name: "Capac PVC cercevea glisare (sash PVC cap)",
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+
+    // ---- ADD-ONS & BAY/BOW PREP (migration phase-2; NOT consumed by any ----
+    // cut rule yet). Catalog parts only, so the Designer's add-on options and
+    // the future M6 bay/bow work have real coded parts to reference. Sources:
+    // HAWDIO 21-7-2026.pdf "Add Ons" printed p13 / PDF 14 and "Bay Poles"
+    // printed p14 / PDF 15. No calibrated cut rule exists for ANY of these
+    // (Spec/questions.md Q6) — enabling them in a quote requires a reference
+    // job or explicit supplier doc first. cost/price 0 (not in M5.5 lists).
+    "aux-ext-25": {
+      code: "SPQ-2-75252",
+      name: "25mm Frame Extension Profile",   // p13: 70 wide × 25 high; takes 25×10 steel SPQ-2-83998
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-coupling-frame": {
+      code: "SPQ-2-72252",
+      name: "Coupling Frame Connection",      // p13 (H-section clip joining two frames)
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-bay-corner-square": {
+      code: "SPQ-2-63252",
+      name: "Square Corner Profile",          // p14: 70×60; takes 50×50 steel (SPS-2-82995, p17)
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-bay-pole": {
+      code: "SPQ-2-61252",
+      name: "Bay Pole Profile",               // p14: Ø66 hex-core pole; takes Ø36 steel (SPS-2-82996, p17)
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-coupling-70": {
+      code: "SPQ-2-76252",
+      name: "Coupling Profile 70",            // p14: 93×26.4; takes 43×11 steel (SPS-2-82992, p17)
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    "aux-bay-corner-post": {
+      code: "SPQ-2-74252",
+      name: "Corner Post Pipe Profile 70mm",  // p14: 70 wide × 18.9 (curved cover for the pole)
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
@@ -628,6 +735,14 @@ export const SUNNYPLAST_70: ProfileSystem = {
     "hw-fricthinge-16":       { code: "FH-16",       name: "16\" Friction Hinge",                  cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Friction Stays",    lengthMm: 400 },
     "hw-fricthinge-20":       { code: "FH-20",       name: "20\" Friction Hinge",                  cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Friction Stays",    lengthMm: 500 },
     "hw-fricthinge-24":       { code: "FH-24",       name: "24\" Friction Hinge",                  cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Friction Stays",    lengthMm: 600 },
+    // 90° friction-stay option — HAWDIO 21-7-2026.pdf printed p7 (PDF 8),
+    // Casement system spec: "Friction stays: 17mm stack / 90° 13.5mm stack".
+    // NEW option in the re-issued manual (migration phase-2). Code synthesized
+    // (the manual prints none — panels precedent); NO lengthMm on purpose so
+    // pickFrictionHinge (hardware.ts, explicit-key table) can never select it.
+    // Spec-recording / documents-only until a calibrated allocation rule +
+    // sized variants exist (Spec/questions.md Q7).
+    "hw-fricthinge-90":       { code: "FH-90DEG",    name: "90° Friction Hinge (13.5mm stack)", cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Friction Stays" },
 
     // Door
     "hw-door-handle":         { code: "DR-HDL-LL",   name: "White Handle Lever/Lever (Short Backplate)", cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Door Handle" },

@@ -12,8 +12,8 @@ BOM, Price Summary).
 The fabrication engine is **already calibrated** against real reference jobs: Quotila 85/88/90
 (casement + single door), Jobs 44/48 "Andrei UK" (sliding patio — these superseded the earlier
 Job 104 yogi-test calibration) and Job 00000264 (French door).
-`npm run validate` runs **435 assertions** (432 green + 3 pre-existing DB weld-drift failures —
-see memory/validate-weld-drift.md; they are not a regression signal).
+`npm run validate` currently runs **883 assertions** (880 green + 3 pre-existing DB weld-drift
+failures — see memory/validate-weld-drift.md; they are not a regression signal).
 
 ## Tech stack (confirmed with the owner)
 
@@ -110,6 +110,13 @@ Default seeded admin (override via `ADMIN_EMAIL`/`ADMIN_PASSWORD`): `admin@local
 - `POST /api/quote` — `{ systemId, designId, widthMm, heightMm, mode?, overrides? }` → full `QuoteOutput`.
   `mode:"custom"` + `overrides` (per-profile allowance tweaks) drives the Custom extraction mode.
 - `POST /api/quote/document` — `{ which: "workOrder"|"cuttingList"|"bom"|"priceSummary", …quote }` → HTML
+- `GET  /api/families` · `GET /api/families/:key` — Designer families + JSON option system (D1)
+- `POST /api/line-items/resolve` — **Designer D2**: body = `LineItemDraft` → `ResolvedLineItem`
+  (stateless, no persistence; 400 only for a malformed body — an invalid draft resolves with issues).
+  **D5:** an optional `views:["internal"|"schematic"]` (body or `?views=`) adds those elevations to
+  `geometrySvg`; it is a request option the draft schema strips, so it is never persisted.
+  **D8:** an optional `style:"flat"|"realistic"` (body or `?style=`) picks how they are DRAWN —
+  also request-only, and never applied to the SVG the documents embed.
 
 **Authenticated (JWT bearer — `Authorization: Bearer <token>`):**
 
@@ -120,7 +127,17 @@ Default seeded admin (override via `ADMIN_EMAIL`/`ADMIN_PASSWORD`): `admin@local
 - `POST /api/orders` (draft) · `GET /api/orders?page&limit` · `GET /api/orders/:id` ·
   `DELETE /api/orders/:id` (`orders.delete`, scoped OWN/ALL; cascades items/documents)
 - `POST /api/orders/:id/items` (rejects non-quotable designs) · `DELETE /api/orders/:id/items/:itemId`
-- `POST /api/orders/:id/confirm` → generates & persists 7 documents (aggregated across items)
+- `POST /api/orders/:id/line-items` · `PUT`/`DELETE …/line-items/:itemId` — **Designer D2** line
+  items (draft orders only; drafts MAY persist with error issues — confirm is the gate)
+- `PUT  /api/orders/:id/commercials` — **D6** basket: `fittingType`/`fittingPrice`/`surveyPrice`/
+  `deliveryCharge`/`discountCode`/`taxRatePct` (draft only). Validates the code (400 with the
+  reason if unknown/expired/inactive) and responds with fresh `BasketTotals`.
+  `GET /api/orders/:id` carries `basket`; `GET /api/orders?q=&status=` searches/filters and each
+  row carries `basketTotal`.
+- `GET/POST/PUT/DELETE /api/discounts[/:code]` — **D6** discount codes (`discounts` RBAC module)
+- `POST /api/orders/:id/confirm` → generates & persists 7 documents (aggregated across items —
+  legacy items and Designer line items together; **422** if any designer item has an error issue);
+  freezes the basket onto the order (`basketTotals`, `discountAmount`, `totalPrice`)
 - `GET  /api/orders/:id/documents` · `GET /api/orders/:id/documents/:type` (HTML)
 - `GET  /api/orders/:id/documents/:type/pdf` — **PDF** (M4); rendered lazily on first hit, then
   cached in object storage (`orders/{id}/{TYPE}.pdf`) and served from cache thereafter
@@ -164,8 +181,34 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
 - `src/validation/jobs.ts` — the geometry + pricing safety net (run after ANY engine/catalog change);
   also calls `src/tools/extract-topology.test.ts#validateExtractor`, `src/engine/pricing.test.ts#validatePricing`
   (colour-uplift + M5.5 tier assertions), `src/engine/svg.test.ts#validateSvg`, and
-  `src/validation/prices.test.ts#validateSupplierPrices` (M5.5, gated on import). Current baseline:
-  **~484 passed, 3 pre-existing DB weld-drift failures** (see memory/validate-weld-drift.md — not a regression).
+  `src/validation/prices.test.ts#validateSupplierPrices` (M5.5, gated on import),
+  `src/engine/limits.test.ts#validateLimits` + `src/catalog/ed-table.test.ts#validateEdTable`
+  (manual-migration phase 4), and `src/designer/rules.test.ts#validateRules` +
+  `src/designer/options.test.ts#validateOptionSystem` (Designer D1) +
+  `src/designer/resolve.test.ts#validateDesigner` (Designer D2, extended in D7 with
+  `validateSecondFamily`; both designer DB suites SKIP on a DB that predates the D1 seed) and the
+  DB-free `src/designer/basket.test.ts#validateBasket` (D6). Current baseline:
+  **880 passed, 3 pre-existing DB weld-drift failures** (see memory/validate-weld-drift.md — not a regression).
+- `src/designer/basket.ts` — **the only place order-level money is derived** (D6): items subtotal →
+  discount → extras → tax → grand total, pure, with `basket.test.ts` (65 assertions) beside it.
+  `src/api/order-basket.ts` is its I/O half (prices an order's items, loads the discount row).
+- `src/catalog/families/index.ts` — the family REGISTRY (D7): `FAMILIES` + `buildOptionSystem()` +
+  `mergeOptionSystems()`. `prisma/seed.ts` reads this and names no family; a duplicate option key
+  with different content THROWS, which is what makes `familyKeys` sharing the only way to share.
+- `src/designer/*` — the Designer platform: `option-types.ts` + `line-item-types.ts` (contracts),
+  `rules.ts` (JSON rule DSL), `option-integrity.ts` (pure write-time seed validation), and the D2
+  resolver — `resolve.ts` (the pipeline), `select.ts` (selection precedence),
+  `adapters/cellnode.ts` (+ `adapters/index.ts` registry). **Pure, no I/O** — same rule as the
+  engine; the catalog reaches the resolver as a `CatalogSnapshot`. Seed sources are
+  `src/catalog/families/*` + `src/catalog/options/*`.
+- `web/app/(app)/designer/` + `web/components/designer/*` — the Designer UI: `workspace.tsx`
+  (the draft reducer + debounced resolve + the component selection + the D5 view switch/cache),
+  `measurements.tsx`, `options.tsx` (scope-aware), `structure.tsx` (D4 tree/actions/history),
+  `canvas.tsx` (D4 breadcrumb + selection wiring around the shared `window-designer.tsx`, D5
+  `mirrored` pass-through), `controls/*` (display-driven primitives + the tri-state
+  `option-row.tsx`), with the draft helpers in `web/lib/designer-draft.ts` and the client-side
+  view export in `web/lib/svg-download.ts`. **No option key appears in any of it** — everything
+  renders from the option system.
 - `src/tools/extract-topology.ts` — M3 SVG→topology extractor (build/seed-time; pure of the engine).
 - `src/catalog/derived-topologies.generated.ts` — generated extractor output (DO NOT hand-edit).
 - `src/catalog/price-lists/*` — M5.5 verbatim supplier-price transcriptions + `mapping.ts` (see
@@ -246,6 +289,64 @@ sub-milestone at a time. Full breakdown in "## Phase 2 — UI frontend" below.*
       **(3) a three.js 3D massing view**. Engine stays pure; pricing.ts untouched. See
       "## U7 — Visualization & dual-colour" below.
 
+*Phase 3 — the schema-driven **Designer** (Task 1, `Spec/01-windows-module/`). Built ALONGSIDE
+`/quote`, which stays untouched (owner decision). Phases D1–D7 map to that folder's phase files.*
+
+- [x] **D1 — Option engine (backend foundation).** Product families + the JSON option system as
+      DATA: 4 new tables (`product_family`, `option_group`, `option_def`, `option_choice`,
+      migration `20260725010000_add_designer_option_system`), the platform contracts in
+      `src/designer/option-types.ts`, a pure fail-loud rule-DSL evaluator (`rules.ts`), seed
+      sources (`src/catalog/families/casement-window.ts` + `src/catalog/options/windows.ts`),
+      loader accessors (`getFamily`/`listFamilies`/`getOptionSystem`) and `src/api/families.ts`
+      (public GETs + admin PATCH). **No engine change, no UI** — see "## Designer — D1" below.
+- [x] **D2 — Line-item core.** The stateless resolve pipeline + persisted line items: migration
+      `20260726010000_add_designer_line_items`, the pure resolver (`src/designer/resolve.ts`,
+      `select.ts`, `adapters/cellnode.ts`, `line-item-types.ts`), two additive `QuoteInput` fields
+      (`hardwareOverrides`, `topologyOverride`), `src/api/lineitems.ts` (public stateless resolve
+      + order-scoped CRUD) and confirm integration. The whole designer now works headlessly over
+      HTTP; D3–D5 only add UI. **725 assertions** (691 + 34 new). See "## Designer — D2" below.
+- [x] **D3 — Configurator shell.** The `/designer` workspace: a Server-Component route that
+      resolves descriptor + option system + design (or a saved draft) and hands the client
+      `web/components/designer/workspace.tsx` its initial state. One `useReducer` over the
+      `LineItemDraft` is the only writer; a 350 ms debounced `POST /api/line-items/resolve` with
+      stale-response discard drives the live canvas, price and issues. Inspector = Measurements
+      (descriptor dimensions, split-mode control, generated span inputs, location) + Options
+      (schema-driven groups → controls, search, tri-state). ONE additive server field
+      (`ResolvedLineItem.geometry`, the solved rects minus the SVG). **725 assertions unchanged.**
+      See "## Designer — D3" below.
+- [x] **D4 — Component editing.** Always-on component selection: click a part on the drawing (or
+      the Structure tree) to scope the inspector to it, answer options per-component with the
+      apply-scope the option itself declares, run the seeded instant actions (add transom /
+      mullion / midrail, remove divider), convert component types, and undo any structural edit
+      from a history list. ONE additive server field (`ResolvedLineItem.components`) plus a
+      two-pass selection resolve (a conversion changes which components exist). **738 assertions**
+      (725 + 13 new). See "## Designer — D4" below.
+- [x] **D5 — Views & preview.** The canvas view switch is complete: **External | Internal |
+      Schematic | 3D**. Two additive `renderSvg` options (`view:"internal"` — one horizontal
+      mirror + a stylised handle glyph; `schematic` — technical style + an annotation layer whose
+      every number is read off an already-solved rect), an additive `QuoteInput.views` →
+      `QuoteOutput.geometry.svgViews`, a per-REQUEST `views` option on the resolver/API (never
+      persisted on a draft), mirrored canvas hit-testing, per-view caching and an SVG/PNG
+      download. **775 assertions** (738 + 37 new). See "## Designer — D5" below.
+- [x] **D6 — Basket & orders (commercial layer).** Fitting / survey / delivery / discount codes /
+      per-order VAT on top of the engine's price, derived in ONE pure function
+      (`src/designer/basket.ts`) that the API, the orders UI and the Price Summary all call — so no
+      two surfaces can disagree. Migration `20260726020000_add_basket_commercials`,
+      `PUT /api/orders/:id/commercials`, `/api/discounts` CRUD (its own RBAC module), an additive
+      `DocBasket` document block (omitted ⇒ byte-identical), and the orders UI's pricing card +
+      live totals ledger. **862 assertions** (775 + 65 basket + 22 second-family). See
+      "## Designer — D6" below.
+- [x] **D8 — Presentation pass.** An opt-in **realistic** render style (bevelled mitred profile
+      faces, moulded bead, glazed glass, procedural woodgrain, soft shadow) used by the Designer
+      canvas and `/quote` only — documents and the seeded gallery keep the flat drawing, byte for
+      byte. The inspector drops to **two tabs** with progressive disclosure, and the shared UI kit
+      gets one elevation scale / one label treatment. **880 assertions** (862 + 18). See
+      "## Designer — D8".
+- [x] **D7 — Extensibility proof (`entrance-door`).** A second product family added as pure seed
+      data: `src/catalog/families/entrance-door.ts` + `src/catalog/options/doors.ts`, sharing 13
+      family-agnostic options through `familyKeys` instead of copying them. **Zero `web/`
+      changes** — the audit is `Spec/01-windows-module/phase-7-audit.md`. See "## Designer — D7".
+
 # Phase 2 UI frontend
 
 Stack confirmed: **Next.js**. UI sub-milestones **U0–U6** are tracked in the Roadmap above; full
@@ -266,12 +367,67 @@ length-dependent refinements that don't conflict for the validated jobs. Recorde
   Frame 5ch/6ch = none (✓ matches catalog); T-transom `SPQ-05-20252` reinforced only **>1.5 m**;
   mullion `SPQ-5-30252` / Z `SPQ-005-30252` reinforced only **>1 m**. Calibrated jobs use long
   members so the binary rule happens to match; short members may be over-reinforced. Future refinement.
-- **External Deduction (ED) table** by corner angle for bay/bow assemblies: 90°=63.2 mm down to
-  135°=53.2 mm. Needed when bay/bow products are added (engine is 90°-rectangular only today).
-- **Clear-opening (door) formula:** `Clear Opening = W − (X1 + 40) − (SW + 44.5)`.
+- **External Deduction (ED) table** by corner angle for bay/bow assemblies — **now imported
+  verbatim** as `src/catalog/ed-table.ts` (91 rows, 90°=63.2 → 180°=40.85, HAWDIO PDF 42; the page
+  carries no printed number). Data-only, no consumer until M6 (engine is 90°-rectangular today).
+  **Never interpolate** — the step changes three times (0.22 → 0.24 → 0.29 per degree), so
+  `edForAngle()` returns `undefined` for unlisted angles rather than inventing one. Three print
+  defects recorded, not corrected (stray `°` in the ED column at 129°/156°; 135° prints 53.2 where
+  the run implies 53.18). Integrity assertions in `ed-table.test.ts`.
+- **Clear-opening (door) formulas** — SUPERSEDED by the re-issued manual
+  (`collections/docs/HAWDIO 21-7-2026.pdf`, printed p40 / PDF 41; verified against the page
+  2026-07-25). The old edition's `W − (X1 + 40) − (SW + 44.5)` is off by 60 mm — do NOT use it.
+  Current formulas: between transoms `W − ((X1÷2) + 50) − (SW + 76.5)`; between transom & outer
+  frame, and between outer frame (both): `W − (X1 + 70) − (SW + 74.5)`. Companion X2-variant page
+  printed p39 / PDF 40. **Not yet implemented anywhere in code** (documentation-only — verified by
+  inventory, Spec/02-manual-migration/phase-1); if a clear-opening figure is ever computed/printed,
+  encode these with a `// HAWDIO p40 (PDF 41)` citation.
 - **Per-product glass-deduction tables** (Casement, Tilt&Turn, French, Residential Door, …) give
   authoritative glass sizes; they differ by frame chamber (5ch vs 6ch). Use these to extend glass
   sizing beyond the 3 calibrated jobs.
+
+### Size & weight limits (2026-07-25, Spec/02-manual-migration phase-4)
+
+`src/engine/limits.ts` (pure, no I/O, **advisory only — feeds no cut math**) imports the manual's
+never-used rule data, all cited to HAWDIO p70/p71 (PDF 72/73):
+
+- `SIZE_LIMITS` — the 10 printed max sash/frame sizes + weights (casement top/side hung, T&T,
+  flush sash, resurgence, residential + French door, fixed). Rows for families we don't model
+  carry an empty `sashKinds`; **sliding has no row on p70 and must stay unmapped**.
+- `sashWeightKg()` / `glazingWeightPerM2()` — `Σ GLASS pane thicknesses × 2.5 kg/m² × w(m) × h(m)`
+  (spacer excluded). Self-verifying: all 10 printed max weights reproduce from their printed max
+  sizes on the 4-20-4 basis (20 kg/m²) to 1 d.p. — asserted in `limits.test.ts`.
+- `checkSizeLimits(geometry)` → `LimitIssue[]`: warning when a sash exceeds a printed max but is
+  within the **10% rule**, error beyond +10% or when overweight; also whole-unit and
+  1.8m transom/mullion checks. Returns `[]` for families with no printed row (never invents one).
+  `paneThicknessesMm: []` ⇒ skip the weight check rather than guess a make-up.
+- `wedgeCount()` and `TRICKLE_VENT` are **reference data with no consumer** — the wedge part code
+  is a literal "( REQ CODE )" placeholder in the manual (supplier query Q-J), so no BOM line is
+  emitted; surfacing vent/drainage data on documents is gated on Spec/questions.md Q16.
+
+`POST /api/quote` returns an **additive** `limitIssues[]` alongside the unchanged quote; it never
+blocks a quote. `solve()` and every document renderer are untouched.
+
+### Manual-migration catalog additions (2026-07-25, Spec/02-manual-migration phase-2)
+
+The re-issued manual (`HAWDIO 21-7-2026.pdf`) added parts the catalog lacked. They are seeded as
+**inert catalog data**: £0, page-cited, referenced by **no design**, absent from
+`reinforcementMap`, and never emitted by any cut rule — so every quote stays byte-identical. Do
+**not** wire any of them into topology defaults without a deduction source or calibrated job.
+
+| Part key | Code | What / cite |
+|---|---|---|
+| `mullion-75` | SPQ-050-30252 | "T" Mullion 70mm, face 75 — p11/PDF 12. No deduction set exists for it yet. |
+| `reinf-35x15` | SPQ-2-83997 | 35×15 box steel — p17/PDF 18. Likely the cill-95 alternative (p12); unmapped. |
+| `reinf-25x10` | SPQ-2-83998 | 25×10 box steel — p17/PDF 18. Likely the frame-extension steel (p13); unmapped. |
+| `aux-ext-25`, `aux-coupling-frame` | SPQ-2-75252, SPQ-2-72252 | Add-ons (frame extension + coupling) — p13/PDF 14. No calibrated cut rule (Spec/questions.md Q6). |
+| `aux-bay-corner-square`, `aux-bay-pole`, `aux-coupling-70`, `aux-bay-corner-post` | SPQ-2-63252, -61252, -76252, -74252 | Bay/bow prep for M6 — p14/PDF 15. |
+| `hw-fricthinge-90` | FH-90DEG | 90° friction stay, 13.5mm stack — p7/PDF 8. Code synthesized; **no `lengthMm`** so `pickFrictionHinge()` cannot select it. |
+
+Two findings from that phase corrected earlier records: the **sliding frame face 48 is correct**
+(the manual's 84 is section depth, not sightline — see the Sliding Patio section), and the
+**weld allowance comes from the calibrated jobs, not any manual** (now cited in
+`src/catalog/settings.ts`).
 
 ## M3 extractor & calibration tiers
 
@@ -458,7 +614,10 @@ separate interlock profile in the cut list.**
 3 mm/end weld on the mitred frame/sash cuts only, per-profile `weldAllowanceMm: 3`, same
 convention as the French docs):**
 - Frame `SPQ-GL-10252` ("Rama pentru glisare 48mm") face **48**: Hor Ext=W Int=W−96; Vert Ext=H
-  Int=H−96; mitred `\ - /`, continuous jambs. Sash `SPQ-GL-20252` ("Canat pentru glisare 85mm")
+  Int=H−96; mitred `\ - /`, continuous jambs. (Manual cross-check 2026-07-25: the HAWDIO profile
+  portfolio p15/PDF 16 draws the section 84 × 48 — the **84 is the front-to-back track depth**,
+  NOT the sightline; assembly sections p29–32 confirm 48 is the elevation face. Face 48 is
+  correct.) Sash `SPQ-GL-20252` ("Canat pentru glisare 85mm")
   face **85**. Bead `SPQ-1-51252` ("Bagheta ptr.24mm", `bead-sl-24`) face 20. Glass rebate **15**
   (glass = beadInt + 30: 809×1874 / 964×2084). All authentic codes (old `SPQ-SL-*` placeholders
   are gone).
@@ -778,9 +937,494 @@ depths for v1 — no engine change); box front faces carry the outside colour, b
 A 2D/3D tab switch lives in the configurator preview card; WebGL-absent ⇒ graceful 2D fallback.
 Future: expose per-profile `depthMm` via the options API for dimensionally-accurate extrusion.
 
+**Dashboard honesty pass (D6).** The dashboard's 12-bar chart and its three-service "system
+health" list were hardcoded decoration. They are now real: monthly CONFIRMED-order value from
+`GET /api/orders` (bucketed client-free in the Server Component, with an empty state when there is
+nothing to chart) and three rows that report only what the page actually observed — engine
+reachable, catalog product count, documents generated. Money on the dashboard, the orders list and
+the order page is the same `BasketTotals.grandTotal`.
+
 **Tests:** `src/engine/svg.test.ts#validateSvg` (render-option byte-identity + joints/tint markers),
 `pricing.test.ts` (+ summed dual-colour uplift), and `jobs.ts#validateColourAndJoints` (solve-level
 White+White == default, joints additive, joints don't change pricing) — all wired into `npm run validate`.
+
+## Designer — D1 (option engine)
+
+The first slice of the schema-driven Designer (`Spec/01-windows-module/phase-1-option-engine.md`).
+**Backend data layer only** — no resolver, no line items, no UI, and `src/engine/*` untouched, so
+the legacy `/quote` path and every geometry/pricing assertion are unaffected.
+
+**The shape of it.** A product family is ONE `ProductFamilyDescriptor` (JSONB on `product_family`)
+plus option definitions; the UI, resolver and basket read the descriptor and never special-case a
+family. Options live in three tables (`option_group` → `option_def` → `option_choice`), are seeded
+from `src/catalog/options/windows.ts`, loaded into memory by `loadDesignerSnapshot()`, and served
+by `GET /api/families/:key`. Contracts + the `EngineEffectKind` → engine-touch-point table are in
+`src/designer/option-types.ts`. `order` columns map to `sort_order` (reserved SQL word).
+
+**Catalog is the single source of truth for choices.** Colour/glass/cill/bead/frame/hardware
+choices are GENERATED from the live `ProfileSystem` — label AND partKey both come from the catalog,
+never retyped — so renaming a catalog part renames its choice (asserted). Prices are never stored
+on a choice; a choice points at a catalog part via `partKey` and the price is resolved from there.
+A dangling `partKey` is a hard seed failure, because it would silently price to £0.
+
+**Size constraints are generated, not retyped.** `casement-window.ts` builds its 16 constraints
+from `src/engine/limits.ts#SIZE_LIMITS` — the verbatim HAWDIO p70 transcription — so there is ONE
+copy of the printed size table in the repo, and every constraint carries that page cite. Two bounds
+per dimension mirror `checkSizeLimits()`: warning at the printed max, error past the 10% rule.
+
+**Golden rule, applied to options.** Six options ship `pricingMode:"none"` + a helpText saying why:
+`profile.addon` (parts exist, no calibrated cut rule — Q6), `hardware.locking` / `hardware.hinge`
+(the espag/stay are SIZE-SELECTED by the engine; free choice would break a calibrated rule from
+the UI — Q19), `hardware.ventilator` (no vent part exists), `general.drainage` (Q7), and
+`glazing.method` (unglazed still prices its glass until the phase-2 resolver can omit it — Q20).
+They appear, persist and print; they do not fabricate or price.
+
+**Owner-owned vs seed-owned.** Reseeding preserves `presentation`, `order`/`sort_order` and
+`defaultCollapsed` (verified by a row-level diff across two full seeds with edits in between);
+everything else is re-applied from the seed. `isDefault` is seed-owned and deliberately NOT
+patchable — a default decides what every new line item gets (bead-28 keeps quotes byte-identical)
+and an admin flip would silently revert on the next deploy.
+
+**API.** `GET /api/families` + `GET /api/families/:key` are PUBLIC (no cost data — same split as
+`/api/systems/:id/options`); `PATCH /api/families/{option-groups,options,choices}/:key` require
+`catalog.update` (RBAC reuses the catalog module — no new module, no RBAC migration) and refresh
+the snapshot in place. Creating/deleting options is NOT exposed: seeds own structure, and deleting
+a choice that persisted line items reference would corrupt history.
+
+**Validation.** `validateRules` (62 assertions: every operator, nesting, 17 fail-loud cases) and
+`validateOptionSystem` (descriptor, 1:1 catalog correspondence, cited constraints, unique
+constraint ids, a recursive scan proving no cost/price key is served, and seven deliberately
+corrupted copies of the real seed that must be rejected). Baseline moved 571 → **691 passed**,
+same 3 pre-existing weld-drift failures.
+
+## Designer — D2 (line-item core)
+
+The stateless resolve pipeline + persisted line items
+(`Spec/01-windows-module/phase-2-line-item-core.md`). After this the designer works **headlessly
+over HTTP**; D3–D5 add only UI. Legacy `/quote` and legacy `OrderItem`s are untouched and
+coexist in the same order.
+
+**The pipeline** (`src/designer/resolve.ts#resolveLineItem(draft, snapshot)`, PURE — the catalog
+arrives as a `CatalogSnapshot`, never read as I/O): validate dimensions against the family
+descriptor → apply `topologyEdits` via the adapter → resolve scoped selections → map
+`engineEffect`s to `QuoteInput` slots → **`solve()` (unchanged entrypoint)** → evaluate the
+descriptor's constraints on solved geometry → assemble a `ResolvedLineItem`. Issues never throw:
+an invalid-but-well-formed draft returns a resolve carrying error issues (malformed JSON is the
+API's 400). Contracts live in `src/designer/line-item-types.ts`.
+
+**Two additive `QuoteInput` fields — the only engine change**, both clone-on-override exactly like
+`glassKey`/`frameKey`, both byte-identical when absent (the 691 assertions held):
+`hardwareOverrides?: Record<slot, partKey>` (threaded to `computeHardware`; only genuine 1:1 slots
+— "handle" today — since espag/friction stay are SIZE-selected, questions.md Q19) and
+`topologyOverride?: CellNode` (the seam through which every topology edit reaches the engine).
+
+**The `cellnode` adapter** (`src/designer/adapters/cellnode.ts`, registry in `adapters/index.ts`):
+stable **position-derived componentIds** — `cell:<path>`, `cell:<path>/glass`, `divider:<path>`,
+`edge:<side>`, `cill` (never uuids, so ids survive re-solves and line-item duplication) — plus
+immutable tree transforms for `split` / `add-midrail` / `convert-component` / `set-sash-kind` /
+`remove-divider`, `equalSplitRatios()` for the `equalSplit` mode, and `pinCellField`/`pinAllCells`
+for component-scoped glass/bead. **No new engine math**: "equal" is the midpoint of the target
+cell's solved bounds, which the engine's "divider centred on ratio × window" rule turns into equal
+daylight children; inserted dividers default to `transom-t-67`/`mullion-78`, the same defaults the
+M3 extractor applies to every collection design.
+
+**Selection precedence** (`src/designer/select.ts`, option-schema §7): component-scoped >
+`<type>:*` all-of-type > item-level > `isDefault` > unset. Hidden options are skipped entirely
+(no issue even when required); malformed visibility rules become error issues rather than a silent
+false (`rules.ts` stays fail-loud).
+
+**API.** `POST /api/line-items/resolve` is **public** like `/api/quote` (stateless, powers the live
+designer). `POST/PUT/DELETE /api/orders/:id/line-items[/:itemId]` persist a draft + its cached
+resolve + `catalogVersion` (drafts MAY carry error issues — the designer saves work in progress).
+`GET /api/orders/:id` gained a `designerItems[]` (draft + summary + issues + totals, not the full
+resolve). **Confirm** re-resolves every designer item: any error-severity issue ⇒ **422** with the
+issues and the order stays draft; otherwise the resolver's engine output — shape-identical to a
+legacy item's — joins the same `aggregate.ts` stream, so the 7-document flow needed no per-kind
+branching. `getCatalogVersion()` (new loader accessor, bumped on every load/refresh) stamps
+provenance on each resolve.
+
+**Deliberate limits (golden rule).** `equalGlass` emits a not-implemented warning and falls back to
+the drawn positions (Q4). `hardware-substitution` is per-slot, so differing per-sash picks warn
+`conflicting-selection` and the first wins (per-sash hardware needs a per-cell engine map — D4).
+`bom-line` accepts catalog **hardware** parts only; glass/gasket/profile rows carry per-m²/per-metre
+semantics no calibrated source gives. Only the **weight** verdicts from `checkSizeLimits()` merge
+into the issues — the size verdicts already arrive as descriptor constraints generated from the same
+`SIZE_LIMITS` transcription.
+
+**Validation.** `src/designer/resolve.test.ts#validateDesigner` (wired into `npm run validate`,
+SKIPs on a DB predating the D1 seed): the **golden byte-identity test** (a defaults-only draft
+reproduces a direct `solve()` exactly — bars, reinforcement, glass, gaskets, hardware, pricing
+lines and totals), scoped glass touching exactly one pane, the three-rung precedence ladder,
+`split(equal)` == the authored design at ratio 0.5, `equalSplit` equalising an unequal authored
+split, required-unset vs hidden-required, a constraint firing with its HAWDIO citation at the right
+severity, idempotence, the `hardwareOverrides` substitution, and unknown option/choice keys
+degrading to issues rather than crashes. Baseline **691 → 725 passed**, same 3 weld-drift failures.
+Also curl-verified end to end (resolve → persist → GET → confirm → 7 documents; the 422 path; and a
+legacy quote + legacy order confirm proving coexistence).
+
+## Designer — D3 (configurator shell)
+
+The `/designer` workspace (`Spec/01-windows-module/phase-3-configurator-shell.md`). Almost
+entirely `web/`; the legacy `/quote` configurator is **untouched** and stays the gallery's default
+action.
+
+**One state, one writer.** `web/components/designer/workspace.tsx` holds a single `LineItemDraft`
+in a `useReducer`; every control dispatches and nothing keeps a shadow copy of an answer. That is
+why "reopen a saved item and see the same state" is trivially true — **the saved draft IS the
+state** (the route restores it verbatim from `GET /api/orders/:id`, never re-derives it from query
+params). The resolve is a pure function of that draft: a **350 ms debounced**
+`POST /api/line-items/resolve` with a sequence counter that discards superseded responses; a failed
+resolve shows a banner over the retained last-good preview rather than wiping the canvas.
+
+**Schema-driven, provably.** The Options tab renders groups → options → choices straight from
+`GET /api/families/:key`: order, labels, defaults, filters, help text and the control type all come
+from the option system, and `controls/index.tsx` picks a primitive from `display`
+(`segmented`/`select`/`select-image` grid popover with filter chips/`toggle`/`number`/`text`).
+Seeding a new option row makes it appear correctly grouped and styled with **no `web/` change** —
+verified by grep: no option key appears anywhere in `web/components/designer/*` or
+`web/lib/designer-draft.ts`. The tri-state grammar (default muted / changed emphasised + reset /
+amber-required / red-error) lives in ONE place, `controls/option-row.tsx`, so a new control type
+inherits it.
+
+**What phase 3 can answer.** Item-level options, plus component-level options whose **declared
+default apply-scope is `all-of-type`** (`applyScopes[0]`) — glass type, handle, locking, hinge.
+Those render as item-wide controls writing an **unscoped** selection, which the server's precedence
+ladder already applies to every component in scope (`select.ts` rung 3) and which a D4
+per-component answer will override. Options whose default apply-scope is `"this"` (add-on, sash
+type, ventilator) and every `display:"action"` are genuinely per-part: they are counted in a
+per-group hint chip and wait for D4.
+
+**Measurements.** Dimension fields come from `descriptor.dimensions` (inline min/max), the split
+modes from `descriptor.splitModes` — with any mode the resolver reports as not-implemented
+**hidden rather than offered-and-ignored** (equalGlass today, questions.md Q4). Span rows are
+generated from the SOLVED geometry, one per divider, and commit `centreline ÷ solved frame
+dimension` — the exact fraction the canvas drag handles write, so keyboard and pointer editing
+round-trip identically. Dragging a divider also switches the item to `byDimensions`, otherwise the
+resolver would recompute equal positions and silently discard the drag.
+
+**Two structural rules instead of hardcoded keys.** The location field is hoisted into Measurements
+by matching an *item-level text option carrying a suggestion list*; `draft.location` (which the
+documents print) is written at SAVE time from `resolved.summary.locationLabel`, so the option
+system stays the single source of the answer. Colour swatches for the 3D view are found by
+`engineEffect.kind === "colour-key"` + `params.side`, and the hex is catalog data
+(`ColourOption.hex`) — the UI computes no colour.
+
+**The one server change** is additive: `ResolvedLineItem.geometry` now carries the engine's solved
+rects — the `/api/quote` geometry **minus its `svg`** (already in `geometrySvg.external`; carrying
+it twice would double every persisted resolve). The canvas cannot place drag handles, nor D4
+hit-test a component, from an SVG string alone. `solve()`, pricing and the documents are untouched;
+**725 assertions unchanged** (same 3 pre-existing weld-drift failures).
+
+**Reuse, not rebuild.** The canvas is the existing `window-designer.tsx` (drag handles, dimension
+overlay) fed `{...resolved.geometry, svg: geometrySvg.external}`, and the 3D tab the existing lazy
+`window-3d.tsx`. Internal/Schematic views are **hidden** until D5.
+
+**Entry + exit.** Quotable gallery cards gain a secondary **"Design in studio"** action; the family
+is matched from the descriptors' own `designSource.productIds` (a non-casement product shows no
+link, and registering a second family in D7 lights its products up with no `web/` change). Order
+detail gained a **Designer line items** table (edit → studio, remove, per-item total and issue
+count) so a saved item is reopenable; the confirm gate now counts legacy + designer items together.
+The full commercial basket stays D6.
+
+**Verified live** against the real engine + Postgres: draft → persist → `GET /api/orders/:id`
+returns the draft byte-for-byte → `/designer?orderId&itemId` restores every value → confirm → the
+work order prints `1400 × 1300 … ×2 — Kitchen`. Equal-split recomputes a 1400×1300 unit's transom
+to 650.0 and equalises glass (582.5/582.5); an oversize unit returns the HAWDIO-p70-cited
+constraint pair. `npm run build` + `npm run lint` clean (22 routes).
+
+## Designer — D4 (component editing)
+
+Selection, scoping and structural editing (`Spec/01-windows-module/phase-4-component-editing.md`).
+Almost entirely `web/`; `/quote` stays untouched and the engine is unchanged.
+
+**One additive server field.** `ResolvedLineItem.components` is the adapter's `listComponents()`
+of the SOLVED geometry — stable position-derived id, type, kind, label and a **mm rect**. The
+browser cannot hit-test a component, nor label a tree, from an SVG string; re-deriving topology in
+the UI would be a second implementation of the adapter. Asserted stable across a resize (ids
+identical at 1200×1200 and 1400×1300 while the rects move) — which is what lets a selection AND a
+component-scoped answer survive editing.
+
+**Selection is always on** (the reference UI needs a modal "edit individual components" mode).
+Click a part on the drawing or a row in the Structure tree — one `useState` feeds both, so they
+cannot disagree. Hit-areas are sorted **biggest-first** so the smallest component under the cursor
+wins; the highlight is a 20 % accent fill, never opaque, so the fabrication drawing stays readable.
+Escape and the breadcrumb return to item scope. If an edit deletes the selected component the
+selection falls back to its parent, then to the item — computed during render, so the inspector
+can never point at something that no longer exists. **The canvas is the existing
+`window-designer.tsx`**, which gained three OPTIONAL props (`components`, `selectedComponentId`,
+`onSelectComponent`); omitting them is the pre-D4 behaviour, which is how `/quote` is untouched.
+
+**Scoping mirrors the server, it doesn't reimplement it.** `web/lib/designer-draft.ts`
+`effectiveAnswer(draft, option, component?)` walks the same ladder as `src/designer/select.ts`
+(component > `<type>:*` > item > default > unset) purely to render honestly: which rung answered
+(badge "Override" / "All sashes" / "From item") and what a Reset falls back to. The apply-scope
+toggle offers exactly the scopes the OPTION declares (`scope.applyScopes`) and writes
+`cell:root.left` or `sash:*`; switching it **moves** an existing answer rather than leaving a stale
+one winning elsewhere. Item-level options stay visible under a "Whole item" divider, minus anything
+already answerable in the component scope — one answer never gets two controls.
+
+**Structure tab = the a11y contract.** Every canvas interaction has an equivalent there: the
+component tree (selection), the instant actions, and the edit history. Actions are whatever
+`display:"action"` options the seed declares for the selected component's type, executed by
+appending **the option's own `action` template** with the selection's componentId filled in — so a
+new action option is pure data. Undo removes one edit and **replays the rest** (asserted:
+removing an edit == never having made it). A failed edit is shown in red with the resolver's
+message and a remove button rather than silently dropped.
+
+**The one behavioural change in the resolver: selections + effects now run at most TWICE.** A
+selection can BE a structural change (convert a pane to a sash), and that changes which components
+exist — a sash owns a `…/glass` pane a glass cell does not. With a single pass, an answer scoped to
+that new pane could never resolve (permanent `unknown-component`), so "convert this pane to a sash,
+then give only that sash obscure glass" was unreachable. When pass 1 applies a structural effect the
+components are re-derived and selections resolved once more; only the final pass's issues are
+reported. It terminates because the resolver already skips a topology edit whose component matches,
+and every other effect is idempotent into a fresh effects object. **The golden byte-identity test
+and all 738 assertions hold.**
+
+**Orphan pruning.** `pruneSelections(draft, components)` drops selections whose concrete
+componentId is gone (never `<type>:*` or item-level answers) after each resolve. The server-side
+safety net stays fail-loud: an orphaned scope that slips through is an `unknown-component` ERROR,
+never applied to some other component.
+
+**Still no option key anywhere in `web/`** (same grep as D3). Two new structural rules make that
+true: conversions are filtered to the descriptor's `componentConversions` by reading each choice's
+own `engineEffect.params.to`, and actions are found by `display === "action"` + the option's
+declared `componentTypes`.
+
+**Validation.** `resolve.test.ts` gains 13 assertions: the components contract (stability, typing,
+sub-components, dividers, edges, absent on a failed solve), edit-history determinism, and the
+orphaned-scope issue. Baseline **725 → 738 passed**, same 3 pre-existing weld-drift failures.
+Live-verified end to end: split → convert → per-pane glass resolves clean, prices the sash ring +
+its hardware, and the BOM prints exactly two glass rows (one per pane); `glass:*` collapses them to
+one; the draft round-trips byte-for-byte through save and reopen.
+
+## Designer — D5 (views & preview)
+
+The elevation the user is looking at (`Spec/01-windows-module/phase-5-views-and-preview.md`).
+All three 2D views are **engine renders of the same solved geometry** — the UI stays dumb, and
+documents could embed any of them later without new machinery.
+
+**Two more `renderSvg` options, same byte-identity discipline as joints/colour.**
+`view:"internal"` wraps the whole drawing in ONE mirror about the window centreline
+(`matrix(-1 0 0 1 w 0)`; the viewBox is symmetric about `w/2`, so it is unchanged) — hinge sides
+and opening chevrons flip together, and nothing can drift out of frame. `schematic:{faceWidths?,
+glassSizes?}` swaps in a white-fill/thin-stroke palette and appends `<g id="schematic">`. Omitting
+both ⇒ the historical SVG, byte for byte.
+
+**No new engine math — every annotated number is a rect the engine already solved:** frame face =
+`outer`→`rootDaylight`, divider face = the transom's `rect.h` / the mullion's `rect.w`, sash ring
+face = `sashOuter`→`sashInner`, glass = `glassRect` rounded EXACTLY as `bars.ts#emitGlass` rounds
+it — so a schematic pane label and its cutting-list row are the same number by construction
+(asserted row-by-row on a real job). Live: casement 64/67/79, French 48/48/67/105, sliding 48/85 —
+all calibrated catalog face widths.
+
+**Handles are drawn only where the hinge edge is recorded.** The glyph (lever + rose, bounded by
+the stile rect) goes on the closing edge — opposite the hinge the chevron already points at — for
+casement, door, tilt&turn and French leaves. **Sliding panels get none**: the catalog gives each
+sliding panel a handle but records no stile for it, and inventing one is a guess. Note the
+internal view mirrors the handle too: a sash hinged left from outside reads hinge-right /
+handle-left from inside. That contradicts the phase file's original acceptance wording and is the
+physically correct behaviour of a mirror (recorded as a deviation there).
+
+**Views are a REQUEST option, never draft data.** `QuoteInput.views` (precedent: `showJoints`) →
+`QuoteOutput.geometry.svgViews`; `resolveLineItem(draft, snapshot, {views})` →
+`ResolvedLineItem.geometrySvg.{external,internal,schematic}`. `POST /api/line-items/resolve` reads
+`views` from the body or `?views=`, and the draft zod schema **strips** it — so the view someone
+happened to be looking at can never be persisted on a line item. Absent ⇒ external only ⇒ the
+pre-D5 payload.
+
+**The canvas.** The view switch drives which elevation is requested; rendered SVGs are cached per
+(view, draft) so switching back is free, and a switch to a new view skips the 350 ms debounce
+(it's a click, not typing). `window-designer.tsx` gained ONE optional `mirrored` prop: it mirrors
+the mm→px transform for hit-testing (verified in a browser — clicking a pane gives the identical
+breadcrumb in External, Internal and Schematic) and suppresses the dimension lines + drag handles,
+because a dragged position would have to be un-mirrored on the way back to `splitRatios`.
+Measuring therefore lives in External and Schematic, which are un-mirrored — Schematic being the
+natural measure mode. `/quote` passes neither prop and is untouched. "Download SVG/PNG" is
+client-side (`web/lib/svg-download.ts`); no backend route, no storage key.
+
+**Incidental fix:** the designer canvas stage had resolved to **height 0** since D3 (the card
+centres its children, so `h-full` resolved against an indefinite min-height-only flex container,
+and `overflow-hidden` clipped the drawing). `self-stretch` on `designer/canvas.tsx`'s root fixes
+it — the stage now measures 838×798 where it measured 838×0.
+
+**Validation.** `svg.test.ts` +26 (external byte-identity, the mirror wrapper preserving every base
+shape verbatim, handle handedness + containment, each annotation family toggling independently,
+French/sliding smoke) and `jobs.ts#validateViews` +11 (no `svgViews` by default; identical SVG /
+parts / documents / totals with views requested; every cutting-list glass row present as a pane
+label; the 67 mm transom face). Baseline **738 → 775 passed**, same 3 pre-existing weld-drift
+failures.
+
+## Designer — D6 (basket & orders)
+
+The commercial layer on top of the fabrication price
+(`Spec/01-windows-module/phase-6-basket-and-orders.md`): fitting, survey, delivery, discount codes
+and a per-order VAT override.
+
+**One function owns order money.** `src/designer/basket.ts#computeBasket(items, commercials,
+settings, at, opts)` is pure (no I/O, no clock beyond the `at` used for discount validity) and is
+what the API response, the orders list, the order detail ledger and the Price Summary all render.
+`src/api/order-basket.ts` is its I/O half: it prices the order's items (legacy items through
+`solve()`, designer items through the resolver) and loads the discount row. Drafts are priced LIVE;
+confirmed orders replay the `basketTotals` snapshot frozen at confirm — that is what makes a
+confirmed order immutable even after a price list, a VAT rate or a discount code changes.
+
+**Two deliberate deviations from the phase file's formula, both to keep ONE number:**
+
+1. **The items subtotal is PRE-TAX.** The phase file sums each item's `grandTotal`, but the engine's
+   grand total already includes VAT; taxing that base again charges VAT twice per item. The subtotal
+   is `netPrice`, and tax is applied exactly once over items − discount + extras.
+2. **The subtotal is the AGGREGATED order price**, not the sum of the lines. `aggregateOrder()`
+   prices an order as ONE job (flat setup labour once, wastage over merged material) and that is
+   what the BOM/Price Summary print — charging the line sum would have overcharged the verification
+   order by **£105.03** against its own paperwork. Lines keep their own prices; the gap is shown
+   explicitly as `itemsAdjustment` ("Order-level adjustment — shared setup"), never hidden.
+
+Discount rules: percent or fixed, applied to the ITEMS subtotal before extras, clamped to
+`[0, subtotal]` (a £500 code on a £200 basket makes the items free, never negative). Fitting
+applicability: `none` ⇒ neither fitting nor survey; `fit` ⇒ fitting only; `fit-and-survey` ⇒ both;
+**delivery is independent and always charged when set**.
+
+**Schema/API.** Migration `20260726020000_add_basket_commercials` — seven nullable `order` columns
+plus `basketTotals` JSONB, and a `discount_code` table (plain SQL, `migrate deploy`-safe).
+`PUT /api/orders/:id/commercials` validates the code BEFORE storing it (400 with the reason) and
+returns fresh totals; `GET /api/orders/:id` carries `basket`; the list carries `basketTotal` and
+now supports `?q=`/`?status=`. Discount CRUD lives at `/api/discounts` under its **own RBAC module**
+(`discounts` in `src/rbac/registry.ts`, nav `/admin/discounts`) — commercial data, not catalog data,
+so no `loadCatalog()` refresh. **Run `npm run sync:permissions` (or `db:seed`) after deploying** so
+the module row exists.
+
+**Documents.** `renderPriceSummary` and `renderPlannerList` take an optional `DocBasket` (plain data,
+same additive pattern as `DocBranding`). When present, the engine's own tax/GRAND TOTAL rows are
+replaced by the basket block so a document never prints two contradictory totals; when absent the
+output is **byte-identical** to pre-D6 (asserted live).
+
+**UI.** Order detail (draft) gains a "Pricing & extras" card — fitting segmented control, three
+price inputs with applicability hints, discount code, tax override, and a totals ledger that shows
+only the lines that apply. Confirm now lists WHICH designer item blocked it and why (the 422 body).
+Both item tables show a per-line total read from the same basket. `/admin/discounts` is the CRUD
+page (live/scheduled/expired/inactive status derived, not stored).
+
+**Validation.** `src/designer/basket.test.ts#validateBasket` — 65 DB-free assertions (percent/fixed
+discounts, the floor-at-zero clamp, validity windows, the applicability matrix, default vs override
+vs zero-rated tax, the aggregate override, rounding, mixed legacy+designer lines). Baseline
+**775 → 862 passed**, same 3 pre-existing weld-drift failures. Plus 46 live end-to-end assertions
+(recorded in the phase file).
+
+## Designer — D7 (second family: entrance-door)
+
+The extensibility proof (`Spec/01-windows-module/phase-7-extensibility-proof.md`), audited in
+`Spec/01-windows-module/phase-7-audit.md`. A whole second configurable product family —
+**`entrance-door`**, over the 19 quotable Single Door designs — added as **pure seed data**, with
+**zero changes under `web/`**.
+
+- **`src/catalog/families/entrance-door.ts`** — the descriptor. Leaf constraints are GENERATED from
+  `src/engine/limits.ts#SIZE_LIMITS` (the residential-door row, HAWDIO p70), so the repo still holds
+  ONE transcription of the printed size table. The overall width/height bounds are declared as
+  ergonomic UI guard rails and explicitly NOT manual figures — the manual prints a maximum door
+  LEAF but no outer-frame maximum for a doorset, and the "FIXED - (OUTER FRAME SIZE)" 2000 mm row
+  would have warned on every ordinary 2100 mm door.
+- **`src/catalog/options/doors.ts`** — door leaf type (a real `set-sash-kind` topology edit),
+  handle / lock / cylinder / hinges (real catalog-priced 1:1 substitutions), plus door sash profile
+  and threshold as INFORMATIONAL options (`pricingMode:"none"` + a helpText saying why — golden
+  rule). `adoptShared()` extends 13 family-agnostic options' `familyKeys` in place rather than
+  copying them.
+- **`src/catalog/families/index.ts`** — the registry. `prisma/seed.ts` now imports `FAMILIES` +
+  `buildOptionSystem()` from here and names no family; `mergeOptionSystems()` unions `familyKeys`
+  for a shared option key and **throws** if two families define the same key differently.
+- **`src/engine/hardware.ts`** — the one engine change: `lock`, `cylinder` and `hinge` join `handle`
+  as substitution slots on the door leaf. They qualify by the same test the handle passed (fixed
+  quantity per leaf, nothing size-selected). The keep set stays UNSLOTTED on purpose — the engine
+  picks R/H or L/H from the hinge side, and a free choice could fit a wrong-handed keep.
+  Byte-identical when no override is passed.
+
+**Validation.** `resolve.test.ts#validateSecondFamily` — the door golden test (a defaults-only door
+draft reproduces a direct `solve()` byte-for-byte), descriptor-driven assertions, the shared vs
+door-specific option split, a hardware substitution that changes the BOM and not the geometry, and a
+fanlight split producing the seeded default transom. Live-verified end to end: both families served,
+a door resolves and prices (net £245.09), persists on an order beside a legacy casement item, and
+confirms into the 7 documents.
+
+## Designer — D8 (presentation pass: realistic preview + simplified inspector)
+
+Owner feedback after using D1–D7: the inspector was overwhelming, the shared UI was noisy, and the
+canvas preview "looked basic" next to the reference designer in `collections/windows/views/*.png`.
+Three changes, none of which touch fabrication output.
+
+**1. A realistic render style — opt-in, engine-side.** `RenderSvgOpts.style: "flat" | "realistic"`
+(`src/engine/svg.ts`). Realistic draws each profile ring as **four mitred trapezoid faces** whose
+shared edges ARE the 45° mitres, lit from the top left by a four-stop gradient per face (the doubled
+stop near the middle is the moulding step); adds a moulded **bead band** between a sash's inner rect
+and its `glassRect`; paints glass with a tinted gradient plus two diagonal reflection bands sized to
+sit wholly inside the pane (so no clip path is needed); and casts one `feDropShadow` for the unit,
+applied OUTSIDE the mirror group so the internal elevation is lit from the same side.
+**No new engine math** — every polygon corner is a corner of a rect the solver already produced.
+`schematic` always wins over `style` (a technical drawing must stay flat).
+
+**Woodgrain is catalog data, not a guess.** New nullable `colour_option.texture`
+(migration `20260727010000_add_colour_texture`) → `ColourOption.texture?: "woodgrain"` → an
+`feTurbulence` + `feColorMatrix` filter on the grained faces (horizontal grain on rails, vertical on
+stiles). Nothing about a hex says whether a foil is grained, so an untagged finish renders smooth
+and the admin catalog editor gets a Texture select beside the swatch picker. The seed never writes
+it, so a reseed cannot clear a finish the owner has tagged (same rule as the uplift %s).
+
+**Threading follows `showJoints`/`views` exactly.** `QuoteInput.svgStyle` → `solve()`;
+`ResolveOptions.style` → a per-REQUEST option the draft schema strips, so a saved line item never
+remembers the style someone was looking at; `POST /api/line-items/resolve` reads `style` from the
+body or `?style=`. **Documents are excluded by construction**: when a realistic preview is asked
+for, `solve()` renders a SECOND flat SVG and hands THAT to the document renderers — so
+`geometry.svg` is glossy while the work order, cutting list, BOM and price summary stay byte-for-byte
+what they were (verified by diffing all 4 documents × 4 designs before/after). The 516 seeded gallery
+SVGs are untouched — no re-seed. Consumers: the Designer canvas and the `/quote` preview only.
+
+**2. The inspector is two tabs, not three.** `Measurements | Product`. `structure.tsx` stopped being
+a tab and became sections inside Product (`PartsList`, `ComponentActions`, `EditHistory`) that appear
+only when they have something to say — parts at item scope, actions when a part is selected, history
+only once an edit exists. **The a11y contract is unchanged**: every canvas interaction still has a
+keyboard-reachable equivalent, which was the only reason that tab existed. Three further rules, all
+structural (so **still no option key anywhere under `web/`**):
+
+- **One group open at a time**, seeded from the option system's own `defaultCollapsed`.
+- **"N more" per group**: a row is shown at rest when it is answered, required-and-unset, carrying an
+  issue, or among the first three in seed order — and `pricingMode: "none"` rows always start in the
+  "more" bucket. Search bypasses the disclosure entirely.
+- **One apply-scope control for the whole panel** ("This sash" / "All sashes") instead of a pair of
+  pills on every row; an option whose `applyScopes` exclude the panel scope is written its own way.
+- Help text moved behind an **ⓘ** per row. Printing every option's caveat paragraph at once was most
+  of what made the panel feel dense.
+- Qty / customer / save moved out of the header into a **footer action bar** on the inspector.
+
+**3. Shared kit refresh** (`web/components/ui.tsx` + `globals.css`) — ONE elevation scale
+(`--shadow-xs/sm/md/lg`) replacing four ad-hoc shadows, one `labelClass` replacing a dozen inline
+micro-label declarations, consistent radii, lighter borders, a single focus-ring treatment. **No
+component API changed**, so every other page inherits it with no edit. The canvas overlay
+(`window-designer.tsx`) picked up drafting-style dimension leaders (hairline + end ticks, no arrow
+markers) with an editable white pill carrying a pencil glyph and an amber value, and the selection
+highlight gained a white rim so it reads on both glass and profile. The drawing stage
+(`.industrial-grid`) lost its blue dot grid for a plain graded field — the reference puts nothing
+behind the window, and a pattern competes with the glass reflections.
+
+**4. Issues are actionable.** The Issues popover lists a repair beside each problem instead of only
+navigating to it. `web/lib/designer-draft.ts#fixForIssue()` is pure and returns a **reducer action**
+(so the reducer stays the draft's only writer): an out-of-range or missing dimension snaps to the
+descriptor's own declared bound; a rejected topology edit offers "Undo this change"; an answer
+pointing at a component/option/choice that no longer exists offers a reset to the seed's default;
+and a required-but-unanswered option offers its OWN `isDefault` choice when it declares one. The
+button says what it will do ("Set overall width to 3000 mm"), and a "Fix N automatically" appears
+when several are repairable.
+
+**What deliberately has NO one-click fix**, shown as "Needs a decision" with the citation:
+`constraint` / `size-limit` — the HAWDIO-cited printed maxima (sash sizes, weights, 1.8 m divider
+runs). Resizing a unit until a printed maximum is satisfied is the fabricator's call, not the UI's,
+and the printed figure is not on the client to clamp against. `conflicting-selection` is excluded
+for the same reason: only the user knows which of two answers they meant. Verified live (7/7): an
+out-of-range width offers and applies the clamp, while a 3000×2000 casement raises the
+"HAWDIO p70 (PDF 72)" warning with no fix button.
+
+**Validation.** `svg.test.ts` +16 (flat byte-identity, defs/faces/shadow counts, finish-derived
+gradient ids, grain only when flagged, schematic-wins, mirror ordering, French/sliding smoke):
+**862 → 880 passed**, same 3 pre-existing weld-drift failures. Plus the document byte-identity diff
+above, and a live headless-browser pass over all four canvas views with no console errors.
 
 ## Conventions
 

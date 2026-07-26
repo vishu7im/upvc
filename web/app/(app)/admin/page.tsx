@@ -33,6 +33,13 @@ const CARDS = [
     icon: "settings",
   },
   {
+    href: "/admin/discounts",
+    module: "discounts",
+    title: "Discount codes",
+    desc: "Percentage or fixed codes with an optional validity window, applied to an order's items subtotal.",
+    icon: "tag",
+  },
+  {
     href: "/admin/catalog",
     module: "catalog",
     title: "Catalog pricing",

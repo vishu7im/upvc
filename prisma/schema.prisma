@@ -246,6 +246,9 @@ model ColourOption {
   priceUpliftPct Decimal @default(0) @db.Decimal(6, 3)
   isBase         Boolean @default(false)
   hex            String? // optional display swatch (CSS hex), e.g. "#353b3f"; null ⇒ grey preview
+  // Surface texture for the realistic preview only ("woodgrain"). Supplier fact,
+  // never inferred from `hex`; null ⇒ rendered smooth. Affects no price or document.
+  texture        String?
 
   @@unique([systemId, key])
   @@map("colour_option")
@@ -548,11 +551,60 @@ model Order {
   totalPrice   Decimal?  @db.Decimal(12, 4)
   createdAt    DateTime  @default(now())
 
-  items     OrderItem[]
-  documents Document[]
+  // ---- Basket commercials (Designer phase 6, data-model.md §2) --------
+  // All nullable: an order that never touches the commercial layer prices
+  // exactly as it did before (itemsSubtotal == grandTotal).
+  fittingType    String?  @default("none") // none | fit | fit-and-survey
+  fittingPrice   Decimal? @db.Decimal(12, 2)
+  surveyPrice    Decimal? @db.Decimal(12, 2)
+  deliveryCharge Decimal? @db.Decimal(12, 2)
+  discountCode   String?
+  discountAmount Decimal? @db.Decimal(12, 2) // snapshot of the applied discount at confirm
+  taxRatePct     Decimal? @db.Decimal(5, 2) // null ⇒ the Settings VAT rate
+  basketTotals   Json? // BasketTotals snapshot frozen at confirm
+
+  items         OrderItem[]
+  documents     Document[]
+  designerItems DesignerLineItem[]
 
   @@index([userId])
   @@map("order")
+}
+
+// ---- Discount codes (phase 6) ---------------------------------------
+// Commercial data, NOT catalog data: no loadCatalog() refresh, validated at
+// apply time against `active` + the optional validity window.
+model DiscountCode {
+  code      String    @id
+  kind      String // percent | fixed
+  value     Decimal   @db.Decimal(12, 2)
+  active    Boolean   @default(true)
+  validFrom DateTime?
+  validTo   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("discount_code")
+}
+
+// ---- Designer line items (Task 1 phase 2, data-model.md §1) ----------
+// One row per configured Designer product on an order. `draft` is the
+// AUTHORITATIVE LineItemDraft JSON (line-item-schema.md §2); `resolved` is a
+// nullable ResolvedLineItem CACHE whose staleness is detected via
+// `catalogVersion`. Coexists with legacy OrderItem rows on the same order.
+model DesignerLineItem {
+  id             String   @id @default(uuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  position       Int // stable ordering within the order
+  draft          Json // LineItemDraft — AUTHORITATIVE
+  resolved       Json? // ResolvedLineItem — CACHE, nullable
+  catalogVersion String? // provenance of the cached resolve
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([orderId, position])
+  @@map("designer_line_item")
 }
 
 // ---- Order items (one fabricated unit = product + design + W×H) ------
@@ -634,4 +686,84 @@ model Setting {
   logoKey        String?
 
   @@map("setting")
+}
+
+// =====================================================================
+// DESIGNER PLATFORM — product families + the JSON-driven option system
+// (Task 1 / windows-module phase 1).
+//
+// Spec: Spec/00-architecture/data-model.md §1, option-schema.md §3–5,
+//       product-family-plugin.md §2. The TypeScript contracts these mirror
+//       live in src/designer/option-types.ts; every Json column below holds
+//       exactly the sub-shape declared there.
+//
+// Seed sources (source of truth, repo convention): src/catalog/families/*.ts
+// and src/catalog/options/*.ts, applied by prisma/seed.ts.
+//
+// NB the `order` fields map to a "sort_order" column — `order` is a reserved
+// SQL word, and the plain-SQL migrations here must stay quote-free to read.
+// No money lives in these tables: prices stay on the catalog parts a choice
+// points at via `partKey` (golden rule — never an inline price on a choice).
+// =====================================================================
+
+model ProductFamily {
+  key        String   @id // "casement-window"
+  name       String
+  status     String   @default("active") // active | hidden | deprecated
+  descriptor Json // the full ProductFamilyDescriptor
+  updatedAt  DateTime @updatedAt
+
+  @@map("product_family")
+}
+
+model OptionGroup {
+  key              String      @id // "hardware"
+  name             String
+  order            Int         @map("sort_order")
+  icon             String?
+  defaultCollapsed Boolean     @default(true)
+  scope            String      @default("mixed") // item | component | mixed
+  options          OptionDef[]
+
+  @@map("option_group")
+}
+
+model OptionDef {
+  key      String      @id // "hardware.handle"
+  groupKey String
+  group    OptionGroup @relation(fields: [groupKey], references: [key], onDelete: Cascade)
+
+  name         String
+  order        Int            @map("sort_order")
+  display      String // select | select-image | segmented | toggle | number | text | action
+  required     Boolean        @default(false)
+  scope        Json // {level, componentTypes, applyScopes}
+  filters      Json? // [{key,label}]
+  visibility   Json? // rule DSL
+  validation   Json?
+  presentation Json?
+  pricingMode  String         @default("catalog") // catalog | none
+  action       Json? // TopologyEditTemplate (display = "action" only)
+  familyKeys   String[] // denormalised for a single-query load
+  choices      OptionChoice[]
+
+  @@map("option_def")
+}
+
+model OptionChoice {
+  key       String    @id // "handle-white-inline" (globally unique slug, never a uuid)
+  optionKey String
+  option    OptionDef @relation(fields: [optionKey], references: [key], onDelete: Cascade)
+
+  label        String
+  order        Int      @map("sort_order")
+  isDefault    Boolean  @default(false)
+  filterKeys   String[]
+  image        Json? // {kind, ref}
+  swatchHex    String?
+  partKey      String? // catalog part/glass/hardware/cill/colour key → price + BOM
+  engineEffect Json? // {kind, params}
+  visibility   Json?
+
+  @@map("option_choice")
 }

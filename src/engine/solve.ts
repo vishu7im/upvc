@@ -7,7 +7,16 @@
 //
 // =====================================================================
 
-import type { CellNode, ColourOption, DocCill, DocColour, QuoteInput, QuoteOutput, Settings } from "../types.ts";
+import type {
+  CellNode,
+  ColourOption,
+  DocCill,
+  DocColour,
+  QuoteInput,
+  QuoteOutput,
+  QuoteView,
+  Settings,
+} from "../types.ts";
 import { getSystem, getDesign, DEFAULT_SETTINGS } from "../catalog/index.ts";
 import { solveTopology } from "./topology.ts";
 import { computeParts } from "./bars.ts";
@@ -68,12 +77,20 @@ export function solve(input: QuoteInput): QuoteOutput {
     system = { ...system, defaultColourKey: input.colourKey };
   }
 
+  // Per-quote topology override (Designer phase 2). The designer's topology
+  // edits (splits, midrails, sash-kind/component conversions, per-cell glass
+  // pinning) arrive as a complete replacement cell tree. Clone-on-override like
+  // glassKey/frameKey; omitted ⇒ the stored topology, byte-identical.
+  let design = baseDesign;
+  if (input.topologyOverride) {
+    design = { ...design, topology: input.topologyOverride };
+  }
+
   // Per-quote glass selection (U3). Fill the chosen glass into every cell that
   // doesn't pin its own glass. Omitted ⇒ design's baked default (byte-identical).
-  let design = baseDesign;
   if (input.glassKey) {
     if (!system.glass?.[input.glassKey]) throw new Error(`Unknown glass: ${input.glassKey}`);
-    design = { ...baseDesign, topology: fillDefaultGlass(baseDesign.topology, input.glassKey) };
+    design = { ...design, topology: fillDefaultGlass(design.topology, input.glassKey) };
   }
 
   // Per-quote chamber selection. Swap the design's frame profile (e.g. 5ch→6ch);
@@ -119,8 +136,17 @@ export function solve(input: QuoteInput): QuoteOutput {
   // 2. Bars — derive cut pieces, glass, gaskets (at the manufacturing height)
   const parts = computeParts(geometry, design, system, input.widthMm, mfgHeightMm, settings.weldAllowanceMm ?? 0);
 
-  // 3. Hardware — allocate per cell
-  parts.hardware = computeHardware(geometry, system);
+  // 3. Hardware — allocate per cell. Slot substitutions (Designer phase 2) are
+  // validated here so a bad partKey fails loud instead of silently keeping the
+  // default; absent ⇒ the calibrated defaults, byte-identical.
+  if (input.hardwareOverrides) {
+    for (const [slot, partKey] of Object.entries(input.hardwareOverrides)) {
+      if (!system.hardware[partKey]) {
+        throw new Error(`Unknown hardware override for slot "${slot}": ${partKey}`);
+      }
+    }
+  }
+  parts.hardware = computeHardware(geometry, system, input.hardwareOverrides);
 
   // 4. Cutting plan
   const cuttingPlan = planCuts(parts, system);
@@ -133,11 +159,25 @@ export function solve(input: QuoteInput): QuoteOutput {
   // byte-identical to before these features existed.
   const tintInsideHex = insideColour && !insideColour.isBase ? insideColour.hex : undefined;
   const tintOutsideHex = outsideColour && !outsideColour.isBase ? outsideColour.hex : undefined;
+  // The finish's texture is catalog data (ColourOption.texture); the realistic
+  // style is the only consumer, so an untagged finish simply renders smooth.
+  const grain = (outsideColour ?? insideColour)?.texture === "woodgrain" || undefined;
   const colourOpts =
-    tintInsideHex || tintOutsideHex ? { insideHex: tintInsideHex, outsideHex: tintOutsideHex } : undefined;
+    tintInsideHex || tintOutsideHex || grain
+      ? { insideHex: tintInsideHex, outsideHex: tintOutsideHex, ...(grain ? { grain } : {}) }
+      : undefined;
   const svgOpts =
     input.showJoints || colourOpts ? { joints: input.showJoints, colour: colourOpts } : undefined;
-  const svg = renderSvg(geometry, svgOpts);
+  // The presentation style is a live-preview concern (Designer canvas, /quote).
+  // It is applied to what the caller DRAWS, never to what the documents embed —
+  // hence the separate flat render below when the two differ.
+  const previewOpts =
+    input.svgStyle === "realistic" ? { ...svgOpts, style: "realistic" as const } : svgOpts;
+  const svg = renderSvg(geometry, previewOpts);
+  // Extra elevations (Designer phase 5) — same solved geometry, same visual
+  // opts, rendered only when asked for. Documents keep embedding the flat SVG.
+  const svgViews = renderExtraViews(geometry, input.views, previewOpts);
+  const docSvg = previewOpts === svgOpts ? svg : renderSvg(geometry, svgOpts);
 
   // Colour display for document headers. Only when a non-default finish is in
   // play; absent ⇒ no colour row (byte-identical header for default White).
@@ -151,7 +191,7 @@ export function solve(input: QuoteInput): QuoteOutput {
   // 7. Documents — every doc carries the design preview at the *modified*
   // (chosen W×H) dimensions, so the paperwork shows what was actually quoted.
   const images = [
-    { svg, caption: `${design.name} — ${input.widthMm} × ${input.heightMm} mm` },
+    { svg: docSvg, caption: `${design.name} — ${input.widthMm} × ${input.heightMm} mm` },
   ];
   // Cill display info (customer height stays on "Width × Height"; the header adds
   // the cill name + reduced manufacturing height). Omitted ⇒ no cill rows.
@@ -176,12 +216,36 @@ export function solve(input: QuoteInput): QuoteOutput {
       mullions: geometry.mullions,
       ...(geometry.cill ? { cill: geometry.cill } : {}),
       svg,
+      ...(svgViews ? { svgViews } : {}),
     },
     parts,
     cuttingPlan,
     pricing,
     documents,
   };
+}
+
+/**
+ * Render the requested extra elevations from the solved geometry, reusing the
+ * quote's own visual options (joints + colour tint) so a variant is the SAME
+ * drawing seen differently. Returns undefined when nothing was requested, which
+ * is what keeps `geometry.svgViews` absent — and the output byte-identical —
+ * for every existing caller.
+ */
+function renderExtraViews(
+  geometry: Parameters<typeof renderSvg>[0],
+  views: QuoteView[] | undefined,
+  svgOpts: Parameters<typeof renderSvg>[1],
+): Partial<Record<QuoteView, string>> | undefined {
+  if (!views?.length) return undefined;
+  const out: Partial<Record<QuoteView, string>> = {};
+  for (const v of views) {
+    if (v === "internal") out.internal = renderSvg(geometry, { ...svgOpts, view: "internal" });
+    else if (v === "schematic") {
+      out.schematic = renderSvg(geometry, { ...svgOpts, schematic: { faceWidths: true, glassSizes: true } });
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /**

@@ -8,7 +8,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { serverApiGet } from "@/lib/server-api";
-import type { DesignDetail, DesignListItem, Paginated, ProductSummary } from "@/lib/types";
+import type {
+  DesignDetail,
+  DesignListItem,
+  FamilyResponse,
+  FamilySummary,
+  Paginated,
+  ProductSummary,
+} from "@/lib/types";
 import { ApiError } from "@/lib/api";
 import Pager from "@/components/pager";
 import DesignCard from "@/components/design-card";
@@ -22,6 +29,27 @@ const GALLERY_LIMIT = 24;
 function toPage(v: string | string[] | undefined): number {
   const n = parseInt(Array.isArray(v) ? v[0] : (v ?? "1"), 10);
   return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/**
+ * Which Designer family (if any) starts from this product's designs. Read from
+ * the descriptors' own `designSource.productIds` — the gallery never hardcodes
+ * a family key, so registering a second family (phase 7) lights its products up
+ * with no web/ change. Unreachable/absent ⇒ no studio link, gallery unaffected.
+ */
+async function designerFamilyFor(productId: string): Promise<string | undefined> {
+  try {
+    const families = await serverApiGet<FamilySummary[]>("/api/families");
+    const descriptors = await Promise.all(
+      families.map((f) =>
+        serverApiGet<FamilyResponse>(`/api/families/${f.familyKey}`).catch(() => null),
+      ),
+    );
+    return descriptors.find((d) => d?.family.designSource.productIds?.includes(productId))?.family
+      .familyKey;
+  } catch {
+    return undefined;
+  }
 }
 
 export default async function ProductGalleryPage({
@@ -45,9 +73,12 @@ export default async function ProductGalleryPage({
     throw e;
   }
 
-  const designs = await serverApiGet<Paginated<DesignListItem>>(
-    `/api/products/${id}/designs?page=${page}&limit=${GALLERY_LIMIT}`,
-  );
+  const [designs, designerFamilyKey] = await Promise.all([
+    serverApiGet<Paginated<DesignListItem>>(
+      `/api/products/${id}/designs?page=${page}&limit=${GALLERY_LIMIT}`,
+    ),
+    designerFamilyFor(id),
+  ]);
 
   // Fetch each design's SVG in parallel (list endpoint omits it). A failed
   // fetch degrades to a "no preview" tile rather than failing the page.
@@ -120,6 +151,7 @@ export default async function ProductGalleryPage({
                 systemId={product.systemId}
                 productId={product.id}
                 orderId={orderId}
+                designerFamilyKey={designerFamilyKey}
               />
             ))}
           </div>
