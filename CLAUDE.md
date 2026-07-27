@@ -12,7 +12,7 @@ BOM, Price Summary).
 The fabrication engine is **already calibrated** against real reference jobs: Quotila 85/88/90
 (casement + single door), Jobs 44/48 "Andrei UK" (sliding patio — these superseded the earlier
 Job 104 yogi-test calibration) and Job 00000264 (French door).
-`npm run validate` currently runs **883 assertions** (880 green + 3 pre-existing DB weld-drift
+`npm run validate` currently runs **950 assertions** (947 green + 3 pre-existing DB weld-drift
 failures — see memory/validate-weld-drift.md; they are not a regression signal).
 
 ## Tech stack (confirmed with the owner)
@@ -188,7 +188,7 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
   `src/designer/resolve.test.ts#validateDesigner` (Designer D2, extended in D7 with
   `validateSecondFamily`; both designer DB suites SKIP on a DB that predates the D1 seed) and the
   DB-free `src/designer/basket.test.ts#validateBasket` (D6). Current baseline:
-  **880 passed, 3 pre-existing DB weld-drift failures** (see memory/validate-weld-drift.md — not a regression).
+  **947 passed, 3 pre-existing DB weld-drift failures** (see memory/validate-weld-drift.md — not a regression).
 - `src/designer/basket.ts` — **the only place order-level money is derived** (D6): items subtotal →
   discount → extras → tax → grand total, pure, with `basket.test.ts` (65 assertions) beside it.
   `src/api/order-basket.ts` is its I/O half (prices an order's items, loads the discount row).
@@ -211,6 +211,9 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
   renders from the option system.
 - `src/tools/extract-topology.ts` — M3 SVG→topology extractor (build/seed-time; pure of the engine).
 - `src/catalog/derived-topologies.generated.ts` — generated extractor output (DO NOT hand-edit).
+- `src/tools/extract-hardware.ts` → `src/catalog/hardware-stock.generated.ts` — D9 stock-list →
+  catalog hardware (128 rows, £0, DO NOT hand-edit); `src/catalog/options/hardware-filters.ts`
+  derives the pickers' finish/style/hand chips.
 - `src/catalog/price-lists/*` — M5.5 verbatim supplier-price transcriptions + `mapping.ts` (see
   "## M5.5"). `src/tools/import-prices.ts` (`npm run import:prices`) applies them + writes provenance.
 - `src/validation/prices.test.ts` — gated post-import supplier-price assertions (`validateSupplierPrices`).
@@ -342,6 +345,14 @@ sub-milestone at a time. Full breakdown in "## Phase 2 — UI frontend" below.*
       byte. The inspector drops to **two tabs** with progressive disclosure, and the shared UI kit
       gets one elevation scale / one label treatment. **880 assertions** (862 + 18). See
       "## Designer — D8".
+- [x] **D9 — Field-report fixes.** Three defects found using the studio on a real job: a
+      transom/mullion split **cloned the opening sash** (two sash rings = "2 windows"), the confirm
+      gate **422'd on any printed-limit breach** while the legacy `/quote` path printed the same
+      oversize job happily, and the handle dropdown had **one** entry because the catalog held one
+      casement handle. Splits now divide the frame into fixed lights, printed maxima are advisory
+      (and print on the work order), and the owner's real stock list seeds **128** hardware rows
+      with finish/style/hand filter chips. A follow-up correction (Job 154) made a divider dropped
+      into a sash a MIDRAIL, so the opener survives. **947 assertions.** See "## Designer — D9".
 - [x] **D7 — Extensibility proof (`entrance-door`).** A second product family added as pure seed
       data: `src/catalog/families/entrance-door.ts` + `src/catalog/options/doors.ts`, sharing 13
       family-agnostic options through `familyKeys` instead of copying them. **Zero `web/`
@@ -1425,6 +1436,106 @@ out-of-range width offers and applies the clamp, while a 3000×2000 casement rai
 gradient ids, grain only when flagged, schematic-wins, mirror ordering, French/sliding smoke):
 **862 → 880 passed**, same 3 pre-existing weld-drift failures. Plus the document byte-identity diff
 above, and a live headless-browser pass over all four canvas views with no console errors.
+
+## Designer — D9 (field-report fixes: splits, the confirm gate, the hardware list)
+
+Three defects the owner hit using the Designer on a real job. None of them changes fabrication
+math; the first two change what the Designer *lets you do*, the third fills a catalog gap.
+
+**1. A divider dropped into a sash is a MIDRAIL — the opener survives.**
+`applyEdit`'s `case "split"` (`src/designer/adapters/cellnode.ts`) copied the whole `CellSpec` into
+both children, so splitting an opening sash produced **two complete sash rings** — visually two
+windows, with a doubled handle/espag/stay set in the BOM. The first fix made both children **fixed**
+— which deleted the opener and its opening chevron instead, and was equally wrong.
+
+**Job 154** settles it (`Work Order - windows - 27-07-2026.pdf`, 5 pages, all 705 × 705): every page
+prints ONE T Sash ring (2 × 633 hor + 2 × 633 vert) and ONE handle + ONE 400 mm espagnolette + ONE
+16" friction stay. The bar welds **inside** the one ring. So:
+
+| You click a… | What happens |
+|---|---|
+| **fixed / glass** cell | a real guillotine split — a transom or mullion in the FRAME, both new areas fixed |
+| **sash** cell | a **midrail inside the ring** — one opener, one handle, glazing split into panes |
+
+The document reproduces from values already in the catalog — nothing was re-derived: frame face 64
+⇒ daylight 577; sash overlap 28 ⇒ ring **633**; `sash-t` face 79 ⇒ ring Int **475**; and
+`applyMidrails()`'s existing **`Ext = Int + 2 × face`** ⇒ **609** for the 67 mm SPQ-005-30252 (p1)
+and **631** for the 78 mm SPQ-5-30252 (p3 and p4). A third-party production document therefore
+confirms three calibrated values *and* the Job 00000264 horn rule, on two profiles and both axes.
+
+**Vertical midrails** are the new engine capability p4 calibrates: `CellSpec.midrails[].axis`
+(absent ⇒ `"horizontal"`, so every French quote is byte-identical) and an `applyMidrails()` that
+transposes — same arithmetic, other axis — pushing the bar onto `out.mullions` so `emitMullionBars`
+prints it **Vert** with the `< - >` horn prep the doc shows. One axis per ring: a pane GRID has no
+reference job, so mixing them is a hard error rather than a guess.
+
+`openingSymbol()` (`src/engine/svg.ts`) lost its French-only pane guard for the general rule — **a
+glazing-only pane never draws a symbol; the leaf that owns the ring does** — and chevrons are now
+collected and appended AFTER every cell in both the flat and realistic paths, because a midrailed
+sash's later panes were painting over the leaf's chevron. Disjoint guillotine cells never overlapped,
+so this is pixel-identical for every pre-existing design (element order only).
+
+**Not asserted from Job 154, on purpose:** its bead lengths (510 for a 475 pane, where our
+Quotila-calibrated rule gives Int + 40 = 515), its glass (500 × 500) and its sash steel at 470 where
+ours is the ring Int 475. Those are a different bead/steel convention; adopting them would silently
+re-calibrate the whole casement family. Recorded in the job comment as open reconciliation.
+
+**A fanlight is still a frame split** — it is a separate light above the unit, so the frame must
+divide. Convert the leaf to glass, split, then set the lower cell back to an opener; asserted
+end-to-end on a doorset. The seeded actions also gained **`structure.add-transom-at` /
+`add-mullion-at`** (`position:"at-ratio"`), which light up the existing inline prompt — now in
+**mm, not %** ("drop 400 mm from the head"), converted by `mm ÷ the outer dimension on that axis`,
+the same full-window fraction the canvas drag handles write.
+
+**2. Fabrication limits are ADVISORY, not blocking.** Confirm returned **422** on any
+error-severity issue, so a 4050 mm unit could not produce paperwork — while the legacy `/quote`
+path, which gates on nothing, had already printed exactly such a work order
+(`work_order-welded (2).pdf`, sliding OX 4050 × 1040). `ADVISORY_ISSUE_KINDS` +
+`isBlockingIssue()` (`src/designer/line-item-types.ts`) name the three kinds that record a
+fabrication JUDGEMENT rather than a broken item — `constraint`, `size-limit`,
+`dimension-out-of-range` — and only NON-advisory errors block. **Severity is unchanged**: an
+oversize unit still reads red in the inspector with its HAWDIO citation, and D8's `fixForIssue()`
+still offers the clamp; the additive `ResolvedLineItem.blocking` is what confirm and the save toast
+now read. The manual's own 10% tolerance assumes maxima get exceeded deliberately.
+
+The advisories then **print on the work order**: an optional `DocAdvisory[]` param on
+`renderWorkOrder` (same additive pattern as `DocBranding`/`DocBasket`, styled inline like
+`weldNote` so the shared `STYLE` constant — and therefore every other document — is untouched).
+Omitted **or empty** ⇒ byte-identical. The shop floor is told; the office is not stopped.
+
+**3. The handle dropdown had one entry because the CATALOG had one handle.**
+`src/tools/extract-hardware.ts` (build-time, like the M3 topology extractor) transcribes the
+owner's real stock list — `collections/part-list/stockitems.json` — into
+`src/catalog/hardware-stock.generated.ts`, restricted to the five sub-categories the engine
+substitutes 1:1: casement handles, door handles, cylinders, door hinges, door locks.
+**128 rows**, spread into `SUNNYPLAST_70.hardware` **before** the hand-written entries so a
+calibrated row always wins. All **£0**, no `lengthMm` (so `pickEspag`/`pickFrictionHinge` can never
+choose one), referenced by no design and emitted by no cut rule ⇒ **every quote byte-identical**.
+Codes are verbatim where the export has one (cylinders: `GBC1`, `9416N`, …) and **synthesized**
+from the name where it is blank — the convention `HDL-INLINE`/`DR-HDL-LL`/`FH-90DEG` already set;
+reconcile before ordering. The generator dedupes by key AND name against the hand-written rows,
+computed as `SUNNYPLAST_70.hardware[k] !== STOCK_HARDWARE[k]`, which is what makes a re-run
+byte-identical.
+
+`src/catalog/options/hardware-filters.ts` derives **filter chips** from the supplier's own naming
+(finish · style · hand) — pure seed data, so **zero `web/` change**: handle 1 → **35 choices with
+14 chips**, door handle **54**, cylinder **15**, hinge **18**, lock **9**. Four rows that share a
+category but are not selectable are now excluded with a reason (keep sets — the engine picks the
+hand; the French inverter cap / cavity block / shootbolt; the sliding `GLIS-12` cylinder). Cranked
+and monkeytail handles are HANDED, so the resolver **warns** (never blocks, never auto-corrects)
+when an `L/H`/`R/H` part meets a side-hung leaf of the opposite hand — read from the supplier's own
+label, and skipped entirely for top-hung and fixed cells, which have no hand.
+
+**Validation.** `jobs.ts#validateJob154` +27 (the 705 × 705 doc reproduced: ring 633/475, the 609
+and 631 bars on both axes with `< - >`, the pane transpose, and ONE handle / espag / stay with the
+chevron still drawn on every page), `resolve.test.ts` +27 (a sash split keeps its ring, its kind,
+its handle and its ring cut IDENTICALLY; the vertical twin; a fixed cell still splits the frame; a
+door leaf midrails while the 3-step fanlight still yields a frame transom; advisory vs blocking both
+ways) and `jobs.ts#validateAdvisories` +5 (the band prints its message/citation/item/count; absent
+**and** empty ⇒ byte-identical): **880 → 947 passed**, same 3 pre-existing weld-drift failures.
+Plus 38 live assertions against the running engine + Postgres — including the two that matter: the
+opening chevron **survives** a transom (one chevron, not one per pane, not none), and a
+**4050 × 1040 designer item now confirms** with the `HAWDIO p70` note on its work order.
 
 ## Conventions
 

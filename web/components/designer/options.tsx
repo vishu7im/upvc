@@ -322,7 +322,14 @@ export default function OptionsTab({
         {component && actions.length > 0 && (
           <div className="border-b border-slate-200 bg-slate-50/60 px-4 py-2.5">
             <p className={cn("mb-1.5", labelClass)}>Actions</p>
-            <ComponentActions actions={actions} onAction={onAction} />
+            <ComponentActions
+              actions={actions}
+              frameMm={{
+                widthMm: draft.dimensions.widthMm ?? 0,
+                heightMm: draft.dimensions.heightMm ?? 0,
+              }}
+              onAction={onAction}
+            />
           </div>
         )}
 

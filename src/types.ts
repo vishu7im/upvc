@@ -313,6 +313,25 @@ export interface DocBasket {
   grandTotal: number;
 }
 
+/**
+ * One advisory note printed on the Work Order: a fabrication limit this job
+ * knowingly goes past (an oversize unit, an over-max sash, a >1.8 m divider).
+ *
+ * The engine computes none of it — the Designer's resolver raises the issue and
+ * `src/api/orders.ts` hands the surviving advisories over, exactly as it hands
+ * over `DocBranding` / `DocBasket`. Omitted / empty ⇒ no block, byte-identical
+ * output. These NEVER block confirm (ADVISORY_ISSUE_KINDS, line-item-types.ts):
+ * exceeding a printed maximum is the fabricator's call, and the shop floor
+ * needs to be told, not stopped.
+ */
+export interface DocAdvisory {
+  /** Which line item it concerns, e.g. "4050 × 1040 mm". */
+  item: string;
+  message: string;
+  /** The printed source the limit came from (HAWDIO p70 …), when cited. */
+  source?: string;
+}
+
 /** Project-level financial & display settings (Phase 1: GBP, 20% tax, 75% markup, 10% wastage). */
 export interface Settings {
   currency: string;       // "GBP"
@@ -369,14 +388,25 @@ export interface CellSpec {
   beadKey?: string;
   glassKey?: string;
   /**
-   * Horizontal midrails INSIDE this cell's sash (French doors, Job 00000264):
-   * the sash stays ONE welded ring; each midrail is a horn-cut transom bar
-   * welded between the sash uprights (Ext = sash Int + 2 × face), splitting the
-   * glazing into stacked panes with their own beads/glass. `atRatio` is the
-   * midrail centreline as a fraction of the FULL window height (same semantics
-   * as `splitAtRatio`). Only valid on sash-bearing cells; absent ⇒ unchanged.
+   * Midrails INSIDE this cell's sash (French doors, Job 00000264; casement
+   * Job 154): the sash stays ONE welded ring — one opener, one handle, one set
+   * of gear — and each midrail is a horn-cut bar welded between the sash
+   * members (Ext = sash Int + 2 × face), splitting the glazing into panes with
+   * their own beads/glass.
+   *
+   * `atRatio` is the midrail centreline as a fraction of the FULL window
+   * dimension on its axis (height for horizontal, width for vertical) — the
+   * same semantics as `splitAtRatio`.
+   *
+   * `axis` defaults to "horizontal", which is the Job 00000264 French case, so
+   * every pre-existing design is unchanged. The VERTICAL case is calibrated by
+   * Job 154 (Work Order - windows - 27-07-2026.pdf p4): the same
+   * Ext = Int + 2 × face rule on the other axis — printed 631 for the 78 mm
+   * SPQ-5-30252 in a 633 sash (Int 475), exactly as its horizontal twin on p3.
+   *
+   * Only valid on sash-bearing cells; absent ⇒ unchanged.
    */
-  midrails?: { transomKey: string; atRatio: number }[];
+  midrails?: { transomKey: string; atRatio: number; axis?: "horizontal" | "vertical" }[];
 }
 
 /** Recursive cell tree node — describes a design's split structure. */

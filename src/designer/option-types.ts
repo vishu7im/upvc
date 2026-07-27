@@ -134,6 +134,11 @@ export type TopologyEdit =
       position: "equal" | "at-ratio";
       atRatio?: number;
       transomKey?: string;
+      /**
+       * Which way the bar runs inside the sash ring. Omitted ⇒ "horizontal",
+       * the Job 00000264 French case; "vertical" is calibrated by Job 154 p4.
+       */
+      axis?: "horizontal" | "vertical";
     }
   | {
       op: "convert-component";

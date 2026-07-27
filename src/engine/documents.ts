@@ -6,7 +6,7 @@
 // Puppeteer or Playwright — the HTML is already print-ready.
 // =====================================================================
 
-import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, DocColour, DocBasket, BarPiece } from "../types.ts";
+import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, DocColour, DocBasket, DocAdvisory, BarPiece } from "../types.ts";
 
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #28323c; margin: 32px; }
@@ -143,6 +143,32 @@ function colourRows(colour?: DocColour): string {
       <b>Colour:</b><span>${value}</span>`;
 }
 
+/**
+ * Advisory band: fabrication limits this job knowingly goes past. Printed so
+ * the shop floor is TOLD rather than the office being STOPPED — the manual's
+ * own 10% tolerance assumes limits get exceeded deliberately. Absent/empty ⇒
+ * "" (byte-identical work order).
+ */
+function advisoryBand(advisories?: DocAdvisory[]): string {
+  if (!advisories || advisories.length === 0) return "";
+  // Styled inline, like weldNote: adding rules to the shared STYLE constant
+  // would change the bytes of every document that never has an advisory.
+  const rows = advisories
+    .map(
+      (a) =>
+        `<li style="margin-bottom:2px;"><b>${esc(a.item)}</b> — ${esc(a.message)}` +
+        (a.source ? ` <i style="color:#a16207;">${esc(a.source)}</i>` : "") +
+        `</li>`,
+    )
+    .join("");
+  const n = advisories.length;
+  return `<div class="meta advisories" style="border-left:3px solid #b45309;background:#fffbeb;padding:6px 10px;color:#92400e;">
+      <b>Check before fabrication — ${n} printed limit${n === 1 ? "" : "s"} exceeded.</b>
+      This job is outside the manual's published maxima and was released deliberately.
+      <ul style="margin:4px 0 0;padding-left:16px;">${rows}</ul>
+    </div>`;
+}
+
 function header(input: QuoteInput, title: string, systemName: string, designName: string, branding?: DocBranding, images?: DocImage[], cill?: DocCill, colour?: DocColour): string {
   const today = new Date().toLocaleDateString("en-GB");
   return `
@@ -173,6 +199,7 @@ export function renderWorkOrder(
   variant: DocVariant = "normal",
   cill?: DocCill,
   colour?: DocColour,
+  advisories?: DocAdvisory[],
 ): string {
   // Club identical pieces into qty rows (e.g. a frame's 4 bars → 2 rows × qty 2).
   const len = (b: BarPiece) => barLen(b, variant);
@@ -227,7 +254,7 @@ export function renderWorkOrder(
   `).join("");
 
   return wrap("Work Order" + variantSuffix(variant), `
-    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill, colour)}
+    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill, colour)}${advisoryBand(advisories)}
     ${weldNote(variant)}
 
     <div class="section-title">Sections Required</div>

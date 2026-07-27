@@ -58,7 +58,7 @@ import type {
   ResolvedLineItem,
   ResolvedSummary,
 } from "./line-item-types.ts";
-import { LINE_ITEM_SCHEMA_VERSION } from "./line-item-types.ts";
+import { LINE_ITEM_SCHEMA_VERSION, isBlockingIssue } from "./line-item-types.ts";
 import { getAdapter } from "./adapters/index.ts";
 import {
   AdapterError,
@@ -464,6 +464,22 @@ function applyEngineEffects(args: {
           break;
         }
         overrides[slot] = partKey;
+        // Handedness. Cranked and monkeytail handles are HANDED — the supplier
+        // names them "L/H" / "R/H" — and fitting the wrong hand to a side-hung
+        // sash is a real fabrication error (the same reason D7 never exposed
+        // keep sets). Warn only: the hinge side may yet change, and the choice
+        // is the fabricator's. Top-hung and fixed cells have no hand, so they
+        // are skipped entirely rather than guessed at.
+        const handIssue = handMismatch(ev.component?.kind, ev.choice?.label ?? "");
+        if (handIssue) {
+          issues.push({
+            severity: "warning",
+            kind: "conflicting-selection",
+            optionKey: ev.option.key,
+            ...scopeIssue,
+            message: handIssue,
+          });
+        }
         break;
       }
 
@@ -517,6 +533,24 @@ function applyEngineEffects(args: {
   }
 
   return { working, topologyEdited, structuralEdit };
+}
+
+/**
+ * "L/H handle on a right-hung sash" and the mirror case, or undefined when
+ * there is nothing to say. The hand is read from the SUPPLIER'S OWN naming
+ * convention in the part label; a label carrying neither marker is unhanded
+ * and never warned about.
+ */
+function handMismatch(componentKind: string | undefined, label: string): string | undefined {
+  const wantsLeft = componentKind === "casement-side-left" || componentKind === "door-left";
+  const wantsRight = componentKind === "casement-side-right" || componentKind === "door-right";
+  if (!wantsLeft && !wantsRight) return undefined; // top-hung / fixed ⇒ no hand
+  const isLeft = /\bL\/H\b/i.test(label);
+  const isRight = /\bR\/H\b/i.test(label);
+  if (!isLeft && !isRight) return undefined; // unhanded part
+  if (wantsLeft && isRight) return `"${label}" is right-handed, but this leaf is hinged left`;
+  if (wantsRight && isLeft) return `"${label}" is left-handed, but this leaf is hinged right`;
+  return undefined;
 }
 
 /** Build the concrete TopologyEdit a selection's engineEffect params describe. */
@@ -721,6 +755,7 @@ function assemble(
     issues,
     invalidDimensions,
     invalidSpec,
+    blocking: issues.some(isBlockingIssue),
     ...(output ? { pricing: output.pricing } : {}),
     ...(summary ? { summary } : {}),
     // Only the variants the request asked for (svgViews is absent otherwise).

@@ -102,16 +102,24 @@ export function PartsList({
 
 export function ComponentActions({
   actions,
+  frameMm,
   onAction,
 }: {
   actions: OptionDef[];
+  /** The unit's outer size — the denominator `atRatio` is a fraction OF. */
+  frameMm: { widthMm: number; heightMm: number };
   onAction: (option: OptionDef, atRatio?: number) => void;
 }) {
   if (actions.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1.5">
       {actions.map((option) => (
-        <ActionButton key={option.key} option={option} onRun={(ratio) => onAction(option, ratio)} />
+        <ActionButton
+          key={option.key}
+          option={option}
+          frameMm={frameMm}
+          onRun={(ratio) => onAction(option, ratio)}
+        />
       ))}
     </div>
   );
@@ -121,18 +129,31 @@ export function ComponentActions({
  * One instant action. An action whose template asks for an explicit position
  * prompts for it inline; an "equal" action applies straight away (the divider
  * is then draggable on the canvas like any other).
+ *
+ * The prompt is in MILLIMETRES, because that is what a fabricator measures — a
+ * transom drop of 400 mm, not "33%". `atRatio` is a fraction of the WHOLE unit
+ * (CellSpec/splitAtRatio contract), so the conversion is a plain divide by the
+ * outer dimension on the split's axis: no new geometry, and it round-trips with
+ * the canvas drag handles, which write the same fraction.
  */
 function ActionButton({
   option,
+  frameMm,
   onRun,
 }: {
   option: OptionDef;
+  frameMm: { widthMm: number; heightMm: number };
   onRun: (atRatio?: number) => void;
 }) {
   const template = option.action as TopologyEditTemplate | undefined;
   const needsRatio =
     template !== undefined && "position" in template && template.position === "at-ratio";
-  const [ratioText, setRatioText] = useState("50");
+  // A horizontal split is a DROP from the head; a vertical one is a distance
+  // from the left jamb.
+  const horizontal =
+    template !== undefined && "axis" in template && template.axis === "horizontal";
+  const span = horizontal ? frameMm.heightMm : frameMm.widthMm;
+  const [mmText, setMmText] = useState(() => String(Math.round(span / 2)));
   const [open, setOpen] = useState(false);
 
   const chip =
@@ -160,32 +181,39 @@ function ActionButton({
         <span className="truncate">{option.name}</span>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 flex w-56 items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-[var(--shadow-lg)]">
-          <label htmlFor={`act-${option.key}`} className={labelClass}>
-            At
-          </label>
-          <input
-            id={`act-${option.key}`}
-            type="number"
-            min={2}
-            max={98}
-            value={ratioText}
-            onChange={(e) => setRatioText(e.target.value)}
-            className={cn(fieldClass, "h-8 w-16 px-2 font-mono text-sm")}
-          />
-          <span className="text-[11px] font-semibold text-slate-400">%</span>
-          <button
-            type="button"
-            onClick={() => {
-              const pct = Number.parseFloat(ratioText);
-              if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) return;
-              setOpen(false);
-              onRun(pct / 100);
-            }}
-            className="ml-auto rounded-md bg-[#4442e3] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#3634c0]"
-          >
-            Apply
-          </button>
+        <div className="absolute left-0 top-full z-20 mt-1 w-60 rounded-lg border border-slate-200 bg-white p-2 shadow-[var(--shadow-lg)]">
+          <div className="flex items-center gap-2">
+            <label htmlFor={`act-${option.key}`} className={labelClass}>
+              {horizontal ? "Drop" : "From left"}
+            </label>
+            <input
+              id={`act-${option.key}`}
+              type="number"
+              min={1}
+              max={Math.max(1, Math.round(span) - 1)}
+              step={1}
+              value={mmText}
+              onChange={(e) => setMmText(e.target.value)}
+              className={cn(fieldClass, "h-8 w-20 px-2 font-mono text-sm")}
+            />
+            <span className="text-[11px] font-semibold text-slate-400">mm</span>
+            <button
+              type="button"
+              onClick={() => {
+                const mm = Number.parseFloat(mmText);
+                if (!Number.isFinite(mm) || mm <= 0 || mm >= span) return;
+                setOpen(false);
+                onRun(mm / span);
+              }}
+              className="ml-auto rounded-md bg-[#4442e3] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#3634c0]"
+            >
+              Apply
+            </button>
+          </div>
+          <p className="mt-1.5 text-[10px] leading-3 text-slate-400">
+            Centreline, measured from the {horizontal ? "head" : "left jamb"} of the {Math.round(span)} mm
+            frame.
+          </p>
         </div>
       )}
     </div>

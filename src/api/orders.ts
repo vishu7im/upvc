@@ -22,6 +22,7 @@ import {
   renderWorkPlanner,
   type PlannerLine,
 } from "../engine/documents.ts";
+import type { DocAdvisory } from "../types.ts";
 import { DEFAULT_SETTINGS, getFamily, getSystem } from "../catalog/index.ts";
 import { resolveLineItem } from "../designer/resolve.ts";
 import type {
@@ -29,6 +30,7 @@ import type {
   LineItemIssue,
   ResolvedLineItem,
 } from "../designer/line-item-types.ts";
+import { ADVISORY_ISSUE_KINDS, isBlockingIssue } from "../designer/line-item-types.ts";
 import {
   buildOrderLineItemsRouter,
   liveCatalogSnapshot,
@@ -465,8 +467,11 @@ ordersRouter.post(
     if (items.length === 0 && designerRows.length === 0)
       throw new HttpError(400, "Order has no items to confirm");
 
-    // ---- designer items: re-resolve; ANY error-severity issue blocks ----
-    // (line-item-schema.md §5 — drafts may carry errors, confirm may not).
+    // ---- designer items: re-resolve; only BLOCKING errors stop confirm ----
+    // (line-item-schema.md §5 — drafts may carry errors, confirm may not.)
+    // Fabrication-limit breaches are advisory: they are the fabricator's call,
+    // and they travel onto the work order instead of stopping it
+    // (ADVISORY_ISSUE_KINDS, line-item-types.ts).
     const snapshot = designerRows.length ? liveCatalogSnapshot() : null;
     const designerSolved: {
       row: (typeof designerRows)[number];
@@ -475,14 +480,26 @@ ordersRouter.post(
       output: NonNullable<ReturnType<typeof resolveLineItem>["output"]>;
     }[] = [];
     const blocked: { id: string; position: number; issues: LineItemIssue[] }[] = [];
+    /** Advisory (non-blocking) issues, printed on the work order — see below. */
+    const advisories: DocAdvisory[] = [];
     for (const row of designerRows) {
       const draft = row.draft as unknown as LineItemDraft;
       const { resolved, output } = resolveLineItem(draft, snapshot!);
-      const errors = resolved.issues.filter((i) => i.severity === "error");
-      if (errors.length > 0 || !output) {
-        blocked.push({ id: row.id, position: row.position, issues: resolved.issues });
+      const blockers = resolved.issues.filter(isBlockingIssue);
+      if (blockers.length > 0 || !output) {
+        blocked.push({ id: row.id, position: row.position, issues: blockers });
       } else {
         designerSolved.push({ row, draft, resolved, output });
+        // Advisories ride onto the paperwork so the fabricator sees, on the
+        // shop floor, exactly which printed limit this job goes past.
+        for (const issue of resolved.issues) {
+          if (!ADVISORY_ISSUE_KINDS.has(issue.kind)) continue;
+          advisories.push({
+            item: `${draft.dimensions.widthMm} × ${draft.dimensions.heightMm} mm`,
+            message: issue.message,
+            ...(issue.source ? { source: issue.source } : {}),
+          });
+        }
       }
     }
     if (blocked.length > 0) {
@@ -697,6 +714,9 @@ ordersRouter.post(
           brand,
           images,
           "normal",
+          undefined,
+          undefined,
+          advisories.length ? advisories : undefined,
         ),
       },
       {
@@ -710,6 +730,9 @@ ordersRouter.post(
           brand,
           images,
           "welded",
+          undefined,
+          undefined,
+          advisories.length ? advisories : undefined,
         ),
       },
       {

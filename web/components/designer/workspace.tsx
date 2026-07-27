@@ -44,6 +44,7 @@ import {
   clearSelection,
   effectiveAnswer,
   fixForIssue,
+  isAdvisoryIssue,
   isLocationOption,
   pruneSelections,
   removeEdit,
@@ -268,7 +269,11 @@ export default function Workspace({
           // unknown-component errors. Safe against races: a stale response was
           // already discarded above, so `r` describes the current draft.
           if (r.components?.length) dispatch({ type: "prune", components: r.components });
-          if (settledOnce.current) showToast(r.invalidSpec ? "invalid" : "valid");
+          // The toast reports whether the item can be BUILT, not whether every
+          // printed maximum is satisfied — going past one is the fabricator's
+          // call, and an oversize unit flashing "invalid" on every keystroke
+          // reads as a refusal it isn't.
+          if (settledOnce.current) showToast(r.blocking ? "invalid" : "valid");
           settledOnce.current = true;
         })
         .catch((e) => {
@@ -830,6 +835,13 @@ function IssuesButton({
                       // weight maxima) and genuine ambiguities are decisions,
                       // not typos — say so rather than offering a false button.
                       <span className="text-[10px] font-medium text-slate-400">Needs a decision</span>
+                    )}
+                    {isAdvisoryIssue(issue) && (
+                      // Printed-limit breaches are the fabricator's call: they
+                      // travel onto the work order rather than stopping it.
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                        Won&apos;t block confirm
+                      </span>
                     )}
                     <button
                       type="button"

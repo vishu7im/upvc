@@ -150,10 +150,14 @@ export function renderSvg(geometry: SolvedGeometry, opts?: RenderSvgOpts): strin
       shapes.push(rect(m.rect, ink.profile, ink.stroke, 1 * ink.lw));
     }
 
-    // Cells — sash outline (if any) + glazed area + opening-direction chevron.
+    // Cells — sash outline (if any) + glazed area. Opening chevrons are
+    // collected and drawn LAST: a midrailed sash's extra panes arrive as their
+    // own cells, and painting one over the leaf's chevron would clip it.
+    const symbols: string[] = [];
     for (const c of geometry.cells) {
-      drawCell(c, shapes, ink, geometry.outer);
+      drawCell(c, shapes, symbols, ink, geometry.outer);
     }
+    shapes.push(...symbols);
   }
 
   // Inner-joint overlay (opt-in) — drawn above profiles, below the cill.
@@ -208,7 +212,7 @@ export function renderSvg(geometry: SolvedGeometry, opts?: RenderSvgOpts): strin
 </svg>`;
 }
 
-function drawCell(c: SolvedCell, shapes: string[], ink: Ink, outer: Rect): void {
+function drawCell(c: SolvedCell, shapes: string[], symbols: string[], ink: Ink, outer: Rect): void {
   if (c.sashOuter && c.sashInner) {
     // Opening cell: grey sash profile ring with a clear glazed centre. The
     // glazed rect is the cell's bead-Int area — identical to sashInner for
@@ -223,9 +227,9 @@ function drawCell(c: SolvedCell, shapes: string[], ink: Ink, outer: Rect): void 
     shapes.push(rect(c.glassRect, ink.glass, ink.stroke, 1 * ink.lw));
   }
 
-  // Opening-direction chevron — visual indicator only.
+  // Opening-direction chevron — visual indicator only, drawn above every cell.
   const symbol = openingSymbol(c, outer);
-  if (symbol) shapes.push(symbol);
+  if (symbol) symbols.push(symbol);
 }
 
 // ---------------------------------------------------------------------
@@ -351,11 +355,14 @@ function realisticBody(geometry: SolvedGeometry, skin: Skin): string[] {
   for (const t of geometry.transoms) out.push(...barFaces(t.rect, "h", skin, grain));
   for (const m of geometry.mullions) out.push(...barFaces(m.rect, "v", skin, grain));
 
+  // Chevrons are collected and appended LAST, for the same reason as the flat
+  // path: a midrailed sash's later panes would paint over the leaf's symbol.
+  const symbols: string[] = [];
   for (const c of geometry.cells) {
     if (c.sashOuter && c.sashInner) {
       // Flood the leaf first: whatever the bead and pane do not cover stays
-      // profile, which is what carries a French leaf's midrail area (its lower
-      // pane arrives as its own cell) — the same layering the flat style uses.
+      // profile, which is what carries a midrailed leaf's bar area (its other
+      // panes arrive as their own cells) — the same layering the flat style uses.
       out.push(fill(c.sashOuter, skin.base));
       out.push(...bandFaces(c.sashOuter, c.sashInner, skin.id, grain, skin.base));
       out.push(outline(c.sashOuter, REALISTIC_SEAM, 1));
@@ -364,14 +371,15 @@ function realisticBody(geometry: SolvedGeometry, skin: Skin): string[] {
       // A fixed pane's bead is the ring between its daylight and the glass.
       out.push(...beadAndGlass(c.daylight ?? c.outer, c.glassRect, skin, grain));
     } else if (c.glassRect) {
-      // A glazing-only pane of a leaf (French midrail): the leaf already drew
-      // the surrounding profile, so inventing a second ring here would double it.
+      // A glazing-only pane of a leaf (midrail): the leaf already drew the
+      // surrounding profile, so inventing a second ring here would double it.
       out.push(glassPane(c.glassRect, skin));
     }
 
     const symbol = openingSymbol(c, geometry.outer, REALISTIC_SYMBOL);
-    if (symbol) out.push(symbol);
+    if (symbol) symbols.push(symbol);
   }
+  out.push(...symbols);
 
   return out;
 }
@@ -809,8 +817,12 @@ type Chevron = { c1: Pt; apex: Pt; c2: Pt };
  * Returns null for fixed cells / unknown content.
  */
 function openingSymbol(c: SolvedCell, outer: Rect, stroke: string = SYMBOL_STROKE): string | null {
-  // French midrail panes (no sashOuter) never draw a symbol — the leaf cell does.
-  if (c.content.startsWith("french-door") && !c.sashOuter) return null;
+  // A glazing-only PANE of a midrailed sash carries its leaf's `content` but no
+  // sash rects of its own. The symbol belongs to the sash RING, which the leaf
+  // cell draws — one opener, one chevron, spanning every pane inside it. (This
+  // used to be a French-only guard; a midrailed casement, Job 154, drew one
+  // chevron per pane until it was generalised.)
+  if (!c.sashOuter) return null;
   // Bound the symbol to the glazed area so it never overlaps the frame.
   const b = c.sashInner ?? c.glassRect ?? c.sashOuter ?? c.outer;
   const cx = b.x + b.w / 2;

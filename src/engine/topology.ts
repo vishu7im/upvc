@@ -87,11 +87,11 @@ function walk(
   if (node.kind === "leaf") {
     const cell = buildLeafCell(node, pathId, bounds, system);
     out.cells.push(cell);
-    // Midrails INSIDE the sash (French doors, Job 00000264): the sash stays one
-    // welded ring; each midrail is a horn-cut transom between the sash uprights
-    // splitting the glazing into stacked panes (own beads/glass per pane).
+    // Midrails INSIDE the sash (French doors, Job 00000264; casement Job 154):
+    // the sash stays one welded ring; each midrail is a horn-cut bar between
+    // the sash members splitting the glazing into panes (own beads/glass each).
     if (node.cell.midrails?.length && cell.sashInner && cell.sashKey) {
-      applyMidrails(cell, node.cell.midrails, system, out, windowH);
+      applyMidrails(cell, node.cell.midrails, system, out, windowW, windowH);
     }
     return;
   }
@@ -286,56 +286,113 @@ function buildLeafCell(
 }
 
 // ---------------------------------------------------------------------
-// MIDRAILS-IN-SASH (French doors — calibrated Job 00000264, docs 1/4).
+// MIDRAILS-IN-SASH
+//   HORIZONTAL — calibrated Job 00000264 (French doors, docs 1/4).
+//   VERTICAL   — calibrated Job 154 (Work Order - windows - 27-07-2026.pdf p4).
 //
-// A door leaf with midrails keeps its ONE welded sash ring (818 × 2044 at
-// 1700×2100); each midrail is a transom bar T-welded between the sash uprights:
-//   Int = sash Int width (608)   Ext = Int + 2 × face (742 for the 67mm T/M SM)
-// The glazing splits into stacked panes; each pane gets its own beads + glass
-// (pane bead Int 608 × 883.5 → glass 638 × 913.5 = Int + 2×15 rebate — matches
-// the printed 648/924 beads and 638×914 glass exactly).
+// A leaf with midrails keeps its ONE welded sash ring — so ONE opener, ONE
+// handle and ONE set of gear, whatever bars run inside it. Each midrail is a
+// horn-cut bar welded between the opposite sash members:
+//   Int = the sash Int span it crosses      Ext = Int + 2 × face
+//
+// The rule is the SAME on both axes, and Job 154 proves it on two profiles at
+// once. A 705×705 casement (frame face 64 ⇒ daylight 577; sash overlap 28 ⇒
+// sash outer 633; sash-t face 79 ⇒ sash Int 475) prints:
+//   p1  67mm SPQ-005-30252, horizontal → 475 + 2×67 = 609  ✓
+//   p3  78mm SPQ-5-30252,   horizontal → 475 + 2×78 = 631  ✓
+//   p4  78mm SPQ-5-30252,   VERTICAL   → 475 + 2×78 = 631  ✓  (the transpose:
+//       p3's panes are 510w × 236h, p4's are 236w × 510h)
+// …with ONE T Sash ring (2×633 + 2×633) and one handle / espag / stay on every
+// page — which is exactly why a divider dropped into a sash must NOT split the
+// frame into two sashes.
+//
+// A vertical midrail is pushed onto `out.mullions`, so `bars.ts#emitMullionBars`
+// prints it as a VERT bar (the printed orientation on p4); horizontal ones stay
+// on `out.transoms` (HOR). Both get the `< - >` horn end prep the doc shows.
 //
 // The PRIMARY SolvedCell (the one carrying sashOuter — hardware/gasket/labour
 // still key off it) is narrowed to pane 1; panes 2..n are emitted as extra
 // cells with the same content but NO sash rects, so bars/glass/SVG treat them
 // as pure glazing and no hardware/gasket double-counts.
+//
+// `axis` is optional and defaults to "horizontal", so every design authored
+// before Job 154 (i.e. every French door) is byte-identical.
 // ---------------------------------------------------------------------
 function applyMidrails(
   primary: SolvedCell,
-  midrails: { transomKey: string; atRatio: number }[],
+  midrails: { transomKey: string; atRatio: number; axis?: "horizontal" | "vertical" }[],
   system: ProfileSystem,
   out: SolvedGeometry,
+  windowW: number,
   windowH: number,
 ): void {
   const inner = primary.sashInner!;
   const sash = system.sashes[primary.sashKey!];
   const rebate = sash.glassRebate;
 
+  // One axis per sash: mixing them inside a single ring would need a grid of
+  // panes, which no reference job shows. The first midrail's axis wins and a
+  // contradicting one is a hard error rather than a silently ignored field.
+  const axis = midrails[0].axis ?? "horizontal";
+  if (midrails.some((m) => (m.axis ?? "horizontal") !== axis)) {
+    throw new Error(
+      `Mixed horizontal and vertical midrails in ${primary.pathId} — no calibrated job builds a pane grid`,
+    );
+  }
+  const vertical = axis === "vertical";
+
   const sorted = [...midrails].sort((a, b) => a.atRatio - b.atRatio);
 
-  // Pane boundaries top→bottom; each midrail is centred on atRatio × windowH.
+  // Pane boundaries along the split axis (top→bottom, or left→right); each
+  // midrail is centred on atRatio × the FULL window dimension of that axis.
+  const span = vertical ? windowW : windowH;
+  const start = vertical ? inner.x : inner.y;
+  const end = vertical ? inner.x + inner.w : inner.y + inner.h;
+  /** The bar's Int length = the sash Int span it crosses. */
+  const crossing = vertical ? inner.h : inner.w;
+
   const panes: Rect[] = [];
-  let cursorY = inner.y;
+  let cursor = start;
   for (const m of sorted) {
     const profile = system.transoms[m.transomKey];
-    if (!profile) throw new Error(`Unknown midrail transom: ${m.transomKey}`);
+    if (!profile) throw new Error(`Unknown midrail profile: ${m.transomKey}`);
     const face = profile.faceWidth;
-    const centreY = m.atRatio * windowH;
-    panes.push({ x: inner.x, y: cursorY, w: inner.w, h: centreY - face / 2 - cursorY });
-    out.transoms.push({
-      rect: { x: inner.x, y: centreY - face / 2, w: inner.w, h: face },
+    const centre = m.atRatio * span;
+    const near = centre - face / 2;
+    panes.push(
+      vertical
+        ? { x: cursor, y: inner.y, w: near - cursor, h: inner.h }
+        : { x: inner.x, y: cursor, w: inner.w, h: near - cursor },
+    );
+    const bar = {
       parentPathId: primary.pathId,
-      transomKey: m.transomKey,
-      extLengthMm: inner.w + 2 * face,
-      intLengthMm: inner.w,
+      extLengthMm: crossing + 2 * face,
+      intLengthMm: crossing,
       jointType: profile.jointType,
-    });
-    cursorY = centreY + face / 2;
+    };
+    if (vertical) {
+      out.mullions.push({
+        ...bar,
+        rect: { x: near, y: inner.y, w: face, h: inner.h },
+        mullionKey: m.transomKey,
+      });
+    } else {
+      out.transoms.push({
+        ...bar,
+        rect: { x: inner.x, y: near, w: inner.w, h: face },
+        transomKey: m.transomKey,
+      });
+    }
+    cursor = centre + face / 2;
   }
-  panes.push({ x: inner.x, y: cursorY, w: inner.w, h: inner.y + inner.h - cursorY });
+  panes.push(
+    vertical
+      ? { x: cursor, y: inner.y, w: end - cursor, h: inner.h }
+      : { x: inner.x, y: cursor, w: inner.w, h: end - cursor },
+  );
 
   for (const p of panes) {
-    if (p.h <= 0) throw new Error(`Midrail collapses a pane in ${primary.pathId}`);
+    if (p.w <= 0 || p.h <= 0) throw new Error(`Midrail collapses a pane in ${primary.pathId}`);
   }
 
   // Primary cell carries pane 1's glazing; panes 2..n become glazing-only cells.

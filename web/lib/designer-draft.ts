@@ -34,6 +34,24 @@ import type {
 
 export const LINE_ITEM_SCHEMA_VERSION = 1;
 
+/**
+ * Issue kinds that record a fabrication JUDGEMENT rather than a broken item:
+ * printed maxima the job knowingly goes past. They never stop a confirm — they
+ * print on the work order instead. Mirrors `ADVISORY_ISSUE_KINDS` in
+ * `src/designer/line-item-types.ts`, which stays the authority; this copy only
+ * lets the inspector label an issue honestly before the server sees it.
+ */
+const ADVISORY_ISSUE_KINDS = new Set([
+  "constraint",
+  "size-limit",
+  "dimension-out-of-range",
+]);
+
+/** Does this issue stop the order being confirmed? */
+export function isAdvisoryIssue(issue: { kind: string }): boolean {
+  return ADVISORY_ISSUE_KINDS.has(issue.kind);
+}
+
 // ---------------------------------------------------------------------
 // Selections
 // ---------------------------------------------------------------------

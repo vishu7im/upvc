@@ -402,6 +402,116 @@ export function validateDesigner(expect: Expect): void {
       resolved.issues.some((i) => i.kind === "unknown-component" && i.scope === "cell:root.top"), true);
   }
 
+  // ---- 14. A divider dropped into a SASH is a midrail ------------------
+  {
+    // Two defects, one assertion block. Cloning the leaf produced TWO sash
+    // rings ("2 windows", doubled gear); dropping the opener produced none at
+    // all. Job 154 (Work Order - windows - 27-07-2026.pdf) settles it: ONE
+    // ring, ONE handle, and the bar welded inside it.
+    const handleCode = system.hardware["hw-handle-inline"].code;
+    const before = resolveLineItem(draft({ designId: "win-th" }), snap);
+    expect("midrail: the starting design is a single opening sash",
+      (before.resolved.components ?? []).filter((c) => c.type === "sash").length, 1);
+
+    const split = resolveLineItem(
+      draft({
+        designId: "win-th",
+        topologyEdits: [
+          { id: "t1", edit: { op: "split", componentId: "cell:root", axis: "horizontal", position: "equal" } },
+        ],
+      }),
+      snap,
+    );
+    const comps = split.resolved.components ?? [];
+    expect("midrail: no error issues",
+      split.resolved.issues.filter((i) => i.severity === "error").length, 0);
+    expect("midrail: the sash ring SURVIVES (the opener is not deleted)",
+      comps.filter((c) => c.type === "sash").length, 1);
+    expect("midrail: the opener keeps its kind",
+      comps.find((c) => c.type === "sash")?.kind, "casement-top");
+    expect("midrail: the glazing splits into two panes",
+      split.output!.geometry.cells.length, 2);
+    expect("midrail: exactly ONE handle (not doubled, not dropped)",
+      split.output!.parts.hardware.find((h) => h.code === handleCode)?.qty, 1);
+    expect("midrail: one horn-cut bar inside the sash",
+      split.output!.geometry.transoms.length, 1);
+    // The sash ring itself is unchanged — same 4 bars as before the edit.
+    const ring = (o: QuoteOutput) =>
+      JSON.stringify(o.parts.bars.filter((b) => b.code === system.sashes["sash-t"].code));
+    expect("midrail: the sash ring is cut identically to before",
+      ring(split.output!), ring(before.output!));
+
+    // Vertical: the same rule on the other axis (Job 154 p4).
+    const vert = resolveLineItem(
+      draft({
+        designId: "win-th",
+        topologyEdits: [
+          { id: "t1", edit: { op: "split", componentId: "cell:root", axis: "vertical", position: "equal" } },
+        ],
+      }),
+      snap,
+    );
+    expect("vertical midrail: no error issues",
+      vert.resolved.issues.filter((i) => i.severity === "error").length, 0);
+    expect("vertical midrail: the sash ring survives",
+      (vert.resolved.components ?? []).filter((c) => c.type === "sash").length, 1);
+    expect("vertical midrail: prints as a VERT bar", vert.output!.geometry.mullions.length, 1);
+    expect("vertical midrail: two panes side by side", vert.output!.geometry.cells.length, 2);
+    expect("vertical midrail: still one handle",
+      vert.output!.parts.hardware.find((h) => h.code === handleCode)?.qty, 1);
+
+    // A FIXED pane still splits the FRAME — the D9 behaviour, unchanged.
+    const fixedSplit = resolveLineItem(
+      draft({
+        designId: "win-fixed",
+        topologyEdits: [
+          { id: "t1", edit: { op: "split", componentId: "cell:root", axis: "horizontal", position: "equal" } },
+        ],
+      }),
+      snap,
+    );
+    const fixedComps = fixedSplit.resolved.components ?? [];
+    expect("fixed cell: still a real frame split, two glass cells",
+      fixedComps.filter((c) => c.type === "glass").length, 2);
+    expect("fixed cell: no sash is invented", fixedComps.filter((c) => c.type === "sash").length, 0);
+  }
+
+  // ---- 15. Fabrication limits are ADVISORY, not blocking ---------------
+  {
+    // The legacy /quote path has never gated on size — it produced the
+    // 4050 × 1040 sliding work order in the repo root. The Designer must not be
+    // the only surface that refuses to print a buildable job.
+    const over = resolveLineItem(
+      draft({ designId: "win-th", dimensions: { widthMm: 4050, heightMm: 1040 } }),
+      snap,
+    );
+    expect("advisory: an oversize unit still solves", Boolean(over.output), true);
+    expect("advisory: it raises a dimension error",
+      over.resolved.issues.some((i) => i.kind === "dimension-out-of-range" && i.severity === "error"),
+      true);
+    expect("advisory: invalidSpec still true (the inspector still flags it)",
+      over.resolved.invalidSpec, true);
+    expect("advisory: but it does NOT block confirm", over.resolved.blocking, false);
+    expect("advisory: every advisory issue carries a message",
+      over.resolved.issues.every((i) => i.message.length > 0), true);
+
+    // A genuinely broken item still blocks.
+    const broken = resolveLineItem(draft({ designId: "no-such-design" }), snap);
+    expect("advisory: an unknown design still blocks", broken.resolved.blocking, true);
+    const badEdit = resolveLineItem(
+      draft({
+        designId: "win-fixed",
+        topologyEdits: [
+          { id: "x", edit: { op: "remove-divider", componentId: "divider:root" } },
+        ],
+      }),
+      snap,
+    );
+    expect("advisory: a failed topology edit still blocks", badEdit.resolved.blocking, true);
+    expect("advisory: a clean draft blocks nothing",
+      resolveLineItem(draft({ designId: "win-th-over-fixed-z" }), snap).resolved.blocking, false);
+  }
+
   validateSecondFamily(expect, snap);
 }
 
@@ -538,23 +648,56 @@ function validateSecondFamily(expect: Expect, snap: CatalogSnapshot): void {
     }
   }
 
-  // ---- A fanlight over the door is a normal guillotine split ----------
+  // ---- A bar dropped into a door LEAF is a midrail, not a frame transom
   {
+    // Same rule as the casement (Job 154) and the same fabrication the French
+    // door was calibrated on (Job 00000264): the leaf keeps its one welded ring
+    // and its gear, and the bar welds inside it.
     const { resolved, output } = resolveLineItem(
       doorDraft({
         topologyEdits: [
-          { id: "fanlight", edit: { op: "split", componentId: "cell:root", axis: "horizontal", position: "equal" } },
+          { id: "midrail", edit: { op: "split", componentId: "cell:root", axis: "horizontal", position: "equal" } },
         ],
       }),
       snap,
     );
-    expect("fanlight: the split resolved without errors",
+    expect("door midrail: resolved without errors",
       resolved.issues.filter((i) => i.severity === "error").length, 0);
-    expect("fanlight: the unit now has two cells", output!.geometry.cells.length, 2);
-    expect("fanlight: a transom appears in the cut list",
-      output!.geometry.transoms.length, 1);
+    expect("door midrail: the leaf glazing splits into two panes",
+      output!.geometry.cells.length, 2);
+    expect("door midrail: the leaf survives — still exactly one door sash",
+      (resolved.components ?? []).filter((c) => c.type === "sash").length, 1);
+    const doorHandle = getSystem(SYSTEM)!.hardware["hw-door-handle"].code;
+    expect("door midrail: still exactly one door handle",
+      output!.parts.hardware.find((h) => h.code === doorHandle)?.qty, 1);
+    const midrailCode = getSystem(SYSTEM)!.transoms["midrail-67"]?.code;
+    expect("door midrail: cut as the seeded midrail profile",
+      output!.parts.bars.some((b) => b.code === midrailCode), true);
+  }
+
+  // ---- A real FANLIGHT is a frame split, reached via the frame --------
+  {
+    // A fanlight is a separate light ABOVE the doorset, so it divides the
+    // FRAME — which means the root must not be a leaf-sash. Convert the leaf
+    // to glass, split the frame, then make the lower cell a door again. The
+    // capability is unchanged; only the route through it is explicit.
+    const { resolved, output } = resolveLineItem(
+      doorDraft({
+        topologyEdits: [
+          { id: "a", edit: { op: "convert-component", componentId: "cell:root", to: "glass" } },
+          { id: "b", edit: { op: "split", componentId: "cell:root", axis: "horizontal", position: "at-ratio", atRatio: 0.25 } },
+          { id: "c", edit: { op: "set-sash-kind", componentId: "cell:root.bottom", kind: "door-left" } },
+        ],
+      }),
+      snap,
+    );
+    expect("fanlight: resolved without errors",
+      resolved.issues.filter((i) => i.severity === "error").length, 0);
+    expect("fanlight: a frame transom appears", output!.geometry.transoms.length, 1);
     const transomCode = getSystem(SYSTEM)!.transoms["transom-t-67"]?.code;
-    expect("fanlight: the transom is the seeded default profile",
+    expect("fanlight: it is the seeded default frame profile",
       output!.parts.bars.some((b) => b.code === transomCode), true);
+    expect("fanlight: a fixed light above, one door leaf below",
+      (resolved.components ?? []).filter((c) => c.type === "sash").length, 1);
   }
 }

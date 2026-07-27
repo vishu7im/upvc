@@ -6,8 +6,9 @@
 // =====================================================================
 
 import { solve } from "../engine/solve.ts";
-import { loadCatalog } from "../catalog/index.ts";
-import type { QuoteOutput } from "../types.ts";
+import { getDesign, getSystem, loadCatalog } from "../catalog/index.ts";
+import { renderWorkOrder } from "../engine/documents.ts";
+import type { CellSpec, QuoteOutput } from "../types.ts";
 import { validateExtractor } from "../tools/extract-topology.test.ts";
 import { validatePricing } from "../engine/pricing.test.ts";
 import { validateSvg } from "../engine/svg.test.ts";
@@ -872,6 +873,155 @@ function validateViews(): void {
   expect("transom face is the catalog's 67", transomFace, 67);
 }
 
+// Job 154 — "Work Order - windows - 27-07-2026.pdf" (5 pages, all 705 × 705).
+//
+// A THIRD-PARTY production document, and the calibration source for a divider
+// dropped INSIDE a sash. Every page prints ONE T Sash ring (2 × 633 hor +
+// 2 × 633 vert) and ONE handle + ONE 400 mm espagnolette + ONE 16" friction
+// stay — so a bar added to an opening sash must NOT split the frame into two
+// sashes (two windows, doubled gear) NOR drop the opener. It welds inside the
+// one ring as a midrail:
+//
+//   p1  Transom SPQ-005-30252  67mm  horizontal → 1 bar, 609, `<->`
+//   p3  Midrail SPQ-5-30252    78mm  horizontal → 1 bar, 631, `<->`
+//   p4  Midrail SPQ-5-30252    78mm  VERTICAL   → 1 bar, 631, `<->`
+//   p5  no divider                              → plain sash, one 500×500 pane
+//
+// Each length is our OWN calibrated catalog reproducing the document: frame
+// face 64 ⇒ daylight 577; sash overlap 28 ⇒ ring 633; sash-t face 79 ⇒ ring Int
+// 475; midrail Ext = Int + 2 × face ⇒ 609 (67) and 631 (78). Nothing new was
+// derived — the document independently confirms three calibrated values and the
+// Job 00000264 horn rule, on two profiles and both axes.
+//
+// NOT asserted (open reconciliation, never silently adopted): the vendor's bead
+// lengths (510 for a 475 pane, where our Quotila-calibrated rule gives Int + 40
+// = 515) and glass sizes (500 × 500), and its sash steel at 470 where ours is
+// the ring Int 475 (a 2.5 mm/end convention difference). Those follow a
+// different bead/steel convention from the Quotila jobs the catalog is
+// calibrated on; adopting them would silently re-calibrate the casement family.
+function validateJob154(): void {
+  console.log("\n==================================================");
+  console.log("Job 154: 705×705 casement — a midrail inside the sash");
+  console.log("==================================================");
+
+  const base = getDesign("win-th");
+  if (!base) {
+    console.log("  (skipped — design win-th not seeded)");
+    return;
+  }
+  const W = 705, H = 705;
+  const run = (midrails?: { transomKey: string; atRatio: number; axis?: "horizontal" | "vertical" }[]) =>
+    solve({
+      orderNo: "TEST", customer: "Validation", designId: "win-th",
+      widthMm: W, heightMm: H, systemId: "sunnyplast-70",
+      ...(midrails
+        ? { topologyOverride: { kind: "leaf" as const, cell: { ...(base.topology as { kind: "leaf"; cell: CellSpec }).cell, midrails } } }
+        : {}),
+    });
+
+  // ---- p5: the plain sash the other pages build on --------------------
+  const plain = run();
+  const sashCode = getSystem("sunnyplast-70")!.sashes["sash-t"].code;
+  const ring = plain.parts.bars.filter((b) => b.code === sashCode);
+  expect("p5: one welded sash ring — 4 bars", ring.length, 4);
+  expect("p5: ring Ext 633 (daylight 577 + 2×28 overlap)",
+    ring.every((b) => approxEq(b.extMm, 633)), true);
+  expect("p5: ring Int 475 (633 − 2×79 sash face)",
+    ring.every((b) => approxEq(b.intMm, 475)), true);
+  expect("p5: frame 4 × 705",
+    plain.parts.bars.filter((b) => b.code === "SPQ-5-10252" && approxEq(b.extMm, 705)).length, 4);
+  expect("p5: one glazed pane", plain.parts.glass.length, 1);
+
+  // ---- p1: 67 mm bar across the sash ⇒ 609 ----------------------------
+  const p1 = run([{ transomKey: "midrail-67", atRatio: 0.5 }]);
+  const bar67 = p1.parts.bars.find((b) => b.code === "SPQ-005-30252");
+  expect("p1: the 67mm midrail is cut", Boolean(bar67), true);
+  expect("p1: Ext 609 = 475 + 2×67", bar67?.extMm, 609);
+  expect("p1: Int 475 = the sash ring Int", bar67?.intMm, 475);
+  expect("p1: horn-cut end prep", bar67?.endPrep, "< - >");
+  expect("p1: printed as a HOR bar", bar67?.orientation, "H");
+  expect("p1: the sash ring is untouched",
+    JSON.stringify(p1.parts.bars.filter((b) => b.code === sashCode)), JSON.stringify(ring));
+  expect("p1: the glazing splits into two panes", p1.parts.glass.length, 2);
+
+  // ---- p3/p4: 78 mm bar, both axes ⇒ 631 each -------------------------
+  const p3 = run([{ transomKey: "mullion-78", atRatio: 0.5 }]);
+  const bar78h = p3.parts.bars.find((b) => b.code === "SPQ-5-30252");
+  expect("p3: Ext 631 = 475 + 2×78", bar78h?.extMm, 631);
+  expect("p3: printed as a HOR bar", bar78h?.orientation, "H");
+
+  const p4 = run([{ transomKey: "mullion-78", atRatio: 0.5, axis: "vertical" }]);
+  const bar78v = p4.parts.bars.find((b) => b.code === "SPQ-5-30252");
+  expect("p4: the SAME 631 on the vertical axis", bar78v?.extMm, 631);
+  expect("p4: printed as a VERT bar", bar78v?.orientation, "V");
+  expect("p4: horn-cut end prep", bar78v?.endPrep, "< - >");
+  expect("p4: two panes side by side", p4.parts.glass.length, 2);
+  // p3's panes are 510 w × 236 h; p4's are the transpose. Our own numbers
+  // differ from the vendor's bead convention, but the TRANSPOSE must hold.
+  const [w3, h3] = [p3.parts.glass[0].widthMm, p3.parts.glass[0].heightMm];
+  const [w4, h4] = [p4.parts.glass[0].widthMm, p4.parts.glass[0].heightMm];
+  expect("p3 vs p4: the pane is the exact transpose", `${w3}x${h3}`, `${h4}x${w4}`);
+
+  // ---- the whole point: ONE opener, on every page ---------------------
+  for (const [label, out] of [["p1", p1], ["p3", p3], ["p4", p4]] as const) {
+    const hw = (code: string) => out.parts.hardware.find((h) => h.code === code)?.qty ?? 0;
+    expect(`${label}: exactly ONE handle`, hw("HDL-INLINE"), 1);
+    expect(`${label}: exactly ONE espagnolette`,
+      out.parts.hardware.filter((h) => h.code.startsWith("ESPAG-")).reduce((s, h) => s + h.qty, 0), 1);
+    expect(`${label}: exactly ONE friction stay`,
+      out.parts.hardware.filter((h) => h.code.startsWith("FH-")).reduce((s, h) => s + h.qty, 0), 1);
+    expect(`${label}: the opening chevron is still drawn`,
+      (out.geometry.svg.match(/opening|polyline/g) ?? []).length > 0, true);
+  }
+  // One chevron, not one per pane — the leaf draws it, the panes do not.
+  expect("p1: ONE opening symbol for the whole sash",
+    (p1.geometry.svg.match(/<polyline/g) ?? []).length,
+    (plain.geometry.svg.match(/<polyline/g) ?? []).length);
+}
+
+// The Work Order's advisory band (fabrication limits a job knowingly exceeds).
+// Same additive discipline as DocBranding / DocBasket: supplying it prints a
+// cited note, omitting it must leave the document byte-for-byte as it was.
+function validateAdvisories(): void {
+  console.log("\n==================================================");
+  console.log("Work-order advisory band (additive)");
+  console.log("==================================================");
+
+  const input = {
+    orderNo: "TEST", customer: "Validation",
+    designId: "win-th-over-fixed-z", widthMm: 1200, heightMm: 1200,
+    systemId: "sunnyplast-70",
+  } as const;
+  const out = solve({ ...input });
+  const system = getSystem("sunnyplast-70")!;
+  const design = getDesign("win-th-over-fixed-z")!;
+
+  // Omitting the param must change nothing: the call with the argument absent
+  // and the call with it explicitly undefined produce the same bytes, and
+  // solve()'s own work order (which never passes advisories) carries no band.
+  const plain = renderWorkOrder(input, system.name, design.name, out.parts);
+  expect("advisory band: absent argument == explicit undefined",
+    renderWorkOrder(input, system.name, design.name, out.parts, undefined, undefined, "normal", undefined, undefined, undefined),
+    plain);
+  expect("advisory band: solve()'s work order carries no band",
+    out.documents.workOrder.includes("Check before fabrication"), false);
+
+  const withNote = renderWorkOrder(input, system.name, design.name, out.parts, undefined, undefined,
+    "normal", undefined, undefined,
+    [{ item: "4050 × 1040 mm", message: "Overall width exceeds the 3000 mm maximum outer-frame width", source: "HAWDIO p70 (PDF 72)" }]);
+  expect("advisory band prints the message",
+    withNote.includes("Overall width exceeds the 3000 mm maximum outer-frame width"), true);
+  expect("advisory band prints its citation", withNote.includes("HAWDIO p70 (PDF 72)"), true);
+  expect("advisory band names the item", withNote.includes("4050 × 1040 mm"), true);
+  expect("advisory band counts the breaches", withNote.includes("1 printed limit exceeded"), true);
+
+  // An EMPTY list is the same as none — the caller passes `undefined` when
+  // there is nothing to say, but a [] must not print an empty band either.
+  expect("empty advisory list ⇒ byte-identical",
+    renderWorkOrder(input, system.name, design.name, out.parts, undefined, undefined, "normal", undefined, undefined, []),
+    plain);
+}
+
 // Load the catalog from PostgreSQL before solving, then run all jobs.
 (async () => {
   await loadCatalog();
@@ -889,6 +1039,8 @@ function validateViews(): void {
   validateWeldMath();
   validateColourAndJoints();
   validateViews();
+  validateJob154();
+  validateAdvisories();
   validateExtractor(expect);
   validatePricing(expect);
   validateSvg(expect);

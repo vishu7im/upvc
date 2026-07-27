@@ -645,6 +645,12 @@ export interface ResolvedLineItem {
   issues: LineItemIssue[];
   invalidDimensions: boolean;
   invalidSpec: boolean;
+  /**
+   * true ⇒ this item cannot be confirmed. Narrower than `invalidSpec`: going
+   * past a printed fabrication maximum is an error the fabricator may proceed
+   * with, so it sets `invalidSpec` but not `blocking`.
+   */
+  blocking: boolean;
   pricing?: { currency: string; lines: QuoteLine[]; totals: QuoteTotals };
   summary?: ResolvedSummary;
   /** `external` always; the others only when the request asked for them (phase 5). */

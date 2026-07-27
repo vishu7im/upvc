@@ -19,8 +19,12 @@
 //   cill                 the fitted cill, when present
 //
 // TOPOLOGY EDITS map onto existing engine concepts only — no new engine math:
-//   split              inserts an hsplit/vsplit node (engine: solveTopology walk)
-//   add-midrail        appends to CellSpec.midrails (calibrated Job 00000264)
+//   split              on a FIXED cell: inserts an hsplit/vsplit node (engine:
+//                      solveTopology walk), both children fixed lights. On a
+//                      SASH cell it becomes an add-midrail — see `case "split"`
+//   add-midrail        appends to CellSpec.midrails (horizontal: Job 00000264;
+//                      vertical: Job 154). The sash ring, and therefore the
+//                      opener and its gear, survives.
 //   convert-component / set-sash-kind   change leaf content (existing SashKinds)
 //   remove-divider     collapses a split whose children are both leaves
 // "equal" positions are the midpoint of the target cell's solved bounds — the
@@ -230,6 +234,31 @@ export function applyEdit(topology: CellNode, edit: TopologyEdit, ctx: AdapterEd
       const segs = pathSegments(target.path);
       const solved = solvedCellAt(ctx, target.path);
       const isH = edit.axis === "horizontal";
+
+      // A divider dropped into an OPENING SASH is a MIDRAIL, not a frame
+      // transom: it welds inside the one sash ring, so the opener, its handle
+      // and its gear survive. Calibrated by Job 154 (Work Order - windows -
+      // 27-07-2026.pdf), where a 705×705 casement prints ONE T Sash ring
+      // (2×633 + 2×633) and ONE handle / espag / stay on every page, with the
+      // divider as a single horn-cut `< - >` bar inside it. Splitting the
+      // FRAME instead would fabricate two sash rings (two windows, doubled
+      // gear) or, if the opener were dropped, no opener at all — both wrong.
+      // To get a fixed light above an opener, convert the sash to glass first.
+      if (solved.sashInner) {
+        return applyEdit(
+          topology,
+          {
+            op: "add-midrail",
+            componentId: edit.componentId,
+            position: edit.position,
+            ...(edit.atRatio !== undefined ? { atRatio: edit.atRatio } : {}),
+            axis: edit.axis,
+            ...(edit.dividerKey ? { transomKey: edit.dividerKey } : {}),
+          },
+          ctx,
+        );
+      }
+
       // Equal ⇒ divider centred at the midpoint of the cell's bounds; the
       // engine centres the divider on ratio × window (topology.ts), so the two
       // children get equal daylight by construction.
@@ -244,10 +273,18 @@ export function applyEdit(topology: CellNode, edit: TopologyEdit, ctx: AdapterEd
       }
       return replaceAt(topology, segs, (node) => {
         const leaf = requireLeaf(node, target.path);
+        // Defensive: only sash-bearing cells can hold midrails, and those were
+        // routed to `add-midrail` above — so this is unreachable in practice.
         if (leaf.cell.midrails?.length) {
           throw new AdapterError(`Cell "${target.path}" has midrails — remove them before splitting`);
         }
-        const clone = (): CellNode => ({ kind: "leaf", cell: { ...leaf.cell } });
+        // Reached only for a FIXED / glass cell, where the bar really does
+        // divide the frame. Both new areas inherit the glazing spec (glass +
+        // bead) and stay fixed — the same fields `convert-component → glass`
+        // drops below. An opener is never cloned into both halves: that
+        // fabricated two sash rings (two windows, doubled handle/espag/stay).
+        const { sashKey: _s, midrails: _m, ...glazing } = leaf.cell;
+        const clone = (): CellNode => ({ kind: "leaf", cell: { ...glazing, content: "fixed" } });
         return isH
           ? { kind: "hsplit", splitAtRatio: ratio, transomKey: dividerKey, top: clone(), bottom: clone() }
           : { kind: "vsplit", splitAtRatio: ratio, mullionKey: dividerKey, left: clone(), right: clone() };
@@ -261,14 +298,32 @@ export function applyEdit(topology: CellNode, edit: TopologyEdit, ctx: AdapterEd
       if (!solved.sashInner) {
         throw new AdapterError(`Cell "${target.path}" has no sash — midrails weld inside a sash ring`);
       }
+      const vertical = edit.axis === "vertical";
       // Equal ⇒ the midrail centreline at the middle of the sash's glazing
       // opening; atRatio is a FULL-window fraction (CellSpec.midrails contract).
-      const ratio = ratioOrThrow(edit, () => (solved.sashInner!.y + solved.sashInner!.h / 2) / ctx.heightMm);
-      const transomKey = edit.transomKey ?? DEFAULT_MIDRAIL_KEY;
+      const ratio = ratioOrThrow(edit, () =>
+        vertical
+          ? (solved.sashInner!.x + solved.sashInner!.w / 2) / ctx.widthMm
+          : (solved.sashInner!.y + solved.sashInner!.h / 2) / ctx.heightMm,
+      );
+      // Job 154's own profiles: the 67 mm SPQ-005-30252 across a sash (p1,
+      // printed 609) and the 78 mm SPQ-5-30252 up it (p4, printed 631).
+      const transomKey = edit.transomKey ?? (vertical ? DEFAULT_MULLION_KEY : DEFAULT_MIDRAIL_KEY);
       if (!ctx.system.transoms[transomKey]) throw new AdapterError(`Unknown midrail profile: ${transomKey}`);
       return replaceAt(topology, segs, (node) => {
         const leaf = requireLeaf(node, target.path);
-        const midrails = [...(leaf.cell.midrails ?? []), { transomKey, atRatio: ratio }];
+        const existing = leaf.cell.midrails ?? [];
+        // One axis per sash ring — a pane GRID has no calibrated reference job.
+        const currentAxis = existing[0]?.axis ?? (existing.length ? "horizontal" : undefined);
+        if (currentAxis && currentAxis !== (vertical ? "vertical" : "horizontal")) {
+          throw new AdapterError(
+            `Cell "${target.path}" already has ${currentAxis} midrails — a sash cannot carry both axes`,
+          );
+        }
+        const midrails = [
+          ...existing,
+          { transomKey, atRatio: ratio, ...(vertical ? { axis: "vertical" as const } : {}) },
+        ];
         return { kind: "leaf", cell: { ...leaf.cell, midrails } };
       });
     }

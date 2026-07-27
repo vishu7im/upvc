@@ -29,6 +29,13 @@ import type {
   OptionSystemSeed,
 } from "../../designer/option-types.ts";
 import type { ProfileSystem, SashKind } from "../../types.ts";
+import {
+  CASEMENT_STYLE_FILTERS,
+  FINISH_FILTERS,
+  HAND_FILTERS,
+  filterKeysFor,
+  usedFilters,
+} from "./hardware-filters.ts";
 
 const FAMILY = "casement-window";
 
@@ -308,6 +315,26 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
   // Handle: a genuine 1:1 substitution slot — the engine adds exactly one
   // handle per opening sash, so swapping the key changes nothing geometric.
   // Choices are the catalog's casement handles (today: one).
+  const casementHandleKeys = Object.keys(sys.hardware)
+    .filter(
+      (k) => sys.hardware[k].financialCategory === "Casement Handles" && k.startsWith("hw-handle-"),
+    )
+    // The stock list arrives in supplier order; sort by NAME so the picker is
+    // browsable and the seeded `order` is stable across regenerations.
+    .sort((a, b) => sys.hardware[a].name.localeCompare(sys.hardware[b].name));
+
+  const handleFamilies = [FINISH_FILTERS, CASEMENT_STYLE_FILTERS, HAND_FILTERS];
+  const handleChoices: OptionChoice[] = casementHandleKeys.map((key, i) => ({
+    key: `handle-${key}`,
+    optionKey: "hardware.handle",
+    label: sys.hardware[key].name,
+    order: (i + 1) * 10,
+    isDefault: key === "hw-handle-inline", // the calibrated pick (Jobs 85/88/90)
+    filterKeys: filterKeysFor(sys.hardware[key].name, handleFamilies),
+    partKey: key,
+    engineEffect: { kind: "hardware-substitution", params: { slot: "handle" } },
+  }));
+
   options.push(
     opt({
       key: "hardware.handle",
@@ -317,24 +344,19 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
       display: "select-image",
       required: false,
       scope: { level: "component", componentTypes: ["sash"], applyScopes: ["all-of-type", "this"] },
+      // Chips derived from the supplier's own naming — the catalog carries 35+
+      // casement handles, which is not a list you scroll.
+      filters: usedFilters(handleChoices, handleFamilies),
       pricingMode: "catalog",
+      presentation: {
+        helpText:
+          "One handle per opening sash. Cranked and monkeytail handles are HANDED — pick the hand " +
+          "that matches the sash's hinge side (the studio warns if they disagree).",
+      },
       familyKeys: [FAMILY],
     }),
   );
-  const casementHandleKeys = Object.keys(sys.hardware).filter(
-    (k) => sys.hardware[k].financialCategory === "Casement Handles" && k.startsWith("hw-handle-"),
-  );
-  for (const [i, key] of casementHandleKeys.entries()) {
-    choices.push({
-      key: `handle-${key}`,
-      optionKey: "hardware.handle",
-      label: sys.hardware[key].name,
-      order: (i + 1) * 10,
-      isDefault: key === "hw-handle-inline", // the calibrated pick (Jobs 85/88/90)
-      partKey: key,
-      engineEffect: { kind: "hardware-substitution", params: { slot: "handle" } },
-    });
-  }
+  choices.push(...handleChoices);
 
   // Locking + hinge are SIZE-SELECTED by the engine (espagnolette from the sash
   // span, friction stay from the perpendicular span — calibrated on Jobs
@@ -471,6 +493,15 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
 
   // ---- structure (instant actions) ----------------------------------
 
+  // Where the bar lands depends on what you clicked (adapters/cellnode.ts):
+  // inside an opening sash it welds in as a MIDRAIL and the opener survives
+  // (Job 154); on a fixed pane it divides the FRAME and both new areas stay
+  // fixed. The helpText says so rather than the UI, which knows no option keys.
+  const SPLIT_HELP =
+    "Inside an opening sash this welds a midrail into the sash — the opener, its handle and its " +
+    "gear stay exactly as they are. On a fixed pane it adds a bar to the frame and both new areas " +
+    "start as fixed glass; click one to make it an opener.";
+
   options.push(
     opt({
       key: "structure.add-transom",
@@ -481,7 +512,23 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
       required: false,
       scope: { level: "component", componentTypes: ["glass", "panel", "sash"] },
       pricingMode: "catalog",
+      presentation: { helpText: `${SPLIT_HELP} The new transom lands at the middle of the area.` },
       action: { op: "split", axis: "horizontal", position: "equal" },
+      familyKeys: [FAMILY],
+    }),
+    opt({
+      key: "structure.add-transom-at",
+      groupKey: "structure",
+      name: "Add transom at a drop",
+      order: 15,
+      display: "action",
+      required: false,
+      scope: { level: "component", componentTypes: ["glass", "panel", "sash"] },
+      pricingMode: "catalog",
+      presentation: {
+        helpText: `${SPLIT_HELP} Enter the drop — the distance from the head of the frame down to the transom centreline.`,
+      },
+      action: { op: "split", axis: "horizontal", position: "at-ratio" },
       familyKeys: [FAMILY],
     }),
     opt({
@@ -493,7 +540,23 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
       required: false,
       scope: { level: "component", componentTypes: ["glass", "panel", "sash"] },
       pricingMode: "catalog",
+      presentation: { helpText: `${SPLIT_HELP} The new mullion lands at the middle of the area.` },
       action: { op: "split", axis: "vertical", position: "equal" },
+      familyKeys: [FAMILY],
+    }),
+    opt({
+      key: "structure.add-mullion-at",
+      groupKey: "structure",
+      name: "Add mullion at a position",
+      order: 25,
+      display: "action",
+      required: false,
+      scope: { level: "component", componentTypes: ["glass", "panel", "sash"] },
+      pricingMode: "catalog",
+      presentation: {
+        helpText: `${SPLIT_HELP} Enter the distance from the left jamb to the mullion centreline.`,
+      },
+      action: { op: "split", axis: "vertical", position: "at-ratio" },
       familyKeys: [FAMILY],
     }),
     opt({

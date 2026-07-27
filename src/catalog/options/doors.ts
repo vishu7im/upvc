@@ -30,6 +30,12 @@ import type {
 } from "../../designer/option-types.ts";
 import type { ProfileSystem, SashKind } from "../../types.ts";
 import { DOOR_SASH_KINDS } from "../families/entrance-door.ts";
+import {
+  DOOR_STYLE_FILTERS,
+  FINISH_FILTERS,
+  filterKeysFor,
+  usedFilters,
+} from "./hardware-filters.ts";
 
 const FAMILY = "entrance-door";
 
@@ -52,7 +58,9 @@ const SHARED_OPTION_KEYS = [
   "glazing.glass-type",
   "glazing.method",
   "structure.add-transom",
+  "structure.add-transom-at",
   "structure.add-mullion",
+  "structure.add-mullion-at",
   "structure.remove-divider",
   "structure.component-type",
   "general.drainage",
@@ -227,15 +235,46 @@ export function buildDoorsOptionSystem(
     },
   ];
 
+  /**
+   * Catalog rows that share a slot's financialCategory but must NOT be offered
+   * as a choice for it:
+   *   • keep sets — the engine picks R/H or L/H from the leaf's hinge side, so
+   *     a free choice could fit the wrong-handed keep (the D7 rule);
+   *   • the French-door accessories, which are "Door Lock" rows but are welded
+   *     fittings, not a lock you select;
+   *   • the sliding-patio cylinder, a different part at a different price
+   *     (GLIS-12) that belongs to the sliding family, not a doorset.
+   */
+  const NOT_SELECTABLE = (key: string): boolean =>
+    key.startsWith("hw-keep-") ||
+    key.endsWith("-keep-set") ||
+    key === "hw-inverter-cap" ||
+    key === "hw-cavity-lock-block" ||
+    key === "hw-shootbolt" ||
+    key === "hw-patio-cylinder";
+
   for (const h of hardwareOptions) {
-    // Keep sets are catalog "Door Lock" rows too, but they are not selectable:
-    // the engine picks R/H or L/H from the leaf's hinge side, so offering them
-    // would let a quote fit the wrong-handed keep.
-    const partKeys = Object.keys(sys.hardware).filter(
-      (k) => sys.hardware[k].financialCategory === h.category && !k.startsWith("hw-keep-"),
-    );
+    const partKeys = Object.keys(sys.hardware)
+      .filter((k) => sys.hardware[k].financialCategory === h.category && !NOT_SELECTABLE(k))
+      // Supplier order in, alphabetical out: the stock list now supplies 50+
+      // door handles, and a browsable picker beats the export's order.
+      .sort((a, b) => sys.hardware[a].name.localeCompare(sys.hardware[b].name));
     if (partKeys.length === 0) continue; // nothing in the catalog ⇒ no option
 
+    const families =
+      h.slot === "handle" ? [FINISH_FILTERS, DOOR_STYLE_FILTERS] : [FINISH_FILTERS];
+    const slotChoices: OptionChoice[] = partKeys.map((key, i) => ({
+      key: `door-hw-${h.slot}-${key}`,
+      optionKey: h.key,
+      label: sys.hardware[key].name,
+      order: (i + 1) * 10,
+      isDefault: key === h.defaultPartKey, // the calibrated pick
+      filterKeys: filterKeysFor(sys.hardware[key].name, families),
+      partKey: key,
+      engineEffect: { kind: "hardware-substitution", params: { slot: h.slot } },
+    }));
+
+    const slotFilters = usedFilters(slotChoices, families);
     options.push(
       opt({
         key: h.key,
@@ -249,21 +288,14 @@ export function buildDoorsOptionSystem(
           componentTypes: ["sash"],
           applyScopes: ["all-of-type", "this"],
         },
+        // Omitted rather than [] when no chip applies (door locks are unfinished
+        // hardware), so the picker renders no empty filter row.
+        ...(slotFilters.length ? { filters: slotFilters } : {}),
         pricingMode: "catalog",
         presentation: { helpText: h.help },
       }),
     );
-    for (const [i, key] of partKeys.entries()) {
-      choices.push({
-        key: `door-hw-${h.slot}-${key}`,
-        optionKey: h.key,
-        label: sys.hardware[key].name,
-        order: (i + 1) * 10,
-        isDefault: key === h.defaultPartKey, // the calibrated pick
-        partKey: key,
-        engineEffect: { kind: "hardware-substitution", params: { slot: h.slot } },
-      });
-    }
+    choices.push(...slotChoices);
   }
 
   // Threshold. The manual draws door thresholds but the catalog holds no

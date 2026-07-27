@@ -123,6 +123,30 @@ export interface LineItemIssue {
   source?: string;
 }
 
+/**
+ * Issue kinds that record a FABRICATION JUDGEMENT rather than a broken item.
+ *
+ * Every one of them still solves, still prices and still produces paperwork:
+ * exceeding a printed maximum is the fabricator's call, not the software's.
+ * The manual itself assumes it — HAWDIO p70 prints a 10% tolerance ON TOP of
+ * every maximum — and the legacy `/quote` path, which produced the 4050 × 1040
+ * sliding work order in the repo root, has never gated on size at all. The
+ * Designer must not be the only surface that refuses to print the job.
+ *
+ * SEVERITY IS UNCHANGED: an oversize unit still reads as an error in the
+ * inspector, with its citation. This set decides only what BLOCKS CONFIRM.
+ */
+export const ADVISORY_ISSUE_KINDS: ReadonlySet<IssueKind> = new Set<IssueKind>([
+  "constraint", // descriptor rules — generated from SIZE_LIMITS (HAWDIO p70)
+  "size-limit", // checkSizeLimits() weight verdicts
+  "dimension-out-of-range", // the descriptor's own min/max guard rails
+]);
+
+/** An error the order cannot be confirmed with (see ADVISORY_ISSUE_KINDS). */
+export function isBlockingIssue(issue: LineItemIssue): boolean {
+  return issue.severity === "error" && !ADVISORY_ISSUE_KINDS.has(issue.kind);
+}
+
 // ---------------------------------------------------------------------
 // ResolvedLineItem (computed cache — line-item-schema.md §3)
 // ---------------------------------------------------------------------
@@ -140,9 +164,15 @@ export interface ResolvedLineItem {
   /** Provenance of the prices used (loadCatalog timestamp). */
   catalogVersion: string;
   issues: LineItemIssue[];
-  /** true ⇒ blocks confirm (NOT preview) — mirrors the reference flags. */
+  /** Attention flags for the inspector — mirrors the reference flags. */
   invalidDimensions: boolean;
   invalidSpec: boolean;
+  /**
+   * true ⇒ this item cannot be confirmed. Narrower than `invalidSpec`: a unit
+   * over a printed maximum is an error the fabricator may proceed with, so it
+   * sets `invalidSpec` but NOT `blocking` (see ADVISORY_ISSUE_KINDS).
+   */
+  blocking: boolean;
   /** Engine Pricing verbatim; absent when the solve itself failed. */
   pricing?: Pricing;
   summary?: ResolvedSummary;
