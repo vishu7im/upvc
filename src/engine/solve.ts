@@ -12,6 +12,7 @@ import type {
   ColourOption,
   DocCill,
   DocColour,
+  ProfileSystem,
   QuoteInput,
   QuoteOutput,
   QuoteView,
@@ -23,7 +24,7 @@ import { computeParts } from "./bars.ts";
 import { computeHardware } from "./hardware.ts";
 import { planCuts } from "./cutting.ts";
 import { computePricing } from "./pricing.ts";
-import { renderSvg } from "./svg.ts";
+import { renderSvg, type RenderSvgOpts } from "./svg.ts";
 import { applyOverrides } from "./overrides.ts";
 import { renderWorkOrder, renderCuttingList, renderBom, renderPriceSummary } from "./documents.ts";
 
@@ -186,7 +187,17 @@ export function solve(input: QuoteInput): QuoteOutput {
   // It is applied to what the caller DRAWS, never to what the documents embed —
   // hence the separate flat render below when the two differ.
   const previewOpts =
-    input.svgStyle === "realistic" ? { ...svgOpts, style: "realistic" as const } : svgOpts;
+    input.svgStyle === "realistic"
+      ? {
+          ...svgOpts,
+          style: "realistic" as const,
+          hardware: previewDoorHardware(
+            system,
+            input.hardwareOverrides,
+            input.doorOpeningDirection,
+          ),
+        }
+      : svgOpts;
   const svg = renderSvg(geometry, previewOpts);
   // Extra elevations (Designer phase 5) — same solved geometry, same visual
   // opts, rendered only when asked for. Documents keep embedding the flat SVG.
@@ -238,6 +249,47 @@ export function solve(input: QuoteInput): QuoteOutput {
     cuttingPlan,
     pricing,
     documents,
+  };
+}
+
+/**
+ * Map the selected catalogue rows to the four lightweight SVG finishes. This is
+ * presentation metadata only: computeHardware remains the sole owner of which
+ * parts and quantities are actually fitted.
+ */
+function previewDoorHardware(
+  system: ProfileSystem,
+  overrides: Record<string, string> | undefined,
+  openingDirection: "in" | "out" | undefined,
+): NonNullable<RenderSvgOpts["hardware"]> {
+  const selectedName = (slot: string, fallback: string): string =>
+    system.hardware[overrides?.[slot] ?? fallback]?.name ?? "";
+  const finish = (
+    name: string,
+    fallback: "white" | "black" | "chrome" | "gold",
+  ): "white" | "black" | "chrome" | "gold" => {
+    if (/(black|anthracite|graphite)/i.test(name)) return "black";
+    if (/(gold|brass|bronze)/i.test(name)) return "gold";
+    if (/(chrome|silver|satin|polished|stainless)/i.test(name)) return "chrome";
+    if (/white/i.test(name)) return "white";
+    return fallback;
+  };
+
+  const handleName = selectedName("handle", "hw-door-handle");
+  const cylinderName = selectedName("cylinder", "hw-cylinder-brass");
+  const hingeName = selectedName("hinge", "hw-flag-hinge-white");
+  const lockName = selectedName("lock", "hw-door-lock");
+
+  return {
+    openingDirection: openingDirection ?? "in",
+    handle: { finish: finish(handleName, "white") },
+    cylinder: { finish: finish(cylinderName, "gold") },
+    hinge: {
+      finish: finish(hingeName, "white"),
+      style: /high security/i.test(hingeName) ? "high-security" : "flag",
+      count: 3,
+    },
+    lock: { finish: finish(lockName, "chrome") },
   };
 }
 

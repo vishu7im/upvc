@@ -9,6 +9,11 @@
 // =====================================================================
 
 import type { SolvedGeometry, SolvedCell, Rect } from "../types.ts";
+import {
+  doorHardwareDefs,
+  renderDoorHardwareLayer,
+  type DoorHardwareVisuals,
+} from "./svg-hardware.ts";
 
 const PROFILE_FILL = "#e6e6e6"; // grey profile material (frame/transom/mullion/sash)
 const GLASS_FILL = "#ffffff"; // glazed openings (clear)
@@ -83,6 +88,20 @@ export interface RenderSvgOpts {
    */
   view?: SvgView;
   /**
+   * Catalogue-style door hardware presentation. Omitted uses the calibrated
+   * white handle / brass cylinder / white three-hinge door set. This metadata
+   * is consumed only by the realistic renderer.
+   */
+  hardware?: DoorHardwareVisuals;
+  /**
+   * Lightweight glass presentation controls. They never alter the selected
+   * glass part or its dimensions; they only change how a pane is painted.
+   */
+  glass?: {
+    privacy?: boolean;
+    decoration?: "astragal" | "georgian" | "leaded";
+  };
+  /**
    * Render the technical style (white fills, thin strokes) plus the annotation
    * layer. Every number comes from rects already on the solved geometry — no
    * new engine math, nothing invented. Omitted ⇒ the historical output.
@@ -138,7 +157,11 @@ export function renderSvg(geometry: SolvedGeometry, opts?: RenderSvgOpts): strin
   const frameOuter = geometry.frameRect ?? geometry.outer;
 
   if (skin) {
-    shapes.push(...realisticBody(geometry, skin));
+    shapes.push(...realisticBody(geometry, skin, {
+      view: internal ? "internal" : "external",
+      hardware: opts?.hardware,
+      glass: opts?.glass,
+    }));
   } else {
     // Add-on band — drawn first, so the frame paints over its inner edge. Tagged
     // like the joints layer so a reader (and the tests) can find it.
@@ -217,7 +240,7 @@ export function renderSvg(geometry: SolvedGeometry, opts?: RenderSvgOpts): strin
   // drawn outside that group at already-mirrored coordinates.
   const mirror = (r: Rect): Rect => (internal ? { ...r, x: w - (r.x + r.w) } : r);
   const overlays = [
-    internal ? handleLayer(geometry, mirror) : "",
+    internal ? handleLayer(geometry, mirror, !realistic) : "",
     schematic ? annotationLayer(geometry, schematic, mirror) : "",
   ].filter(Boolean);
 
@@ -291,11 +314,28 @@ function buildSkin(baseIn: string, grain: boolean): Skin {
     ${bevelGradients(`${id}-bd`, bead)}
     ${bevelGradients(`${id}-cl`, cill)}
     <linearGradient id="${id}-glass" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f4f8fb"/>
-      <stop offset="0.42" stop-color="#dbe7f0"/>
-      <stop offset="0.44" stop-color="#eaf2f7"/>
-      <stop offset="1" stop-color="#c6d6e2"/>
+      <stop offset="0" stop-color="#edf7fc"/>
+      <stop offset="0.34" stop-color="#d9e9f2"/>
+      <stop offset="0.56" stop-color="#c6dae6"/>
+      <stop offset="1" stop-color="#9eb9c9"/>
     </linearGradient>
+    <radialGradient id="${id}-glassSheen" cx="18%" cy="12%" r="88%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="0.38" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#6f96ad" stop-opacity="0.12"/>
+    </radialGradient>
+    <linearGradient id="${id}-panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${lighten(base, 0.3)}"/>
+      <stop offset="0.48" stop-color="${lighten(base, 0.12)}"/>
+      <stop offset="0.52" stop-color="${base}"/>
+      <stop offset="1" stop-color="${darken(base, 0.1)}"/>
+    </linearGradient>
+    <pattern id="${id}-privacy" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="4" cy="5" r="2.4" fill="#ffffff" opacity="0.13"/>
+      <circle cx="13" cy="12" r="3.2" fill="#6f96ad" opacity="0.08"/>
+      <path d="M0 16L16 0M8 18L18 8" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+    ${doorHardwareDefs(id)}
     <filter id="${id}-shadow" x="-15%" y="-12%" width="130%" height="135%">
       <feDropShadow dx="0" dy="9" stdDeviation="14" flood-color="#0f172a" flood-opacity="0.18"/>
     </filter>${grain ? `\n    ${grainFilter(`${id}-grainH`, "0.004 0.24")}\n    ${grainFilter(`${id}-grainV`, "0.24 0.004")}` : ""}
@@ -355,7 +395,15 @@ function grainFilter(id: string, baseFrequency: string): string {
 }
 
 /** The whole drawing in the realistic style, in painter's order. */
-function realisticBody(geometry: SolvedGeometry, skin: Skin): string[] {
+function realisticBody(
+  geometry: SolvedGeometry,
+  skin: Skin,
+  presentation: {
+    view: SvgView;
+    hardware?: DoorHardwareVisuals;
+    glass?: RenderSvgOpts["glass"];
+  },
+): string[] {
   const out: string[] = [];
   const grain: Grain = skin.grain ? { h: `${skin.id}-grainH`, v: `${skin.id}-grainV` } : {};
 
@@ -371,6 +419,7 @@ function realisticBody(geometry: SolvedGeometry, skin: Skin): string[] {
 
   // Outer frame ring + the unit's own edge.
   out.push(...bandFaces(frameOuter, geometry.rootDaylight, skin.id, grain, skin.base));
+  out.push(profileDetailRing(frameOuter, geometry.rootDaylight));
   out.push(outline(frameOuter, REALISTIC_EDGE, 1.4));
 
   for (const t of geometry.transoms) out.push(...barFaces(t.rect, "h", skin, grain));
@@ -386,29 +435,55 @@ function realisticBody(geometry: SolvedGeometry, skin: Skin): string[] {
       // panes arrive as their own cells) — the same layering the flat style uses.
       out.push(fill(c.sashOuter, skin.base));
       out.push(...bandFaces(c.sashOuter, c.sashInner, skin.id, grain, skin.base));
+      out.push(profileDetailRing(c.sashOuter, c.sashInner));
       out.push(outline(c.sashOuter, REALISTIC_SEAM, 1));
-      out.push(...beadAndGlass(c.sashInner, c.glassRect, skin, grain));
+      out.push(...beadAndGlass(c.sashInner, c.glassRect, skin, grain, c.glassKey, presentation.glass));
     } else if (c.content === "fixed") {
       // A fixed pane's bead is the ring between its daylight and the glass.
-      out.push(...beadAndGlass(c.daylight ?? c.outer, c.glassRect, skin, grain));
+      out.push(...beadAndGlass(c.daylight ?? c.outer, c.glassRect, skin, grain, c.glassKey, presentation.glass));
     } else if (c.glassRect) {
       // A glazing-only pane of a leaf (midrail): the leaf already drew the
       // surrounding profile, so inventing a second ring here would double it.
-      out.push(glassPane(c.glassRect, skin));
+      out.push(glassPane(c.glassRect, skin, c.glassKey, presentation.glass?.privacy));
+      if (presentation.glass?.decoration) {
+        out.push(decorativeGlazing(c.glassRect, presentation.glass.decoration));
+      }
     }
 
-    const symbol = openingSymbol(c, frameOuter, REALISTIC_SYMBOL);
+    const symbol = openingSymbol(c, frameOuter, REALISTIC_SYMBOL, 0.0038, 1.7);
     if (symbol) symbols.push(symbol);
   }
   out.push(...symbols);
+  const hardware = renderDoorHardwareLayer(geometry, {
+    view: presentation.view,
+    defsId: skin.id,
+    visuals: presentation.hardware,
+  });
+  if (hardware) out.push(hardware);
 
   return out;
 }
 
 /** The bead ring around a pane, then the pane itself. */
-function beadAndGlass(around: Rect, glass: Rect | undefined, skin: Skin, grain: Grain): string[] {
+function beadAndGlass(
+  around: Rect,
+  glass: Rect | undefined,
+  skin: Skin,
+  grain: Grain,
+  glassKey?: string,
+  presentation?: RenderSvgOpts["glass"],
+): string[] {
   if (!glass || glass.w <= 0 || glass.h <= 0) return [];
-  return [...bandFaces(around, glass, `${skin.id}-bd`, grain, lighten(skin.base, 0.12)), glassPane(glass, skin)];
+  const out = [
+    ...bandFaces(around, glass, `${skin.id}-bd`, grain, lighten(skin.base, 0.12)),
+    profileDetailRing(around, glass, true),
+    glassPane(glass, skin, glassKey, presentation?.privacy),
+    gasketRing(glass),
+  ];
+  if (presentation?.decoration && !isSolidPanel(glassKey)) {
+    out.push(decorativeGlazing(glass, presentation.decoration));
+  }
+  return out;
 }
 
 /**
@@ -447,6 +522,7 @@ function barFaces(r: Rect, axis: "h" | "v", skin: Skin, grain: Grain): string[] 
   return [
     fill(r, skin.base),
     ...bandFaces(r, inner, skin.id, grain, skin.base),
+    barEdgeDetails(r, axis),
     outline(r, REALISTIC_SEAM, 0.8),
   ];
 }
@@ -458,6 +534,8 @@ function realisticCill(r: Rect, skin: Skin): string[] {
   return [
     fill(r, darken(skin.base, 0.1)),
     ...bandFaces(r, inner, `${skin.id}-cl`, grain, darken(skin.base, 0.1)),
+    `<line x1="${num(r.x + r.h * 0.12)}" y1="${num(r.y + r.h * 0.16)}" x2="${num(r.x + r.w - r.h * 0.12)}" y2="${num(r.y + r.h * 0.16)}" stroke="rgba(255,255,255,0.48)" stroke-width="${num(Math.max(1, r.h * 0.025))}" stroke-linecap="round"/>`,
+    `<line x1="${num(r.x + r.h * 0.08)}" y1="${num(r.y + r.h * 0.82)}" x2="${num(r.x + r.w - r.h * 0.08)}" y2="${num(r.y + r.h * 0.82)}" stroke="rgba(15,23,42,0.28)" stroke-width="${num(Math.max(1, r.h * 0.035))}" stroke-linecap="round"/>`,
     outline(r, REALISTIC_EDGE, 1.2),
   ];
 }
@@ -466,8 +544,14 @@ function realisticCill(r: Rect, skin: Skin): string[] {
  * A glazed pane: the tinted unit, two diagonal reflection bands (both sized to
  * sit wholly inside the pane, so no clip path is needed) and a rebate line.
  */
-function glassPane(r: Rect, skin: Skin): string {
+function glassPane(
+  r: Rect,
+  skin: Skin,
+  glassKey?: string,
+  forcePrivacy?: boolean,
+): string {
   if (r.w <= 0 || r.h <= 0) return "";
+  if (isSolidPanel(glassKey)) return panelPane(r, skin);
   const band = (from: number, width: number, opacity: number): string => {
     const skew = r.w * 0.18;
     const x = r.x + r.w * from;
@@ -482,12 +566,144 @@ function glassPane(r: Rect, skin: Skin): string {
       opacity,
     );
   };
+  const inset = clampNum(Math.min(r.w, r.h) * 0.012, 2, 8);
+  const privacy =
+    forcePrivacy ||
+    Boolean(glassKey && /(obsc|privacy|frost|satin|reed|sand)/i.test(glassKey));
   return [
     `<rect x="${num(r.x)}" y="${num(r.y)}" width="${num(r.w)}" height="${num(r.h)}" fill="url(#${skin.id}-glass)"/>`,
-    band(0.05, 0.16, 0.17),
-    band(0.3, 0.07, 0.1),
+    `<rect x="${num(r.x + inset)}" y="${num(r.y + inset)}" width="${num(Math.max(0, r.w - 2 * inset))}" height="${num(Math.max(0, r.h - 2 * inset))}" fill="url(#${skin.id}-glassSheen)" opacity="0.62"/>`,
+    privacy
+      ? `<rect x="${num(r.x)}" y="${num(r.y)}" width="${num(r.w)}" height="${num(r.h)}" fill="url(#${skin.id}-privacy)"/>`
+      : "",
+    band(0.04, 0.12, 0.22),
+    band(0.25, 0.055, 0.12),
+    `<line x1="${num(r.x + inset)}" y1="${num(r.y + inset)}" x2="${num(r.x + r.w - inset)}" y2="${num(r.y + inset)}" stroke="rgba(255,255,255,0.64)" stroke-width="${num(Math.max(1, inset * 0.45))}"/>`,
+    `<line x1="${num(r.x + r.w - inset)}" y1="${num(r.y + inset)}" x2="${num(r.x + r.w - inset)}" y2="${num(r.y + r.h - inset)}" stroke="rgba(49,75,92,0.2)" stroke-width="${num(Math.max(1, inset * 0.45))}"/>`,
+    outline(r, REALISTIC_SEAM, 1),
+  ].filter(Boolean).join("\n  ");
+}
+
+/** Opaque infill panel: a shallow moulded face rather than transparent glass. */
+function panelPane(r: Rect, skin: Skin): string {
+  const inset = clampNum(Math.min(r.w, r.h) * 0.035, 8, 28);
+  return [
+    `<rect x="${num(r.x)}" y="${num(r.y)}" width="${num(r.w)}" height="${num(r.h)}" fill="url(#${skin.id}-panel)"/>`,
+    `<rect x="${num(r.x + inset)}" y="${num(r.y + inset)}" width="${num(Math.max(0, r.w - 2 * inset))}" height="${num(Math.max(0, r.h - 2 * inset))}" rx="${num(inset * 0.28)}" fill="${lighten(skin.base, 0.13)}" stroke="rgba(15,23,42,0.2)" stroke-width="${num(Math.max(1, inset * 0.1))}"/>`,
+    `<path d="M ${num(r.x + inset * 1.25)} ${num(r.y + r.h - inset * 1.25)} V ${num(r.y + inset * 1.25)} H ${num(r.x + r.w - inset * 1.25)}" fill="none" stroke="rgba(255,255,255,0.58)" stroke-width="${num(Math.max(1, inset * 0.12))}" stroke-linecap="round"/>`,
     outline(r, REALISTIC_SEAM, 1),
   ].join("\n  ");
+}
+
+function isSolidPanel(glassKey?: string): boolean {
+  return Boolean(glassKey?.startsWith("panel-"));
+}
+
+/**
+ * Thin glazing bars / lead lines. Coordinates are inset and clamped to the
+ * pane, so the pattern scales with the glass and can never overflow it.
+ */
+function decorativeGlazing(
+  r: Rect,
+  style: NonNullable<NonNullable<RenderSvgOpts["glass"]>["decoration"]>,
+): string {
+  const inset = clampNum(Math.min(r.w, r.h) * 0.045, 8, 30);
+  const x0 = r.x + inset;
+  const x1 = r.x + r.w - inset;
+  const y0 = r.y + inset;
+  const y1 = r.y + r.h - inset;
+  if (x1 <= x0 || y1 <= y0) return "";
+  const sw = clampNum(Math.min(r.w, r.h) * 0.0022, 1, 3.2);
+  const lines: string[] = [];
+  const vertical = (ratio: number) =>
+    lines.push(svgDetailLine(x0 + (x1 - x0) * ratio, y0, x0 + (x1 - x0) * ratio, y1));
+  const horizontal = (ratio: number) =>
+    lines.push(svgDetailLine(x0, y0 + (y1 - y0) * ratio, x1, y0 + (y1 - y0) * ratio));
+
+  if (style === "astragal") {
+    vertical(0.5);
+    horizontal(0.5);
+  } else if (style === "georgian") {
+    vertical(1 / 3);
+    vertical(2 / 3);
+    horizontal(1 / 3);
+    horizontal(2 / 3);
+  } else {
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      lines.push(svgDetailLine(x0, y0 + (y1 - y0) * t, x0 + (x1 - x0) * t, y0));
+      lines.push(svgDetailLine(x1, y0 + (y1 - y0) * t, x1 - (x1 - x0) * t, y0));
+      lines.push(svgDetailLine(x0, y1 - (y1 - y0) * t, x0 + (x1 - x0) * t, y1));
+      lines.push(svgDetailLine(x1, y1 - (y1 - y0) * t, x1 - (x1 - x0) * t, y1));
+    }
+  }
+
+  return `<g class="decorative-glazing" fill="none" stroke="rgba(82,96,108,0.58)" stroke-width="${num(sw)}" stroke-linecap="round">
+    <g transform="translate(${num(sw * 0.65)} ${num(sw * 0.65)})" stroke="rgba(255,255,255,0.52)">${lines.join("")}</g>
+    ${lines.join("\n    ")}
+  </g>`;
+}
+
+function profileDetailRing(outer: Rect, inner: Rect, bead = false): string {
+  const thickness = Math.max(
+    1,
+    Math.min(
+      inner.x - outer.x,
+      inner.y - outer.y,
+      outer.x + outer.w - (inner.x + inner.w),
+      outer.y + outer.h - (inner.y + inner.h),
+    ),
+  );
+  const step = clampNum(thickness * (bead ? 0.14 : 0.18), 1.2, 12);
+  const outerDetail = insetRect(outer, step);
+  const rebate = expandRect(inner, step * 0.38);
+  return `<g class="${bead ? "bead-details" : "profile-details"}" fill="none">
+      <rect x="${num(outerDetail.x)}" y="${num(outerDetail.y)}" width="${num(outerDetail.w)}" height="${num(outerDetail.h)}" stroke="rgba(255,255,255,0.42)" stroke-width="${num(Math.max(0.7, step * 0.16))}"/>
+      <rect x="${num(rebate.x)}" y="${num(rebate.y)}" width="${num(rebate.w)}" height="${num(rebate.h)}" stroke="rgba(15,23,42,0.2)" stroke-width="${num(Math.max(0.8, step * 0.2))}"/>
+    </g>`;
+}
+
+function gasketRing(glass: Rect): string {
+  const width = clampNum(Math.min(glass.w, glass.h) * 0.008, 2.2, 7);
+  const around = expandRect(glass, width * 0.45);
+  return `<rect x="${num(around.x)}" y="${num(around.y)}" width="${num(around.w)}" height="${num(around.h)}" rx="${num(width * 0.28)}" fill="none" stroke="#26323a" stroke-opacity="0.72" stroke-width="${num(width)}"/>`;
+}
+
+function barEdgeDetails(r: Rect, axis: "h" | "v"): string {
+  const thickness = axis === "h" ? r.h : r.w;
+  const offset = thickness * 0.18;
+  return axis === "h"
+    ? `<g fill="none">
+        <line x1="${num(r.x + offset)}" y1="${num(r.y + offset)}" x2="${num(r.x + r.w - offset)}" y2="${num(r.y + offset)}" stroke="rgba(255,255,255,0.42)" stroke-width="${num(Math.max(0.8, thickness * 0.025))}"/>
+        <line x1="${num(r.x + offset)}" y1="${num(r.y + r.h - offset)}" x2="${num(r.x + r.w - offset)}" y2="${num(r.y + r.h - offset)}" stroke="rgba(15,23,42,0.2)" stroke-width="${num(Math.max(0.8, thickness * 0.03))}"/>
+      </g>`
+    : `<g fill="none">
+        <line x1="${num(r.x + offset)}" y1="${num(r.y + offset)}" x2="${num(r.x + offset)}" y2="${num(r.y + r.h - offset)}" stroke="rgba(255,255,255,0.42)" stroke-width="${num(Math.max(0.8, thickness * 0.025))}"/>
+        <line x1="${num(r.x + r.w - offset)}" y1="${num(r.y + offset)}" x2="${num(r.x + r.w - offset)}" y2="${num(r.y + r.h - offset)}" stroke="rgba(15,23,42,0.2)" stroke-width="${num(Math.max(0.8, thickness * 0.03))}"/>
+      </g>`;
+}
+
+function insetRect(r: Rect, inset: number): Rect {
+  return {
+    x: r.x + inset,
+    y: r.y + inset,
+    w: Math.max(0, r.w - inset * 2),
+    h: Math.max(0, r.h - inset * 2),
+  };
+}
+
+function expandRect(r: Rect, amount: number): Rect {
+  return {
+    x: r.x - amount,
+    y: r.y - amount,
+    w: r.w + amount * 2,
+    h: r.h + amount * 2,
+  };
+}
+
+function svgDetailLine(x1: number, y1: number, x2: number, y2: number): string {
+  return `<line x1="${num(x1)}" y1="${num(y1)}" x2="${num(x2)}" y2="${num(y2)}"/>`;
 }
 
 function polygon(points: number[][], fillValue: string, filterId?: string): string {
@@ -660,10 +876,23 @@ function handleSide(c: SolvedCell, outer: Rect): "left" | "right" | "top" | "bot
  * closing stile/rail) — a symbol, not hardware art, and purely visual: it is
  * derived from the sash ring rects and feeds no cut, BOM or price line.
  */
-function handleLayer(geometry: SolvedGeometry, mirror: (r: Rect) => Rect): string {
+function handleLayer(
+  geometry: SolvedGeometry,
+  mirror: (r: Rect) => Rect,
+  includeDoors = true,
+): string {
   const parts: string[] = [];
   for (const c of geometry.cells) {
     if (!c.sashOuter || !c.sashInner) continue;
+    if (
+      !includeDoors &&
+      (c.content === "door-left" ||
+        c.content === "door-right" ||
+        c.content === "french-door-master" ||
+        c.content === "french-door-slave")
+    ) {
+      continue;
+    }
     const side = handleSide(c, geometry.frameRect ?? geometry.outer);
     if (!side) continue;
     const outerR = c.sashOuter;
@@ -843,7 +1072,13 @@ type Chevron = { c1: Pt; apex: Pt; c2: Pt };
  * matching the collection artwork. Tilt&turn draws two (turn "<" + tilt "v").
  * Returns null for fixed cells / unknown content.
  */
-function openingSymbol(c: SolvedCell, outer: Rect, stroke: string = SYMBOL_STROKE): string | null {
+function openingSymbol(
+  c: SolvedCell,
+  outer: Rect,
+  stroke: string = SYMBOL_STROKE,
+  widthScale = 0.012,
+  minWidth = 4,
+): string | null {
   // A glazing-only PANE of a midrailed sash carries its leaf's `content` but no
   // sash rects of its own. The symbol belongs to the sash RING, which the leaf
   // cell draws — one opener, one chevron, spanning every pane inside it. (This
@@ -905,7 +1140,7 @@ function openingSymbol(c: SolvedCell, outer: Rect, stroke: string = SYMBOL_STROK
     default: return null;
   }
 
-  const sw = Math.max(4, Math.min(b.w, b.h) * 0.012);
+  const sw = Math.max(minWidth, Math.min(b.w, b.h) * widthScale);
   return chevrons
     .map((ch) => {
       const pts = `${num(ch.c1.x)},${num(ch.c1.y)} ${num(ch.apex.x)},${num(ch.apex.y)} ${num(ch.c2.x)},${num(ch.c2.y)}`;

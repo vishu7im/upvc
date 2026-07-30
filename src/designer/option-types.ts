@@ -85,6 +85,7 @@ export type OptionPricingMode = "catalog" | "none";
  * | `profile-substitution` | a profile slot on the topology/quote (`frameKey` today; `beadKey`|
  * |                        | fill is a phase-2 resolver addition, mirroring `fillDefaultGlass`)|
  * | `hardware-substitution`| swap one hardware key in the computed hardware tally             |
+ * | `preview`              | presentation-only metadata; never changes fabrication or pricing |
  * | `bom-line`             | append a plain priced BOM line (catalog part × qty)              |
  * | `topology-edit`        | a `TopologyEdit` applied by the family's engine adapter          |
  * | `none`                 | NO engine effect — recorded on the line item + documents only    |
@@ -100,6 +101,7 @@ export type EngineEffectKind =
   | "addon"
   | "profile-substitution"
   | "hardware-substitution"
+  | "preview"
   | "bom-line"
   | "topology-edit"
   | "none";

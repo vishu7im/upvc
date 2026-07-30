@@ -866,6 +866,12 @@ export interface QuoteInput {
    */
   svgStyle?: "flat" | "realistic";
   /**
+   * Door swing used only by the realistic elevation. An inward-opening door
+   * exposes its hinges internally; an outward-opening door exposes them
+   * externally. It changes no geometry, cut, hardware quantity or price.
+   */
+  doorOpeningDirection?: "in" | "out";
+  /**
    * Per-quote hardware slot substitutions (Designer phase 2). Keyed by the
    * engine's conceptual hardware SLOT (today: "handle"); the value is the
    * catalog hardware partKey to fit in that slot instead of the calibrated

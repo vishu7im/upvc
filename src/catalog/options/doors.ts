@@ -378,10 +378,9 @@ export function buildDoorsOptionSystem(
   //
   // Every one of these appears in the reference door product
   // (collections/doors/lineitems.json, 41 rows) and NONE of them has a catalog
-  // part or a calibrated cut rule. They ship the way `hardware.threshold`
-  // above does: recorded, printed, and honest about fabricating nothing
-  // (questions.md Q7). Adding real behaviour later is a data change plus the
-  // rule — never a guess here.
+  // part or a calibrated cut rule. They are recorded, printed, and honest about
+  // fabricating nothing (questions.md Q7). Opening direction additionally feeds
+  // presentation-only hinge visibility; it still changes no cut, BOM or price.
   const gated: {
     key: string;
     group: string;
@@ -551,7 +550,10 @@ export function buildDoorsOptionSystem(
         label,
         order: (i + 1) * 10,
         isDefault: k === g.defaultKey,
-        engineEffect: { kind: "none" },
+        engineEffect:
+          g.key === "general.opening-direction" && (k === "in" || k === "out")
+            ? { kind: "preview", params: { doorOpeningDirection: k } }
+            : { kind: "none" },
       });
     }
   }

@@ -140,6 +140,72 @@ function validateRealisticStyle(expect: Expect, g: SolvedGeometry, base: string)
   // pane with no sash rects; sliding carries framed panels and no divider).
   const french = renderSvg(makeFrenchGeometry(), { style: "realistic" });
   expect("French renders realistically", french.startsWith("<svg"), true);
+  expect("realistic French renders catalogue door hardware", french.includes('id="door-hardware"'), true);
+  expect("realistic French renders one operating handle layer", french.includes('id="handles"'), true);
+  expect("open-in external hides hinge assets", (french.match(/class="door-hinge"/g) ?? []).length, 0);
+  const frenchInternal = renderSvg(makeFrenchGeometry(), { style: "realistic", view: "internal" });
+  expect("open-in internal shows hinge assets", (frenchInternal.match(/class="door-hinge"/g) ?? []).length, 6);
+  const frenchOut = renderSvg(makeFrenchGeometry(), {
+    style: "realistic",
+    hardware: { openingDirection: "out" },
+  });
+  expect("open-out external shows hinge assets", (frenchOut.match(/class="door-hinge"/g) ?? []).length, 6);
+  const frenchOutInternal = renderSvg(makeFrenchGeometry(), {
+    style: "realistic",
+    view: "internal",
+    hardware: { openingDirection: "out" },
+  });
+  expect("open-out internal hides hinge assets", (frenchOutInternal.match(/class="door-hinge"/g) ?? []).length, 0);
+  expect("realistic French renders a cylinder", french.includes('class="door-cylinder"'), true);
+  expect("realistic French renders the concealed lock strip", french.includes('class="door-lock"'), true);
+  const blackHardware = renderSvg(makeFrenchGeometry(), {
+    style: "realistic",
+    hardware: {
+      openingDirection: "out",
+      handle: { finish: "black" },
+      cylinder: { finish: "chrome" },
+      hinge: { finish: "black", style: "high-security", count: 4 },
+    },
+  });
+  expect("selected black handle uses the black hardware gradient", blackHardware.includes("url(#we6e6e6-hw-black)"), true);
+  expect("configured hinge count scales per leaf", (blackHardware.match(/class="door-hinge"/g) ?? []).length, 8);
+  expect("high-security hinge variant is labelled", blackHardware.includes('data-style="high-security"'), true);
+  const accessorised = renderSvg(makeFrenchGeometry(), {
+    style: "realistic",
+    hardware: {
+      ventilator: { finish: "white", location: "sash" },
+      restrictor: { finish: "chrome" },
+      letterbox: { finish: "gold" },
+      knocker: { finish: "chrome" },
+      spyhole: { finish: "chrome" },
+      catFlap: { finish: "white" },
+    },
+  });
+  expect("external ventilator is conditional", accessorised.includes('class="door-ventilator"'), true);
+  expect("external letterbox is conditional", accessorised.includes('class="door-letterbox"'), true);
+  expect("external knocker is conditional", accessorised.includes('class="door-knocker"'), true);
+  expect("external spyhole is conditional", accessorised.includes('class="door-spyhole"'), true);
+  expect("external cat flap is conditional", accessorised.includes('class="door-cat-flap"'), true);
+  expect("external view hides the internal restrictor", accessorised.includes('class="door-restrictor"'), false);
+  const accessorisedInternal = renderSvg(makeFrenchGeometry(), {
+    style: "realistic",
+    view: "internal",
+    hardware: {
+      restrictor: { finish: "chrome" },
+      letterbox: { finish: "gold" },
+      knocker: { finish: "chrome" },
+      spyhole: { finish: "chrome" },
+      catFlap: { finish: "white" },
+    },
+  });
+  expect("internal restrictor is conditional", accessorisedInternal.includes('class="door-restrictor"'), true);
+  expect("internal view omits outside-only hardware", accessorisedInternal.includes('id="external-hardware"'), false);
+  const decorated = renderSvg(makeFrenchGeometry(), {
+    style: "realistic",
+    glass: { privacy: true, decoration: "georgian" },
+  });
+  expect("privacy glass uses the lightweight pattern", decorated.includes("-privacy)"), true);
+  expect("decorative glazing is a dedicated thin SVG layer", decorated.includes('class="decorative-glazing"'), true);
   const sliding = renderSvg(makeSlidingGeometry(), { style: "realistic" });
   expect("sliding renders realistically", sliding.startsWith("<svg"), true);
 

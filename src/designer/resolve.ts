@@ -385,6 +385,18 @@ function applyEngineEffects(args: {
   const adapterImpl = getAdapter(args.adapter);
 
   for (const ev of effective) {
+    // Compatibility for catalogs persisted before opening direction acquired
+    // its presentation-only engine effect.  Existing databases still expose
+    // these stable option/choice keys with kind "none"; interpret them here so
+    // the visual correction does not require a destructive catalog reseed.
+    if (ev.option.key === "general.opening-direction") {
+      if (ev.choice?.key === "general-opening-direction-in") {
+        effects.doorOpeningDirection = "in";
+      } else if (ev.choice?.key === "general-opening-direction-out") {
+        effects.doorOpeningDirection = "out";
+      }
+    }
+
     const effect = ev.choice?.engineEffect;
     if (!effect || effect.kind === "none") continue;
     const partKey = ev.choice?.partKey;
@@ -518,6 +530,14 @@ function applyEngineEffects(args: {
             ...scopeIssue,
             message: handIssue,
           });
+        }
+        break;
+      }
+
+      case "preview": {
+        const opening = effect.params?.doorOpeningDirection;
+        if (opening === "in" || opening === "out") {
+          effects.doorOpeningDirection = opening;
         }
         break;
       }

@@ -585,6 +585,9 @@ export function toQuoteInput(args: {
     ...(effects.hardwareOverrides && Object.keys(effects.hardwareOverrides).length
       ? { hardwareOverrides: effects.hardwareOverrides }
       : {}),
+    ...(effects.doorOpeningDirection
+      ? { doorOpeningDirection: effects.doorOpeningDirection }
+      : {}),
     ...(topologyEdited ? { topologyOverride: workingTopology } : {}),
     ...(views?.length ? { views } : {}),
     ...(svgStyle ? { svgStyle } : {}),

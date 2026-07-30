@@ -604,6 +604,42 @@ function validateSecondFamily(expect: Expect, snap: CatalogSnapshot): void {
       doorOptionKeys.has("hardware.door-handle"), true);
   }
 
+  // ---- Opening direction controls which elevation can see hinges -------
+  {
+    const openIn = resolveLineItem(
+      doorDraft(),
+      snap,
+      { style: "realistic", views: ["internal"] },
+    ).output!;
+    expect("open in: presentation direction reaches QuoteInput",
+      openIn.input.doorOpeningDirection, "in");
+    expect("open in: hinges hidden externally",
+      (openIn.geometry.svg.match(/class=\"door-hinge\"/g) ?? []).length, 0);
+    expect("open in: three hinges visible internally",
+      ((openIn.geometry.svgViews?.internal ?? "").match(/class=\"door-hinge\"/g) ?? []).length, 3);
+
+    const openOut = resolveLineItem(
+      doorDraft({
+        selections: [
+          {
+            optionKey: "general.opening-direction",
+            choiceKey: "general-opening-direction-out",
+          },
+        ],
+      }),
+      snap,
+      { style: "realistic", views: ["internal"] },
+    ).output!;
+    expect("open out: presentation direction reaches QuoteInput",
+      openOut.input.doorOpeningDirection, "out");
+    expect("open out: three hinges visible externally",
+      (openOut.geometry.svg.match(/class=\"door-hinge\"/g) ?? []).length, 3);
+    expect("open out: hinges hidden internally",
+      ((openOut.geometry.svgViews?.internal ?? "").match(/class=\"door-hinge\"/g) ?? []).length, 0);
+    expect("opening direction does not change fabricated parts",
+      fabricationOf(openOut), fabricationOf(openIn));
+  }
+
   // ---- A door-specific option really reaches the engine ---------------
   {
     // Hinges are a fixed-quantity 1:1 slot on a door leaf, so a substitution is

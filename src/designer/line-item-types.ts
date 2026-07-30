@@ -271,6 +271,8 @@ export interface EngineEffectOutputs {
   /** Add-on (frame extension) partKey per frame edge (Job 169). */
   addons?: AddonSelection;
   hardwareOverrides?: Record<string, string>;
+  /** Presentation-only door swing; drives which elevation can see the hinges. */
+  doorOpeningDirection?: "in" | "out";
   /** Plain priced add-lines (catalog hardware part × qty), appended post-solve. */
   bomLines?: { partKey: string; qty: number }[];
 }

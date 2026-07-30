@@ -1036,6 +1036,30 @@ function validateJob169(): void {
     steelLengths(p5, DIV_STEEL).join(), "1710");
   expect("p5: glass 346 × 1740, twice", glassRows(p5), "346×1740 346×1740");
   assertOnePerPage("p5", p5);
+  const p5Preview = solve({
+    orderNo: "TEST", customer: "Validation", designId: "door-single-left",
+    widthMm: W, heightMm: H, systemId: "sunnyplast-70",
+    topologyOverride: {
+      kind: "leaf",
+      cell: {
+        ...leafCell,
+        midrails: [{ transomKey: "mullion-78", atRatio: 500 / 1000, axis: "vertical" }],
+      },
+    },
+    svgStyle: "realistic",
+    views: ["internal"],
+  });
+  expect("p5 realistic: external renders the door hardware layer",
+    p5Preview.geometry.svg.includes('id="door-hardware"'), true);
+  expect("p5 realistic: open-in external hides the hinges",
+    (p5Preview.geometry.svg.match(/class="door-hinge"/g) ?? []).length, 0);
+  expect("p5 realistic: open-in internal shows three hinges and mirrors them",
+    (p5Preview.geometry.svgViews?.internal ?? "").includes('id="door-hardware"') &&
+      (p5Preview.geometry.svgViews?.internal ?? "").includes("matrix(-1 0 0 1 1000 0)") &&
+      ((p5Preview.geometry.svgViews?.internal ?? "").match(/class="door-hinge"/g) ?? []).length === 3,
+    true);
+  expect("p5 realistic: preview style does not change the work order",
+    p5Preview.documents.workOrder, p5.documents.workOrder);
 
   // ---- p1: add-on TOP — the frame loses 25 mm of HEIGHT ----------------
   // Frame 1000 × 1975 ⇒ daylight 864 × 1839 ⇒ ring 920 × 1895 ⇒ Int 710 × 1685.
