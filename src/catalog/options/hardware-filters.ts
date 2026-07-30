@@ -58,6 +58,33 @@ export const DOOR_STYLE_FILTERS: HardwareFilterDef[] = [
 ];
 
 /**
+ * Door hinge shapes. The reference splits this axis into TWO dropdowns —
+ * "Hinge (Door)" (Flag / High Security) and "Hinge Colour (Door)" (9 finishes)
+ * — which our catalog cannot mirror honestly: both dropdowns would write the
+ * SAME 1:1 substitution slot, so answering them separately would conflict.
+ * One picker with a style chip AND a finish chip says exactly the same thing
+ * about the same 17 catalog rows, and cannot contradict itself.
+ */
+export const DOOR_HINGE_STYLE_FILTERS: HardwareFilterDef[] = [
+  { key: "sty-flag", label: "Flag", match: /\bflag\b/i },
+  { key: "sty-high-security", label: "High Security", match: /\bhigh security\b/i },
+];
+
+/** Door lock types, as the stock list names them. */
+export const DOOR_LOCK_STYLE_FILTERS: HardwareFilterDef[] = [
+  { key: "lock-high-security", label: "High Security", match: /\bhigh security\b/i },
+  { key: "lock-shootbolt", label: "Shootbolt", match: /\bshootbolt\b/i },
+  { key: "lock-stable", label: "Stable door", match: /\bstable\b/i },
+  { key: "lock-standard", label: "Standard", match: /\bstandard\b/i },
+];
+
+/** Cylinder variants. */
+export const CYLINDER_STYLE_FILTERS: HardwareFilterDef[] = [
+  { key: "cyl-thumbturn", label: "Thumbturn", match: /\bthumb ?turn\b/i },
+  { key: "cyl-keyed-alike", label: "Keyed alike", match: /\bkeyed alike\b/i },
+];
+
+/**
  * Handedness. A cranked or monkeytail handle is HANDED, and fitting the wrong
  * hand to a side-hung sash is a real fabrication error — so the chip exists to
  * make the hand visible while choosing. (The resolver additionally warns when

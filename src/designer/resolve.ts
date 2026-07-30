@@ -34,6 +34,7 @@ import { checkSizeLimits } from "../engine/limits.ts";
 import type {
   CellNode,
   Design,
+  DocOption,
   ProfileSystem,
   QuoteOutput,
   QuoteView,
@@ -43,6 +44,7 @@ import type {
 import type {
   ComponentType,
   FamilyConstraint,
+  OptionSystem,
   ProductFamilyDescriptor,
   RuleContext,
   SelectionValue,
@@ -314,7 +316,7 @@ export function resolveLineItem(
   }
 
   // ---- 8. assemble -----------------------------------------------------
-  const summary = buildSummary(draft, output, system, selection.effective);
+  const summary = buildSummary(draft, output, system, selection.effective, optionSystem);
   return { resolved: assemble(snapshot, issues, output, summary, undefined, solvedComponents), output };
 }
 
@@ -424,11 +426,48 @@ function applyEngineEffects(args: {
         break;
       }
 
+      // Add-on (frame extension) on one frame edge — pushes the frame in by
+      // that profile's face, leaving the unit size unchanged (Job 169). The
+      // side rides on the choice's own params, so a new edge is pure seed data.
+      case "addon": {
+        if (!partKey) break;
+        const side = effect.params?.side;
+        if (side !== "top" && side !== "bottom" && side !== "left" && side !== "right") {
+          issues.push({
+            severity: "error",
+            kind: "invalid-value",
+            optionKey: ev.option.key,
+            message: `Add-on effect needs params.side (top/bottom/left/right), got "${String(side)}"`,
+          });
+          break;
+        }
+        const aux = system.auxiliaries?.[partKey];
+        if (!aux || aux.faceWidthMm === undefined) {
+          issues.push({
+            severity: "error",
+            kind: "invalid-value",
+            optionKey: ev.option.key,
+            message:
+              `Add-on ${partKey} has no calibrated face width, so it cannot be fitted to a frame edge`,
+          });
+          break;
+        }
+        (effects.addons ??= {})[side] = partKey;
+        break;
+      }
+
       case "profile-substitution": {
         if (!partKey) break;
         const slot = effect.params?.slot;
         if (slot === "frame") {
-          effects.frameKey = partKey;
+          // `side` present ⇒ this answer sets ONE edge (the reference's four
+          // Frame (Standard) rows); absent ⇒ the whole frame, as before.
+          const side = effect.params?.side;
+          if (side === "top" || side === "bottom" || side === "left" || side === "right") {
+            (effects.frameKeys ??= {})[side] = partKey;
+          } else {
+            effects.frameKey = partKey;
+          }
         } else if (slot === "bead") {
           // A DEFAULT bead answer is the design's baked state — pinning it
           // would rewrite the topology for nothing; only explicit answers pin.
@@ -485,7 +524,12 @@ function applyEngineEffects(args: {
 
       case "topology-edit": {
         if (!ev.component) break;
-        const edit = topologyEditFromParams(effect.params ?? {}, ev.component);
+        const edit = topologyEditFromParams(
+          // A profile choice carries its part on the CHOICE (one source of truth
+          // for catalog data), so fold it into the edit payload here.
+          partKey ? { ...(effect.params ?? {}), dividerKey: partKey } : (effect.params ?? {}),
+          ev.component,
+        );
         if (!edit) {
           issues.push({
             severity: "error",
@@ -499,6 +543,20 @@ function applyEngineEffects(args: {
         // Skip no-ops (the selection matches the component's current state) so
         // an untouched draft never carries a topologyOverride.
         if (edit.op === "set-sash-kind" && ev.component.kind === edit.kind) break;
+        // "Mechanical" is offered because the reference offers it, but no
+        // production document gives its deduction — the engine cuts it as
+        // welded and says so on the work order (Spec/questions.md Q22).
+        if (edit.op === "set-divider" && edit.jointMethod === "mechanical") {
+          issues.push({
+            severity: "warning",
+            kind: "not-implemented",
+            optionKey: ev.option.key,
+            ...scopeIssue,
+            message:
+              `${ev.component.label}: a mechanical joint has no calibrated deduction, so this ` +
+              "divider is cut as welded (questions.md Q22).",
+          });
+        }
         if (
           edit.op === "convert-component" &&
           ((edit.to === "sash" && ev.component.type === "sash") ||
@@ -568,6 +626,18 @@ function topologyEditFromParams(
       componentId: cellId,
       to: params.to as ComponentType,
       ...(typeof params.kind === "string" ? { kind: params.kind as SashKind } : {}),
+    };
+  }
+  // Per-divider profile / joint method. `dividerKey` rides on the choice's own
+  // partKey, so the actual profile is resolved by the caller and passed in.
+  if (params.op === "set-divider") {
+    return {
+      op: "set-divider",
+      componentId: `divider:${component.path}`,
+      ...(typeof params.dividerKey === "string" ? { dividerKey: params.dividerKey } : {}),
+      ...(params.jointMethod === "welded" || params.jointMethod === "mechanical"
+        ? { jointMethod: params.jointMethod }
+        : {}),
     };
   }
   return undefined;
@@ -708,6 +778,7 @@ function buildSummary(
   output: QuoteOutput,
   system: ProfileSystem,
   effective: EffectiveSelection[],
+  optionSystem: OptionSystem,
 ): ResolvedSummary {
   const colourName = (key: string | undefined) => (key ? system.colours?.[key]?.name : undefined);
   const inside = effective.find(
@@ -727,6 +798,10 @@ function buildSummary(
 
   return {
     sizeLabel: `${draft.dimensions.widthMm} x ${draft.dimensions.heightMm}`,
+    ...(((): { mainOptions?: DocOption[] } => {
+      const rows = mainOptionRows(effective, optionSystem);
+      return rows.length ? { mainOptions: rows } : {};
+    })()),
     ...(colourLabel ? { colourLabel } : {}),
     ...(typeof location === "string" && location ? { locationLabel: location } : {}),
     leafCount: output.geometry.cells.length,
@@ -736,6 +811,56 @@ function buildSummary(
       hMm: round1(c.glassRect.h),
     })),
   };
+}
+
+/**
+ * The Work Order's "Main Options" rows, from the already-resolved selections.
+ *
+ * Grouped by option so one option is one label. When the SAME option was
+ * answered differently on different components, every distinct value is listed
+ * with the components that carry it — printing just the first would tell the
+ * shop floor something untrue about the rest of the unit.
+ *
+ * "unset" answers are skipped (the reference prints only what was chosen), as
+ * are options the seed marks `omitFromDocuments`.
+ */
+function mainOptionRows(effective: EffectiveSelection[], optionSystem: OptionSystem): DocOption[] {
+  // Printed in the inspector's own reading order: group order, then option
+  // order within the group — the same sequence the reference work order uses.
+  const groupOrder = new Map(optionSystem.groups.map((g) => [g.key, g.order]));
+  const byOption = new Map<
+    string,
+    { name: string; group: number; order: number; values: Map<string, string[]> }
+  >();
+  for (const e of effective) {
+    if (e.source === "unset") continue;
+    if (e.option.presentation?.omitFromDocuments) continue;
+    const text =
+      e.choice?.label ?? (e.value === undefined || e.value === "" ? undefined : String(e.value));
+    if (!text) continue;
+    const entry = byOption.get(e.option.key) ?? {
+      name: e.option.name,
+      group: groupOrder.get(e.option.groupKey) ?? Number.MAX_SAFE_INTEGER,
+      order: e.option.order,
+      values: new Map<string, string[]>(),
+    };
+    const where = entry.values.get(text) ?? [];
+    if (e.component) where.push(e.component.label);
+    entry.values.set(text, where);
+    byOption.set(e.option.key, entry);
+  }
+
+  return [...byOption.values()]
+    .sort((a, b) => a.group - b.group || a.order - b.order || a.name.localeCompare(b.name))
+    .map(({ name, values }) => ({
+      label: name,
+      value:
+        values.size === 1
+          ? [...values.keys()][0]
+          : [...values.entries()]
+              .map(([text, where]) => (where.length ? `${text} (${where.join(", ")})` : text))
+              .join("; "),
+    }));
 }
 
 function assemble(

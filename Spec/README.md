@@ -4,23 +4,24 @@
 > session can open ONE phase file (plus the `00-architecture/` folder for Task-1 phases) and
 > execute it without any other project context. No code was changed while producing these specs.
 
-## The two workstreams
+## The workstreams
 
 | | Workstream | Input analysed | Folder |
 |---|---|---|---|
 | **Task 1** | **Windows Module / Designer** — a modern, JSON-driven line-item configurator built alongside the existing `/quote`, architected to absorb doors/partitions/sliding/future families without UI redesign | `collections/windows/` (13 Quotila/BM-Touch screenshots + `jobitem.json` + `basketsummary.json`) | `00-architecture/` + `01-windows-module/` |
 | **Task 2** | **Manual Migration** — align the app with the re-issued fabrication manual (finding: a point revision of the SAME Sunnyplast manual, not a new document) | `collections/docs/HAWDIO 21-7-2026.pdf` (86 pp, fully read) | `02-manual-migration/` |
+| **Task 3** | **Doors Module** — bring `entrance-door` to parity with the reference configurator: per-edge add-ons (also for windows), per-edge frame profiles, pictures on hardware choices, and the remaining option rows | `collections/doors/` (14 screenshots + `lineitems.json` + the **Job 169** Work Order / Cutting List / Glass Order) | `03-doors-module/` |
 
-The workstreams are independent and may proceed in parallel. The only coupling: migration
-phase-4's limit constraints land richer if the Designer's constraint system (Task 1) exists —
-both specs handle either ordering.
+Tasks 1 and 2 are independent and may proceed in parallel. Task 3 builds on the Designer platform
+that Task 1 delivered. The only coupling with Task 2: migration phase-4's limit constraints land
+richer if the Designer's constraint system (Task 1) exists — both specs handle either ordering.
 
 ## Folder map
 
 ```
 Spec/
 ├── README.md                ← you are here
-├── questions.md             ← open questions Q1–Q17 with recommendations; owner decisions flagged ⚠
+├── questions.md             ← open questions Q1–Q24 with recommendations; owner decisions flagged ⚠
 ├── 00-architecture/         ← READ FIRST for any Task-1 phase (normative contracts)
 │   ├── overview.md              target architecture, tenets, vocabulary, execution graph
 │   ├── product-family-plugin.md family descriptor contract + engine adapters + the extensibility bar
@@ -37,14 +38,21 @@ Spec/
 │   ├── phase-5-views-and-preview.md    external/internal/schematic views
 │   ├── phase-6-basket-and-orders.md    commercial layer (fitting/survey/delivery/discount/tax)
 │   └── phase-7-extensibility-proof.md  second family as pure data + contract audit
-└── 02-manual-migration/     ← Task 2 (read findings.md first)
+├── 02-manual-migration/     ← Task 2 (read findings.md first)
+│   ├── README.md
+│   ├── findings.md              full verified diff of the PDF (evidence base)
+│   ├── supplier-queries.md      Q-A…Q-K to Sunny Plast — SEND FIRST; answers gate phases 2–4
+│   ├── phase-1-breaking-fixes.md        door clear-opening fix (ungated — do first)
+│   ├── phase-2-catalog-additions.md     new parts + reconciliations (partly gated)
+│   ├── phase-3-tilt-turn-calibration.md promote 123 T&T designs (gated on Q15 sign-off)
+│   └── phase-4-limits-and-validation.md size/weight limits, sash-weight formula, ED table
+└── 03-doors-module/         ← Task 3 (read its README for what Job 169 established)
     ├── README.md
-    ├── findings.md              full verified diff of the PDF (evidence base)
-    ├── supplier-queries.md      Q-A…Q-K to Sunny Plast — SEND FIRST; answers gate phases 2–4
-    ├── phase-1-breaking-fixes.md        door clear-opening fix (ungated — do first)
-    ├── phase-2-catalog-additions.md     new parts + reconciliations (partly gated)
-    ├── phase-3-tilt-turn-calibration.md promote 123 T&T designs (gated on Q15 sign-off)
-    └── phase-4-limits-and-validation.md size/weight limits, sash-weight formula, ED table
+    ├── phase-1-addon-profiles.md       frameRect + per-edge add-ons (windows AND doors)
+    ├── phase-2-per-edge-profiles.md    a frame profile per edge, a joint method per divider
+    ├── phase-3-choice-imagery.md       a picture on every hardware choice
+    ├── phase-4-door-option-parity.md   the reference's remaining option rows, honestly gated
+    └── phase-5-documents-and-audit.md  Main Options block, JOB_169 suite, audit
 ```
 
 ## How to execute a phase (any phase)

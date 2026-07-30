@@ -370,3 +370,17 @@ export function importCatalogCsv(
 ): Promise<{ ok: boolean; updated: number; unmatched: string[] }> {
   return apiSendRaw(`/api/catalog/${systemId}/import`, "POST", csv, "text/csv");
 }
+
+/**
+ * Replace one hardware part's picture with a real product photo. The catalog
+ * asset route serves the upload when it exists and a generated glyph otherwise,
+ * so this is an override, not a requirement — nothing breaks without it.
+ */
+export async function uploadHardwareImage(systemId: string, partKey: string, file: File) {
+  return apiSendRaw<{ ok: boolean; url: string; bytes: number }>(
+    `/api/catalog/${systemId}/hardware/${encodeURIComponent(partKey)}/image`,
+    "POST",
+    file,
+    file.type || "image/png",
+  );
+}

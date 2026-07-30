@@ -404,11 +404,25 @@ export const SUNNYPLAST_70: ProfileSystem = {
       weight: 0,
       financialCategory: "Reinf - (steel)",
     },
+    // Used ONLY by SPQ-5-30252 (mullion-78 / the 78 mm divider). Length-gated:
+    // Job 169 (collections/doors/) prints this steel for the divider at Int
+    // 1710 (pages 3 and 5) and NONE at Int 710 / 685 (pages 1, 2 and 4). That
+    // matches the manual's rule that SPQ-5-30252 is reinforced only above 1 m
+    // (HAWDIO p17/PDF 18). The document brackets the threshold between 710 and
+    // 1710 rather than pinning it, so the printed manual figure is what is
+    // encoded — see Spec/questions.md Q23.
+    //
+    // The manual states the same >1 m rule for SPQ-005-30252 and >1.5 m for
+    // SPQ-05-20252, but no PRODUCTION document shows either steel omitted, and
+    // the calibrated Quotila jobs (85/88/90) are the source of truth for those
+    // profiles. They stay ungated until a job evidences it (Q13 precedent:
+    // production docs win over the manual).
     "reinf-26x26-u": {
       code: "REINF-26x26-U",
       name: "26 x 26 U Steel Reinforcement",
       faceWidth: 0,
       endClearance: 0,
+      minBarLengthMm: 1000,     // HAWDIO p17 (PDF 18); confirmed by Job 169
       weldAllowanceMm: 0,       // internal steel insert, not welded
       cost: 0, price: 0,
       per: "m",
@@ -536,16 +550,26 @@ export const SUNNYPLAST_70: ProfileSystem = {
       financialCategory: "Auxiliary Profiles",
     },
 
-    // ---- ADD-ONS & BAY/BOW PREP (migration phase-2; NOT consumed by any ----
-    // cut rule yet). Catalog parts only, so the Designer's add-on options and
-    // the future M6 bay/bow work have real coded parts to reference. Sources:
-    // HAWDIO 21-7-2026.pdf "Add Ons" printed p13 / PDF 14 and "Bay Poles"
-    // printed p14 / PDF 15. No calibrated cut rule exists for ANY of these
-    // (Spec/questions.md Q6) — enabling them in a quote requires a reference
-    // job or explicit supplier doc first. cost/price 0 (not in M5.5 lists).
+    // ---- ADD-ONS & BAY/BOW PREP. Sources: HAWDIO 21-7-2026.pdf "Add Ons" ----
+    // printed p13 / PDF 14 and "Bay Poles" printed p14 / PDF 15.
+    //
+    // `aux-ext-25` is now CALIBRATED and selectable per frame edge. Job 169
+    // (collections/doors/, 5 pages, 1000×2000, a 25 mm SPQ-2-75252 on each of
+    // the four edges in turn) shows it pushes the frame in by exactly its 25 mm
+    // face on the perpendicular axis and leaves the parallel axis alone:
+    //   add-on top/bottom ⇒ frame prints 1005 / 1980 (frame 1000 × 1975)
+    //   add-on left/right ⇒ frame prints  980 / 2005 (frame  975 × 2000)
+    // The unit still measures 1000 × 2000. That resolves Spec/questions.md Q6.
+    // The reference Cutting List itemises NO row for the add-on profile itself,
+    // so neither do we — its own bar length is unevidenced (questions.md Q21).
+    //
+    // Everything BELOW aux-ext-25 is still uncalibrated: no cut rule consumes
+    // the coupling or bay/bow parts, and none carries a `faceWidthMm`, so none
+    // can be selected as an add-on. cost/price 0 (not in the M5.5 lists).
     "aux-ext-25": {
       code: "SPQ-2-75252",
       name: "25mm Frame Extension Profile",   // p13: 70 wide × 25 high; takes 25×10 steel SPQ-2-83998
+      faceWidthMm: 25,                        // Job 169: frame loses exactly 25 mm on that axis
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },

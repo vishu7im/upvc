@@ -24,6 +24,7 @@
 // =====================================================================
 
 import type {
+  ComponentType,
   OptionChoice,
   OptionDef,
   OptionSystemSeed,
@@ -31,11 +32,15 @@ import type {
 import type { ProfileSystem, SashKind } from "../../types.ts";
 import { DOOR_SASH_KINDS } from "../families/entrance-door.ts";
 import {
+  CYLINDER_STYLE_FILTERS,
+  DOOR_HINGE_STYLE_FILTERS,
+  DOOR_LOCK_STYLE_FILTERS,
   DOOR_STYLE_FILTERS,
   FINISH_FILTERS,
   filterKeysFor,
   usedFilters,
 } from "./hardware-filters.ts";
+import { hardwareImage } from "./windows.ts";
 
 const FAMILY = "entrance-door";
 
@@ -48,13 +53,28 @@ const FAMILY = "entrance-door";
  * `hardware.locking` and `hardware.hinge` are deliberately NOT shared: their
  * choices are casement parts and casement sash kinds. Doors declare their own
  * below, against the door catalog.
+ *
+ * The four per-EDGE frame rows, the divider profile and the joint method ARE
+ * shared: a doorset's outer frame and its transom/mullion are the same parts a
+ * window's are (Job 169 prints `SPQ-6-11252` on all four edges of a doorset and
+ * `SPQ-5-30252` as its divider), and the choices are generated from the same
+ * catalog list.
  */
 const SHARED_OPTION_KEYS = [
   "profile.colour-outside",
   "profile.colour-inside",
   "profile.cill",
   "profile.bead",
-  "profile.addon",
+  "profile.frame-top",
+  "profile.frame-bottom",
+  "profile.frame-left",
+  "profile.frame-right",
+  "profile.divider",
+  "profile.joint-method",
+  "profile.addon-top",
+  "profile.addon-bottom",
+  "profile.addon-left",
+  "profile.addon-right",
   "glazing.glass-type",
   "glazing.method",
   "structure.add-transom",
@@ -261,8 +281,19 @@ export function buildDoorsOptionSystem(
       .sort((a, b) => sys.hardware[a].name.localeCompare(sys.hardware[b].name));
     if (partKeys.length === 0) continue; // nothing in the catalog ⇒ no option
 
+    // Each slot gets the chips its own catalog rows can actually earn — the
+    // style axis the reference splits into a second dropdown lives here as a
+    // chip instead (see DOOR_HINGE_STYLE_FILTERS for why).
     const families =
-      h.slot === "handle" ? [FINISH_FILTERS, DOOR_STYLE_FILTERS] : [FINISH_FILTERS];
+      h.slot === "handle"
+        ? [FINISH_FILTERS, DOOR_STYLE_FILTERS]
+        : h.slot === "hinge"
+          ? [FINISH_FILTERS, DOOR_HINGE_STYLE_FILTERS]
+          : h.slot === "lock"
+            ? [FINISH_FILTERS, DOOR_LOCK_STYLE_FILTERS]
+            : h.slot === "cylinder"
+              ? [FINISH_FILTERS, CYLINDER_STYLE_FILTERS]
+              : [FINISH_FILTERS];
     const slotChoices: OptionChoice[] = partKeys.map((key, i) => ({
       key: `door-hw-${h.slot}-${key}`,
       optionKey: h.key,
@@ -270,6 +301,10 @@ export function buildDoorsOptionSystem(
       order: (i + 1) * 10,
       isDefault: key === h.defaultPartKey, // the calibrated pick
       filterKeys: filterKeysFor(sys.hardware[key].name, families),
+      // Every hardware picker shows what the part looks like — the owner's
+      // report ("its show with ui what its look for example handels but in our
+      // app its just text field"). See hardwareImage / src/catalog/glyphs.ts.
+      image: hardwareImage(key),
       partKey: key,
       engineEffect: { kind: "hardware-substitution", params: { slot: h.slot } },
     }));
@@ -281,7 +316,9 @@ export function buildDoorsOptionSystem(
         groupKey: "hardware",
         name: h.name,
         order: h.order,
-        display: h.key === "hardware.door-handle" ? "select-image" : "select",
+        // Every hardware slot is now an image picker: each choice carries a
+        // picture, so the grid is the honest presentation for all of them.
+        display: "select-image",
         required: false,
         scope: {
           level: "component",
@@ -320,8 +357,8 @@ export function buildDoorsOptionSystem(
   );
   for (const [i, [k, label]] of (
     [
-      ["standard", "Standard cill/threshold"],
-      ["low", "Low threshold (level access)"],
+      ["standard", "No Threshold"],
+      ["low", "PRAG-S-70 Low Threshold"],
     ] as const
   ).entries()) {
     choices.push({
@@ -332,6 +369,191 @@ export function buildDoorsOptionSystem(
       isDefault: k === "standard",
       engineEffect: { kind: "none" },
     });
+  }
+
+  // Threshold labels follow the reference's own wording (PRAG-S-70), so the
+  // paperwork reads the same as the job sheets the shop already has.
+
+  // ---- The reference's remaining rows -------------------------------
+  //
+  // Every one of these appears in the reference door product
+  // (collections/doors/lineitems.json, 41 rows) and NONE of them has a catalog
+  // part or a calibrated cut rule. They ship the way `hardware.threshold`
+  // above does: recorded, printed, and honest about fabricating nothing
+  // (questions.md Q7). Adding real behaviour later is a data change plus the
+  // rule — never a guess here.
+  const gated: {
+    key: string;
+    group: string;
+    name: string;
+    order: number;
+    display: OptionDef["display"];
+    level: "item" | "component";
+    componentTypes?: ComponentType[];
+    help: string;
+    values: [string, string][];
+    defaultKey?: string;
+  }[] = [
+    {
+      key: "hardware.hinge-position",
+      group: "hardware",
+      name: "Hinge Position (Door)",
+      order: 45,
+      display: "segmented",
+      level: "component",
+      componentTypes: ["sash"],
+      help:
+        "Recorded on the work order. The engine fits the calibrated three hinges per leaf " +
+        "(Job 90); no production document gives the spacing or the count for four or five, so " +
+        "choosing one changes the paperwork, not the hardware tally.",
+      values: [
+        ["3", "3 Hinges"],
+        ["4", "4 Hinges"],
+        ["5", "5 Hinges"],
+      ],
+      defaultKey: "3",
+    },
+    {
+      key: "hardware.restrictor",
+      group: "hardware",
+      name: "Restrictor (Door)",
+      order: 46,
+      display: "select",
+      level: "component",
+      componentTypes: ["sash"],
+      help:
+        "Recorded on the work order. The catalog holds no restrictor part, so there is nothing " +
+        "to fit or price until one is added.",
+      values: [
+        ["none", "No Door Restrictor"],
+        ["fitted", "Door Restrictor"],
+      ],
+      defaultKey: "none",
+    },
+    {
+      key: "hardware.ventilator-frame",
+      group: "hardware",
+      name: "Ventilator (Frame)",
+      order: 47,
+      display: "select",
+      level: "item",
+      help:
+        "Recorded on the work order. The manual's trickle-vent data is reference-only in " +
+        "src/engine/limits.ts (TRICKLE_VENT has no consumer) and no vent part exists — " +
+        "questions.md Q16.",
+      values: [
+        ["none", "No Ventilator"],
+        ["2500", "2500EA Trickle Vent"],
+        ["4000", "4000EA Trickle Vent"],
+        ["5000", "5000EA Trickle Vent"],
+      ],
+      defaultKey: "none",
+    },
+    {
+      key: "hardware.ventilator-sash",
+      group: "hardware",
+      name: "Ventilator (Sash)",
+      order: 48,
+      display: "select",
+      level: "component",
+      componentTypes: ["sash"],
+      help:
+        "Recorded on the work order. Same gate as the frame ventilator — no vent part exists " +
+        "and no cut rule deducts for one (questions.md Q16).",
+      values: [
+        ["none", "No Ventilator"],
+        ["2500", "2500EA Trickle Vent"],
+        ["4000", "4000EA Trickle Vent"],
+        ["5000", "5000EA Trickle Vent"],
+      ],
+      defaultKey: "none",
+    },
+    {
+      key: "glazing.decoration",
+      group: "glazing",
+      name: "Glass Decoration",
+      order: 40,
+      display: "select",
+      level: "component",
+      componentTypes: ["glass", "sash"],
+      help:
+        "Recorded on the work order. Astragal, Georgian and leaded work all add bar or lead " +
+        "to the pane; the catalog holds no such part and no document gives the layout, so " +
+        "nothing is fabricated or priced.",
+      values: [
+        ["none", "No Decoration"],
+        ["astragal", "Astragal"],
+        ["georgian", "Georgian Bar"],
+        ["leaded", "Leaded"],
+      ],
+      defaultKey: "none",
+    },
+    {
+      key: "glazing.gas-fill",
+      group: "glazing",
+      name: "Glass Gas Fill",
+      order: 50,
+      display: "segmented",
+      level: "item",
+      help:
+        "Recorded on the glass order. Our glass rows are priced per m² as a made-up unit; the " +
+        "supplier lists no separate gas line, so the choice carries no price of its own.",
+      values: [
+        ["argon", "Argon"],
+        ["air", "Air"],
+      ],
+      defaultKey: "argon",
+    },
+    {
+      key: "general.opening-direction",
+      group: "general",
+      name: "Opening Direction",
+      order: 20,
+      display: "segmented",
+      level: "item",
+      help:
+        "Recorded on the work order and the drawing. Every calibrated door job we hold opens " +
+        "inward; an outward-opening doorset uses different weathering and no reference job " +
+        "gives its deduction, so the cut is unchanged either way.",
+      values: [
+        ["in", "Open In"],
+        ["out", "Open Out"],
+      ],
+      defaultKey: "in",
+    },
+  ];
+
+  for (const g of gated) {
+    options.push(
+      opt({
+        key: g.key,
+        groupKey: g.group,
+        name: g.name,
+        order: g.order,
+        display: g.display,
+        required: false,
+        scope:
+          g.level === "item"
+            ? { level: "item" }
+            : {
+                level: "component",
+                componentTypes: g.componentTypes ?? ["sash"],
+                applyScopes: ["all-of-type", "this"],
+              },
+        pricingMode: "none",
+        presentation: { helpText: g.help },
+      }),
+    );
+    for (const [i, [k, label]] of g.values.entries()) {
+      choices.push({
+        key: `${g.key.replace(/\./g, "-")}-${k}`,
+        optionKey: g.key,
+        label,
+        order: (i + 1) * 10,
+        isDefault: k === g.defaultKey,
+        engineEffect: { kind: "none" },
+      });
+    }
   }
 
   // Groups are shared verbatim — a second family reuses the same six.

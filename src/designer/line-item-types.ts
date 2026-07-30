@@ -11,8 +11,11 @@
 // =====================================================================
 
 import type {
+  AddonSelection,
   CellNode,
   Design,
+  DocOption,
+  FrameEdgeKeys,
   Pricing,
   ProfileSystem,
   QuoteInput,
@@ -157,6 +160,18 @@ export interface ResolvedSummary {
   locationLabel?: string;
   leafCount: number;
   glassSizes: { componentId: string; wMm: number; hMm: number }[];
+  /**
+   * Every option answered for this item, in seed order — the reference work
+   * order's "Main Options" table (Job 169, all 5 pages). One row per OPTION:
+   * a component-scoped answer prints its component alongside the value, and
+   * where two components answered the same option differently both are listed,
+   * so the table can never imply a single value that is not true of the whole
+   * unit.
+   *
+   * Options marked `presentation.omitFromDocuments` are excluded. Unanswered
+   * options are excluded — the reference prints only what was chosen.
+   */
+  mainOptions?: DocOption[];
 }
 
 export interface ResolvedLineItem {
@@ -251,6 +266,10 @@ export interface EngineEffectOutputs {
   colourKeyOutside?: string;
   cillKey?: string;
   frameKey?: string;
+  /** A frame profile per outer edge (the reference's four Frame rows). */
+  frameKeys?: FrameEdgeKeys;
+  /** Add-on (frame extension) partKey per frame edge (Job 169). */
+  addons?: AddonSelection;
   hardwareOverrides?: Record<string, string>;
   /** Plain priced add-lines (catalog hardware part × qty), appended post-solve. */
   bomLines?: { partKey: string; qty: number }[];

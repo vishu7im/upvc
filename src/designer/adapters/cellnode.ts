@@ -392,6 +392,41 @@ export function applyEdit(topology: CellNode, edit: TopologyEdit, ctx: AdapterEd
       // The merged cell keeps the FIRST (top/left) child's spec.
       return replaceAt(topology, segs, () => ({ kind: "leaf", cell: { ...a.cell } }));
     }
+
+    // Per-divider profile / joint method — the reference's Transom, Mullion and
+    // "Joint (Structural T/Z)" rows. Only the split node's own fields change,
+    // so the tree shape and every child are untouched.
+    case "set-divider": {
+      if (target.kind !== "divider") throw new AdapterError(`set-divider targets a divider, got "${edit.componentId}"`);
+      if (target.path.includes("#")) {
+        throw new AdapterError("A midrail's profile is set through its cell's midrails, not set-divider");
+      }
+      const segs = pathSegments(target.path);
+      const node = nodeAt(topology, segs);
+      if (node.kind !== "hsplit" && node.kind !== "vsplit") {
+        throw new AdapterError(`No split divider at "${target.path}"`);
+      }
+      if (edit.dividerKey !== undefined && !ctx.system.transoms[edit.dividerKey]) {
+        throw new AdapterError(`Unknown divider profile: ${edit.dividerKey}`);
+      }
+      return replaceAt(topology, segs, (n) => {
+        if (n.kind === "hsplit") {
+          return {
+            ...n,
+            ...(edit.dividerKey ? { transomKey: edit.dividerKey } : {}),
+            ...(edit.jointMethod ? { jointMethod: edit.jointMethod } : {}),
+          };
+        }
+        if (n.kind === "vsplit") {
+          return {
+            ...n,
+            ...(edit.dividerKey ? { mullionKey: edit.dividerKey } : {}),
+            ...(edit.jointMethod ? { jointMethod: edit.jointMethod } : {}),
+          };
+        }
+        return n;
+      });
+    }
   }
 }
 
@@ -545,6 +580,8 @@ export function toQuoteInput(args: {
     ...(effects.colourKeyOutside ? { colourKeyOutside: effects.colourKeyOutside } : {}),
     ...(effects.cillKey ? { cillKey: effects.cillKey } : {}),
     ...(effects.frameKey ? { frameKey: effects.frameKey } : {}),
+    ...(effects.frameKeys && Object.keys(effects.frameKeys).length ? { frameKeys: effects.frameKeys } : {}),
+    ...(effects.addons && Object.keys(effects.addons).length ? { addons: effects.addons } : {}),
     ...(effects.hardwareOverrides && Object.keys(effects.hardwareOverrides).length
       ? { hardwareOverrides: effects.hardwareOverrides }
       : {}),

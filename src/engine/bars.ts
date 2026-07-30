@@ -18,10 +18,12 @@ import type {
   GasketPiece,
   GlassPiece,
   ProfileSystem,
+  Reinforcement,
   SolvedCell,
   SolvedGeometry,
   SolvedParts,
 } from "../types.ts";
+import { framesForEdges } from "./topology.ts";
 
 export function computeParts(
   geometry: SolvedGeometry,
@@ -41,7 +43,13 @@ export function computeParts(
   const reinforcement: BarPiece[] = [];
   const glass: GlassPiece[] = [];
 
-  emitFrameBars(bars, reinforcement, geometry, design, system, widthMm, heightMm, weldDefaultMm);
+  // The outer frame is built to `frameRect`, not the unit — an add-on (frame
+  // extension) on an edge pushes it in by that profile's face (Job 169).
+  // Absent ⇒ the frame fills the unit ⇒ these are widthMm/heightMm exactly.
+  const frameW = geometry.frameRect?.w ?? widthMm;
+  const frameH = geometry.frameRect?.h ?? heightMm;
+
+  emitFrameBars(bars, reinforcement, geometry, design, system, frameW, frameH, weldDefaultMm);
   emitTransomBars(bars, reinforcement, geometry, system, weldDefaultMm);
   emitMullionBars(bars, reinforcement, geometry, system, weldDefaultMm);
 
@@ -151,52 +159,88 @@ function emitFrameBars(
   H: number,
   weldDefaultMm: number,
 ): void {
-  const frame = system.frames[design.frameKey];
-  const fw = frame.faceWidth;
+  // A frame profile per edge (the reference's four Frame (Standard) rows; Job
+  // 169 prints all four). Every design today names one profile, so all four
+  // resolve to it and every length below is the historical `W − 2 × fw` form.
+  const frames = framesForEdges(design, system);
   const wd = weldDefaultMm;
+  // A bar's Int loses the face of the profile at EACH of its two ends — which
+  // are the perpendicular edges, not its own.
+  const horInt = W - frames.left.faceWidth - frames.right.faceWidth;
+  const vertInt = H - frames.top.faceWidth - frames.bottom.faceWidth;
+
+  const pieces: BarPiece[] = [];
 
   // Top & bottom — always continuous, fully mitered.
-  bars.push(barFrame(frame, "Frame top",    W, W - 2 * fw, "H", "\\ - /", wd));
-  bars.push(barFrame(frame, "Frame bottom", W, W - 2 * fw, "H", "\\ - /", wd));
+  pieces.push(barFrame(frames.top,    "Frame top",    W, horInt, "H", "\\ - /", wd));
+  pieces.push(barFrame(frames.bottom, "Frame bottom", W, horInt, "H", "\\ - /", wd));
 
   if (geom.jambsBrokenAtY !== undefined) {
-    const splitY = geom.jambsBrokenAtY;
-    // Top piece: miter at frame corner, Y-notch where the transom welds in.
-    // Length Ext = splitY (raw cut goes from y=0 to the transom centerline).
-    // Int = Ext - frame face (only ONE miter loss; Y-notch has no length loss).
+    // `jambsBrokenAtY` is an absolute y in unit coordinates; the jamb pieces are
+    // measured from the FRAME's top edge (identical without an add-on, where the
+    // frame starts at y = 0).
+    const splitY = geom.jambsBrokenAtY - (geom.frameRect?.y ?? 0);
+    // Top piece: miter at the frame corner (the head's face), Y-notch where the
+    // transom welds in. Length Ext = splitY (raw cut goes from the frame's top
+    // edge to the transom centerline). Int = Ext − the mitred end's face only
+    // (a Y-notch costs no length).
     const topPieceExt = splitY;
-    const topPieceInt = splitY - fw;
+    const topPieceInt = splitY - frames.top.faceWidth;
     const bottomPieceExt = H - splitY;
-    const bottomPieceInt = (H - splitY) - fw;
+    const bottomPieceInt = (H - splitY) - frames.bottom.faceWidth;
 
-    bars.push(barFrame(frame, "Frame left top",     topPieceExt,    topPieceInt,    "V", "\\ - Y]", wd));
-    bars.push(barFrame(frame, "Frame left bottom",  bottomPieceExt, bottomPieceInt, "V", "[Y - /", wd));
-    bars.push(barFrame(frame, "Frame right top",    topPieceExt,    topPieceInt,    "V", "\\ - Y]", wd));
-    bars.push(barFrame(frame, "Frame right bottom", bottomPieceExt, bottomPieceInt, "V", "[Y - /", wd));
+    pieces.push(barFrame(frames.left,  "Frame left top",     topPieceExt,    topPieceInt,    "V", "\\ - Y]", wd));
+    pieces.push(barFrame(frames.left,  "Frame left bottom",  bottomPieceExt, bottomPieceInt, "V", "[Y - /", wd));
+    pieces.push(barFrame(frames.right, "Frame right top",    topPieceExt,    topPieceInt,    "V", "\\ - Y]", wd));
+    pieces.push(barFrame(frames.right, "Frame right bottom", bottomPieceExt, bottomPieceInt, "V", "[Y - /", wd));
   } else {
     // Continuous jambs (Job 88 / Job 90 style)
-    bars.push(barFrame(frame, "Frame left",  H, H - 2 * fw, "V", "\\ - /", wd));
-    bars.push(barFrame(frame, "Frame right", H, H - 2 * fw, "V", "\\ - /", wd));
+    pieces.push(barFrame(frames.left,  "Frame left",  H, vertInt, "V", "\\ - /", wd));
+    pieces.push(barFrame(frames.right, "Frame right", H, vertInt, "V", "\\ - /", wd));
   }
 
-  // Frame reinforcement (none in your data — left as a hook).
-  const reinfKey = system.reinforcementMap[frame.code];
-  if (reinfKey) {
-    const r = system.reinforcement[reinfKey];
-    bars.forEach((b) => {
-      if (b.code === frame.code) {
-        reinf.push(withWeld({
-          code: r.code,
-          name: r.name,
-          position: `Reinf for ${b.position}`,
-          orientation: b.orientation,
-          extMm: b.intMm - 2 * r.endClearance,
-          intMm: b.intMm - 2 * r.endClearance,
-          endPrep: "[ - ]",
-        }, effectiveWeld(r, weldDefaultMm)));
-      }
-    });
+  // Frame reinforcement (none in your data — left as a hook). Keyed off each
+  // piece's OWN code, so a mixed-profile frame reinforces each edge correctly.
+  for (const b of pieces) {
+    const r = reinforcementFor(system, b.code, b.intMm);
+    if (r) {
+      reinf.push(withWeld({
+        code: r.code,
+        name: r.name,
+        position: `Reinf for ${b.position}`,
+        orientation: b.orientation,
+        extMm: b.intMm - 2 * r.endClearance,
+        intMm: b.intMm - 2 * r.endClearance,
+        endPrep: "[ - ]",
+      }, effectiveWeld(r, weldDefaultMm)));
+    }
   }
+
+  bars.push(...pieces);
+}
+
+/**
+ * The reinforcement for a profile code, IF this particular bar is long enough
+ * to take it.
+ *
+ * The manual reinforces the lighter dividers only on long runs (HAWDIO p17/PDF
+ * 18; recorded under "Master PDF findings" in CLAUDE.md), and Job 169 shows the
+ * rule in production: its 78 mm SPQ-5-30252 divider carries 26×26 U steel at
+ * Int 1710 (pages 3 and 5) and none at Int 685/710 (pages 1, 2 and 4).
+ *
+ * A reinforcement without `minBarLengthMm` is always fitted — which is every
+ * entry the casement / French / sliding jobs use, so they are byte-identical.
+ */
+function reinforcementFor(
+  system: ProfileSystem,
+  profileCode: string,
+  barIntMm: number,
+): Reinforcement | undefined {
+  const key = system.reinforcementMap[profileCode];
+  if (!key) return undefined;
+  const r = system.reinforcement[key];
+  if (r?.minBarLengthMm !== undefined && barIntMm < r.minBarLengthMm) return undefined;
+  return r;
 }
 
 function barFrame(
@@ -237,10 +281,10 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       intMm: round1(t.intLengthMm),
       endPrep: "< - >",
     }, effectiveWeld(profile, weldDefaultMm));
-    // Reinforcement (e.g. Job 85: Z-transom gets 13x29 steel)
-    const reinfKey = system.reinforcementMap[profile.code];
-    if (reinfKey) {
-      const r = system.reinforcement[reinfKey];
+    // Reinforcement (e.g. Job 85: Z-transom gets 13x29 steel), skipped on runs
+    // below the profile's printed minimum (Job 169 pages 1/2/4).
+    const r = reinforcementFor(system, profile.code, t.intLengthMm);
+    if (r) {
       piece.reinforcementCode = r.code;
       piece.reinforcementLengthMm = round1(t.intLengthMm - 2 * r.endClearance);
       reinf.push(withWeld({
@@ -274,9 +318,8 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       intMm: round1(m.intLengthMm),
       endPrep: profile.jointType === "S" ? "[ - ]" : "< - >",
     }, effectiveWeld(profile, weldDefaultMm));
-    const reinfKey = system.reinforcementMap[profile.code];
-    if (reinfKey) {
-      const r = system.reinforcement[reinfKey];
+    const r = reinforcementFor(system, profile.code, m.intLengthMm);
+    if (r) {
       piece.reinforcementCode = r.code;
       piece.reinforcementLengthMm = round1(m.intLengthMm - 2 * r.endClearance);
       reinf.push(withWeld({
@@ -312,10 +355,9 @@ function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, sys
   ];
 
   // Reinforcement for every sash bar — always required in your system.
-  const reinfKey = system.reinforcementMap[sash.code];
-  if (reinfKey) {
-    const r = system.reinforcement[reinfKey];
-    for (const p of pieces) {
+  for (const p of pieces) {
+    const r = reinforcementFor(system, sash.code, p.intMm);
+    if (r) {
       const reinfLen = p.intMm - 2 * r.endClearance;
       p.reinforcementCode = r.code;
       p.reinforcementLengthMm = round1(reinfLen);

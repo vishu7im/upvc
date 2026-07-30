@@ -103,6 +103,7 @@ async function seedSystem(
       stickOut?: number;
       jointType?: string;
       endClearance?: number;
+      minBarLengthMm?: number;
     } = {},
   ) => {
     // These values are edited in Admin > Catalog / filled by the price-list
@@ -144,16 +145,24 @@ async function seedSystem(
     await upsertPart(key, PartKind.BEAD, b, { stickOut: b.stickOut });
   }
   for (const [key, r] of Object.entries(sys.reinforcement)) {
-    await upsertPart(key, PartKind.REINFORCEMENT, r, {
+    // `minBarLengthMm` is a real column but not part of the ProfileSection base,
+    // so it travels through `extra` and is stripped from the base payload.
+    const { minBarLengthMm, ...rBase } = r;
+    await upsertPart(key, PartKind.REINFORCEMENT, rBase, {
       endClearance: r.endClearance,
+      ...(minBarLengthMm !== undefined ? { minBarLengthMm } : {}),
     });
   }
-  // Auxiliary profiles (sliding tracks/caps, Jobs 44/48). No face/weld concept —
-  // stored with the base columns only (faceWidth/weld 0, specialised cols NULL).
+  // Auxiliary profiles. The sliding tracks/caps (Jobs 44/48) have no face/weld
+  // concept and store faceWidth 0. The ADD-ON (frame extension) profiles do have
+  // an elevation face — it is how far fitting one pushes the frame in from that
+  // edge (Job 169) — and it rides in the same `faceWidth` column, since that is
+  // exactly what it is. faceWidth 0 ⇒ not selectable as an add-on.
   for (const [key, a] of Object.entries(sys.auxiliaries ?? {})) {
+    const { faceWidthMm, ...aBase } = a;
     await upsertPart(key, PartKind.AUXILIARY, {
-      ...a,
-      faceWidth: 0,
+      ...aBase,
+      faceWidth: faceWidthMm ?? 0,
       weldAllowanceMm: 0,
     });
   }

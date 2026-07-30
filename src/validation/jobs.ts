@@ -14,6 +14,7 @@ import { validatePricing } from "../engine/pricing.test.ts";
 import { validateSvg } from "../engine/svg.test.ts";
 import { validateLimits } from "../engine/limits.test.ts";
 import { validateEdTable } from "../catalog/ed-table.test.ts";
+import { validateGlyphs } from "../catalog/glyphs.test.ts";
 import { validateRules } from "../designer/rules.test.ts";
 import { validateOptionSystem } from "../designer/options.test.ts";
 import { validateDesigner } from "../designer/resolve.test.ts";
@@ -504,6 +505,11 @@ const JOB_264_UNEQUAL: ExpectedJob = {
 
 let passCount = 0, failCount = 0;
 
+/** Same 1-dp rounding the engine's own cut lengths use (bars.ts#round1). */
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
 function approxEq(a: number, b: number, tol = 0.6): boolean {
   // 0.6mm tolerance for rounding (Quotila rounds to nearest 0.5mm sometimes).
   return Math.abs(a - b) <= tol;
@@ -899,6 +905,335 @@ function validateViews(): void {
 // the ring Int 475 (a 2.5 mm/end convention difference). Those follow a
 // different bead/steel convention from the Quotila jobs the catalog is
 // calibrated on; adopting them would silently re-calibrate the casement family.
+// =====================================================================
+// JOB 169 — "sunnyplast order test", 30-07-2026 (collections/doors/).
+//
+// A 5-page Work Order + its Cutting List and Glass Order, every page a
+// 1000 × 2000 single door in Frame 6 Chamber (SPQ-6-11252) with a Door Sash Z
+// leaf. Between them the pages exercise:
+//   p1  a 25 mm add-on on the TOP edge    + a horizontal divider in the leaf
+//   p2  the same add-on on the BOTTOM edge + a horizontal divider
+//   p3  the same add-on on the LEFT edge   + a VERTICAL divider
+//   p4  the same add-on on the RIGHT edge  + a horizontal divider
+//   p5  no add-on                          + a VERTICAL divider
+//
+// TWO THINGS THIS DOCUMENT ESTABLISHES:
+//
+// 1. The ADD-ON RULE (Spec/questions.md Q6, previously ungated). Fitting the
+//    25 mm SPQ-2-75252 to an edge shortens the frame by exactly 25 mm on the
+//    PERPENDICULAR axis and leaves the parallel axis alone — the frame becomes
+//    1000 × 1975 or 975 × 2000 while the unit still measures 1000 × 2000. Four
+//    independent confirmations, one per edge. The Cutting List itemises NO row
+//    for the add-on profile itself, so neither do we (questions.md Q21).
+//
+// 2. LENGTH-DEPENDENT REINFORCEMENT. The 78 mm divider carries its 26×26 U
+//    steel at Int 1710 (p3, p5) and NONE at Int 685/710 (p1, p2, p4) — the
+//    manual's ">1 m" rule for SPQ-5-30252 (HAWDIO p17/PDF 18), now evidenced by
+//    a production document (questions.md Q23).
+//
+// EVERYTHING ELSE REPRODUCES FROM VALUES ALREADY CALIBRATED — this document
+// validates the catalog rather than changing it: frame-6ch face 68 (Job 90),
+// sash-door-z overlap 28 and face 105 (Job 90), midrail Ext = Int + 2 × face
+// (Job 00000264), bead Ext = pane + 40 and glass = pane + 30 (Jobs 85/88/90),
+// sash steel = ring Int (Job 90), and Settings.weldAllowanceMm 2.5 (every
+// printed size is finished + 5).
+//
+// It also confirms, from a third party, the Job 154 midrail rule: all five
+// pages carry ONE sash ring and ONE handle / lock / cylinder / 3 hinges,
+// whichever divider button was pressed.
+//
+// NOT asserted (open reconciliation, never silently adopted): the document's
+// Gasket 01 / 02 metreage (11.26 m / 6.294 m on p1), which follows a different
+// derivation from our Jobs-85/88/90 rule (questions.md Q24), and its "Run Up
+// Block" accessory, which has no catalog part.
+//
+// The divider POSITIONS are read straight off each drawing: the dimension the
+// page prints (375 on p1, 1100 on p4, "500 | 475" on p3, "500 | 500" on p5) is
+// the divider's centreline measured from the FRAME edge, and dividing it by the
+// frame dimension on that axis gives the fraction the engine takes. That the
+// resulting panes, beads and glass then match the printed tables is the check.
+function validateJob169(): void {
+  console.log("\n==================================================");
+  console.log("Job 169: 1000×2000 single door — add-ons on all four edges");
+  console.log("==================================================");
+
+  const base = getDesign("door-single-left");
+  if (!base) {
+    console.log("  (skipped — design door-single-left not seeded)");
+    return;
+  }
+  const sys = getSystem("sunnyplast-70")!;
+  if (sys.auxiliaries?.["aux-ext-25"]?.faceWidthMm !== 25) {
+    console.log("  (skipped — aux-ext-25 has no 25 mm face; reseed the catalog)");
+    return;
+  }
+  const FRAME = sys.frames["frame-6ch"].code;      // SPQ-6-11252
+  const SASH = sys.sashes["sash-door-z"].code;     // SPQ-5-45252
+  const DIVIDER = sys.transoms["mullion-78"].code; // SPQ-5-30252
+  const SASH_STEEL = sys.reinforcement["reinf-28x44.5-u"].code;
+  const DIV_STEEL = sys.reinforcement["reinf-26x26-u"].code;
+
+  const W = 1000, H = 2000;
+  const leafCell = (base.topology as { kind: "leaf"; cell: CellSpec }).cell;
+  const run = (
+    addons?: Record<string, string>,
+    midrails?: { transomKey: string; atRatio: number; axis?: "horizontal" | "vertical" }[],
+  ) =>
+    solve({
+      orderNo: "TEST", customer: "Validation", designId: "door-single-left",
+      widthMm: W, heightMm: H, systemId: "sunnyplast-70",
+      ...(addons ? { addons } : {}),
+      ...(midrails
+        ? { topologyOverride: { kind: "leaf" as const, cell: { ...leafCell, midrails } } }
+        : {}),
+    });
+
+  /** Printed (saw) sizes for one profile code, deduped and sorted. */
+  const printed = (out: ReturnType<typeof solve>, code: string, orient?: "H" | "V") =>
+    [...new Set(
+      out.parts.bars
+        .filter((b) => b.code === code && (!orient || b.orientation === orient))
+        .map((b) => round1(b.weldedExtMm)),
+    )].sort((a, b) => a - b);
+
+  const steelLengths = (out: ReturnType<typeof solve>, code: string) =>
+    [...new Set(out.parts.reinforcement.filter((b) => b.code === code).map((b) => round1(b.extMm)))]
+      .sort((a, b) => a - b);
+
+  const glassRows = (out: ReturnType<typeof solve>) =>
+    out.parts.glass
+      .map((g) => `${g.widthMm}×${g.heightMm}`)
+      .sort()
+      .join(" ");
+
+  // The reference fits exactly one of each on every page, whatever the divider.
+  const hardwareCount = (out: ReturnType<typeof solve>, code: string) =>
+    out.parts.hardware.filter((h) => h.code === code).reduce((n, h) => n + h.qty, 0);
+
+  const assertOnePerPage = (page: string, out: ReturnType<typeof solve>) => {
+    expect(`${page}: ONE sash ring (4 bars)`, out.parts.bars.filter((b) => b.code === SASH).length, 4);
+    expect(`${page}: one handle`, hardwareCount(out, sys.hardware["hw-door-handle"].code), 1);
+    expect(`${page}: one lock`, hardwareCount(out, sys.hardware["hw-door-lock"].code), 1);
+    expect(`${page}: one cylinder`, hardwareCount(out, sys.hardware["hw-cylinder-brass"].code), 1);
+    expect(`${page}: three hinges`, hardwareCount(out, sys.hardware["hw-flag-hinge-white"].code), 3);
+  };
+
+  // ---- p5: no add-on, vertical divider at the centre -------------------
+  // Frame 1000 × 2000 ⇒ daylight 864 × 1864 ⇒ ring 920 × 1920 ⇒ Int 710 × 1710.
+  // Drawing: "500 | 500" along the sill — the divider centreline at mid-frame.
+  const p5 = run(undefined, [{ transomKey: "mullion-78", atRatio: 500 / 1000, axis: "vertical" }]);
+  expect("p5: frame Hor printed 1005", printed(p5, FRAME, "H").join(), "1005");
+  expect("p5: frame Vert printed 2005", printed(p5, FRAME, "V").join(), "2005");
+  expect("p5: sash Hor printed 925", printed(p5, SASH, "H").join(), "925");
+  expect("p5: sash Vert printed 1925", printed(p5, SASH, "V").join(), "1925");
+  expect("p5: sash steel 710 / 1710", steelLengths(p5, SASH_STEEL).join(), "710,1710");
+  const p5div = p5.parts.bars.find((b) => b.code === DIVIDER);
+  expect("p5: vertical divider printed 1871", round1(p5div?.weldedExtMm ?? 0), 1871);
+  expect("p5: divider Int 1710 = the ring Int", round1(p5div?.intMm ?? 0), 1710);
+  expect("p5: horn-cut end prep", p5div?.endPrep, "< - >");
+  expect("p5: printed as a VERT bar", p5div?.orientation, "V");
+  expect("p5: the >1 m divider IS reinforced (26×26 U 1710)",
+    steelLengths(p5, DIV_STEEL).join(), "1710");
+  expect("p5: glass 346 × 1740, twice", glassRows(p5), "346×1740 346×1740");
+  assertOnePerPage("p5", p5);
+
+  // ---- p1: add-on TOP — the frame loses 25 mm of HEIGHT ----------------
+  // Frame 1000 × 1975 ⇒ daylight 864 × 1839 ⇒ ring 920 × 1895 ⇒ Int 710 × 1685.
+  // Drawing: "375" top light over "1600" (375 + 1600 = 1975, the FRAME height).
+  const p1 = run({ top: "aux-ext-25" }, [{ transomKey: "mullion-78", atRatio: 375 / 1975 }]);
+  expect("p1: unit height is unchanged", p1.geometry.outer.h, 2000);
+  expect("p1: the FRAME is 1975 high", round1(p1.geometry.frameRect?.h ?? 0), 1975);
+  expect("p1: frame Hor printed 1005 (width untouched)", printed(p1, FRAME, "H").join(), "1005");
+  expect("p1: frame Vert printed 1980 (2005 − 25)", printed(p1, FRAME, "V").join(), "1980");
+  expect("p1: sash Hor printed 925", printed(p1, SASH, "H").join(), "925");
+  expect("p1: sash Vert printed 1900", printed(p1, SASH, "V").join(), "1900");
+  expect("p1: sash steel 710 / 1685", steelLengths(p1, SASH_STEEL).join(), "710,1685");
+  const p1div = p1.parts.bars.find((b) => b.code === DIVIDER);
+  expect("p1: horizontal divider printed 871", round1(p1div?.weldedExtMm ?? 0), 871);
+  expect("p1: divider Int 710", round1(p1div?.intMm ?? 0), 710);
+  expect("p1: printed as a HOR bar", p1div?.orientation, "H");
+  expect("p1: the SHORT divider is NOT reinforced", steelLengths(p1, DIV_STEEL).length, 0);
+  expect("p1: glass 740 × 221 and 740 × 1446", glassRows(p1), "740×1446 740×221");
+  expect("p1: no cut row for the add-on profile",
+    p1.parts.bars.filter((b) => b.code === "SPQ-2-75252").length, 0);
+  assertOnePerPage("p1", p1);
+
+  // ---- p2: add-on BOTTOM — same frame, divider lower --------------------
+  const p2 = run({ bottom: "aux-ext-25" }, [{ transomKey: "mullion-78", atRatio: 1000 / 1975 }]);
+  expect("p2: bottom add-on gives the SAME frame as top",
+    `${printed(p2, FRAME, "H").join()}|${printed(p2, FRAME, "V").join()}`, "1005|1980");
+  expect("p2: sash printed 925 / 1900",
+    `${printed(p2, SASH, "H").join()}|${printed(p2, SASH, "V").join()}`, "925|1900");
+  expect("p2: glass 740 × 846 and 740 × 821", glassRows(p2), "740×821 740×846");
+  assertOnePerPage("p2", p2);
+
+  // ---- p3: add-on LEFT — the frame loses 25 mm of WIDTH -----------------
+  // Frame 975 × 2000 ⇒ daylight 839 × 1864 ⇒ ring 895 × 1920 ⇒ Int 685 × 1710.
+  // Drawing: "500 | 475" along the sill (500 + 475 = 975, the FRAME width).
+  const p3 = run({ left: "aux-ext-25" }, [{ transomKey: "mullion-78", atRatio: 500 / 975, axis: "vertical" }]);
+  expect("p3: unit width is unchanged", p3.geometry.outer.w, 1000);
+  expect("p3: the FRAME is 975 wide", round1(p3.geometry.frameRect?.w ?? 0), 975);
+  expect("p3: the frame is offset 25 mm from the left", round1(p3.geometry.frameRect?.x ?? -1), 25);
+  expect("p3: frame Hor printed 980 (1005 − 25)", printed(p3, FRAME, "H").join(), "980");
+  expect("p3: frame Vert printed 2005 (height untouched)", printed(p3, FRAME, "V").join(), "2005");
+  expect("p3: sash Hor printed 900", printed(p3, SASH, "H").join(), "900");
+  expect("p3: sash Vert printed 1925", printed(p3, SASH, "V").join(), "1925");
+  expect("p3: sash steel 685 / 1710", steelLengths(p3, SASH_STEEL).join(), "685,1710");
+  const p3div = p3.parts.bars.find((b) => b.code === DIVIDER);
+  expect("p3: vertical divider printed 1871", round1(p3div?.weldedExtMm ?? 0), 1871);
+  expect("p3: the >1 m divider IS reinforced (26×26 U 1710)",
+    steelLengths(p3, DIV_STEEL).join(), "1710");
+  expect("p3: glass 346 × 1740 and 321 × 1740", glassRows(p3), "321×1740 346×1740");
+  assertOnePerPage("p3", p3);
+
+  // ---- p4: add-on RIGHT — the SAME frame as left ------------------------
+  // Drawing: "1100" over "900" (1100 + 900 = 2000, the FRAME height).
+  const p4 = run({ right: "aux-ext-25" }, [{ transomKey: "mullion-78", atRatio: 1100 / 2000 }]);
+  expect("p4: right add-on gives the SAME frame as left",
+    `${printed(p4, FRAME, "H").join()}|${printed(p4, FRAME, "V").join()}`, "980|2005");
+  expect("p4: the frame starts at x = 0", round1(p4.geometry.frameRect?.x ?? -1), 0);
+  const p4div = p4.parts.bars.find((b) => b.code === DIVIDER);
+  expect("p4: horizontal divider printed 846 (685 + 2×78 + 5)", round1(p4div?.weldedExtMm ?? 0), 846);
+  expect("p4: divider Int 685", round1(p4div?.intMm ?? 0), 685);
+  expect("p4: the SHORT divider is NOT reinforced", steelLengths(p4, DIV_STEEL).length, 0);
+  expect("p4: glass 715 × 946 and 715 × 746", glassRows(p4), "715×746 715×946");
+  const beads4 = [...new Set(
+    p4.parts.bars.filter((b) => b.code === sys.beads["bead-28"].code).map((b) => round1(b.extMm)),
+  )].sort((a, b) => a - b);
+  expect("p4: beads 725 / 756 / 956", beads4.join(), "725,756,956");
+  assertOnePerPage("p4", p4);
+
+  // ---- the add-on is geometry only, on every edge -----------------------
+  for (const side of ["top", "bottom", "left", "right"] as const) {
+    const out = run({ [side]: "aux-ext-25" });
+    expect(`add-on ${side}: still no cut row for SPQ-2-75252`,
+      [...out.parts.bars, ...out.parts.reinforcement].filter((b) => b.code === "SPQ-2-75252").length, 0);
+  }
+
+  // ---- the schematic measures the FRAME, not the unit -------------------
+  // An add-on must never be read as extra frame sightline: the annotated face
+  // is the gap between the FRAME rect and the daylight, so it stays 68 (and the
+  // door leaf 105) whether or not one is fitted.
+  const faces = (out: ReturnType<typeof solve>) =>
+    [...(out.geometry.svgViews?.schematic ?? "").matchAll(/>(\d+)</g)].map((m) => m[1]).join();
+  const schemPlain = solve({
+    orderNo: "TEST", customer: "Validation", designId: "door-single-left",
+    widthMm: W, heightMm: H, systemId: "sunnyplast-70", views: ["schematic"],
+  });
+  const schemAddon = solve({
+    orderNo: "TEST", customer: "Validation", designId: "door-single-left",
+    widthMm: W, heightMm: H, systemId: "sunnyplast-70", views: ["schematic"],
+    addons: { top: "aux-ext-25" },
+  });
+  expect("the schematic prints face widths at all", faces(schemPlain).length > 0, true);
+  expect("the annotated frame face is unchanged by an add-on",
+    faces(schemAddon), faces(schemPlain));
+
+  // ---- and it is genuinely additive ------------------------------------
+  const plain = run();
+  expect("no add-on ⇒ no frameRect on the geometry", plain.geometry.frameRect, undefined);
+  expect("no add-on ⇒ the frame fills the unit",
+    `${printed(plain, FRAME, "H").join()}|${printed(plain, FRAME, "V").join()}`, "1005|2005");
+}
+
+// =====================================================================
+// PER-EDGE FRAME PROFILES + PER-DIVIDER JOINT METHOD (doors phase 2).
+//
+// The reference offers `Frame (Standard) (Top|Bottom|Left|Right)` as four
+// independent dropdowns — Job 169 prints all four in Main Options — and a
+// `Joint (Structural T/Z)` of Welded or Mechanical per divider.
+//
+// On this system the two frames genuinely differ (frame-5ch face 64, frame-6ch
+// face 68), so a mixed selection changes the cut. Each bar's Int loses the face
+// of the profile at each of its two ends, which are the PERPENDICULAR edges.
+//
+// "Mechanical" is offered because the reference offers it, but NO production
+// document gives its deduction, so the bar is cut as welded and the resolver
+// warns (Spec/questions.md Q22). Asserted here: the cut really is unchanged.
+function validatePerEdgeFrames(): void {
+  console.log("\n==================================================");
+  console.log("Per-edge frame profiles + joint method (doors phase 2)");
+  console.log("==================================================");
+
+  const base = getDesign("win-th");
+  if (!base) {
+    console.log("  (skipped — design win-th not seeded)");
+    return;
+  }
+  const sys = getSystem("sunnyplast-70")!;
+  const F5 = sys.frames["frame-5ch"];   // face 64
+  const F6 = sys.frames["frame-6ch"];   // face 68
+  expect("the two frames differ, so a mix is meaningful", F5.faceWidth !== F6.faceWidth, true);
+
+  const W = 1200, H = 1200;
+  const run = (frameKeys?: Record<string, string>) =>
+    solve({
+      orderNo: "TEST", customer: "Validation", designId: "win-th",
+      widthMm: W, heightMm: H, systemId: "sunnyplast-70",
+      ...(frameKeys ? { frameKeys } : {}),
+    });
+
+  // ---- byte-identity: all four edges the same == naming none ----------
+  const plain = run();
+  const allFive = run({ top: "frame-5ch", bottom: "frame-5ch", left: "frame-5ch", right: "frame-5ch" });
+  expect("naming the design's own frame on all four edges changes nothing",
+    JSON.stringify(allFive.parts), JSON.stringify(plain.parts));
+  expect("…and neither does the geometry",
+    JSON.stringify(allFive.geometry.cells), JSON.stringify(plain.geometry.cells));
+
+  // ---- a single edge moves ONLY its own side -------------------------
+  // frame-6ch on the LEFT: the daylight starts 4 mm further in, so the head and
+  // sill lose 4 mm of Int; the jambs (whose ends are top/bottom) are untouched.
+  const mixed = run({ left: "frame-6ch" });
+  const bar = (out: ReturnType<typeof solve>, pos: string) =>
+    out.parts.bars.find((b) => b.position === pos);
+  expect("the head keeps its full Ext", bar(mixed, "Frame top")?.extMm, bar(plain, "Frame top")?.extMm);
+  expect("the head Int loses exactly the 4 mm face difference",
+    round1((bar(plain, "Frame top")!.intMm) - (bar(mixed, "Frame top")!.intMm)), 4);
+  expect("the jambs are untouched (their ends are the head and sill)",
+    bar(mixed, "Frame left")?.intMm, bar(plain, "Frame left")?.intMm);
+  expect("the LEFT jamb is now the 6-chamber profile", bar(mixed, "Frame left")?.code, F6.code);
+  expect("the RIGHT jamb is still the design's own", bar(mixed, "Frame right")?.code, F5.code);
+  expect("the daylight moves in by 4 mm on the left only",
+    round1(mixed.geometry.cells[0].daylight!.x - plain.geometry.cells[0].daylight!.x), 4);
+  expect("and the daylight narrows by the same 4 mm",
+    round1(plain.geometry.cells[0].daylight!.w - mixed.geometry.cells[0].daylight!.w), 4);
+
+  // ---- an unknown frame is a loud error, never a silent fallback ------
+  let threw = false;
+  try {
+    run({ left: "no-such-frame" });
+  } catch {
+    threw = true;
+  }
+  expect("an unknown per-edge frame throws", threw, true);
+
+  // ---- joint method: recorded, printed, NOT re-cut --------------------
+  const root = base.topology;
+  if (root.kind !== "hsplit") {
+    console.log("  (joint-method checks skipped — win-th is not a split design)");
+    return;
+  }
+  const welded = solve({
+    orderNo: "TEST", customer: "Validation", designId: "win-th",
+    widthMm: W, heightMm: H, systemId: "sunnyplast-70",
+    topologyOverride: { ...root, jointMethod: "welded" as const },
+  });
+  const mechanical = solve({
+    orderNo: "TEST", customer: "Validation", designId: "win-th",
+    widthMm: W, heightMm: H, systemId: "sunnyplast-70",
+    topologyOverride: { ...root, jointMethod: "mechanical" as const },
+  });
+  expect("welded is the default — naming it changes nothing",
+    JSON.stringify(welded.parts), JSON.stringify(plain.parts));
+  expect("mechanical does NOT invent a different cut (questions.md Q22)",
+    JSON.stringify(mechanical.parts), JSON.stringify(plain.parts));
+  expect("but it IS recorded on the solved divider",
+    mechanical.geometry.transoms[0]?.jointMethod, "mechanical");
+  expect("and welded records nothing (absent ⇒ welded ⇒ byte-identical)",
+    welded.geometry.transoms[0]?.jointMethod, undefined);
+}
+
 function validateJob154(): void {
   console.log("\n==================================================");
   console.log("Job 154: 705×705 casement — a midrail inside the sash");
@@ -1040,12 +1375,16 @@ function validateAdvisories(): void {
   validateColourAndJoints();
   validateViews();
   validateJob154();
+  validateJob169();
+  validatePerEdgeFrames();
   validateAdvisories();
   validateExtractor(expect);
   validatePricing(expect);
   validateSvg(expect);
   validateLimits(expect);
   validateEdTable(expect);
+  validateGlyphs(expect);
+  validateGlyphs(expect);
   validateRules(expect);
   validateOptionSystem(expect);
   validateDesigner(expect);

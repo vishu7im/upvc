@@ -285,6 +285,11 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
         reinforcement[p.partKey] = {
           ...base,
           endClearance: num(p.endClearance),
+          // NULL ⇒ always fitted (every pre-Job-169 row), so omitting the key
+          // keeps the engine's reinforcement output byte-identical.
+          ...(p.minBarLengthMm !== null && p.minBarLengthMm !== undefined
+            ? { minBarLengthMm: num(p.minBarLengthMm) }
+            : {}),
         };
         break;
       case "AUXILIARY":
@@ -296,6 +301,10 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
           per: "m",
           weight: num(p.weight),
           financialCategory: p.financialCategory,
+          // The add-on (frame extension) profiles carry their elevation face in
+          // the shared `faceWidth` column; the sliding cut items store 0, which
+          // means "no face concept" and therefore "not fittable to a frame edge".
+          ...(num(p.faceWidth) > 0 ? { faceWidthMm: num(p.faceWidth) } : {}),
         };
         break;
     }

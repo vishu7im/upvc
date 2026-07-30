@@ -72,7 +72,39 @@ export function OptionControl(props: OptionControlProps) {
 // Choice controls
 // ---------------------------------------------------------------------
 
+/**
+ * The URL a choice's `image` resolves to. `catalog-asset` goes through the BFF
+ * so the same-origin rule holds; `url` is used verbatim. The route serves an
+ * admin-uploaded product photo when one exists and a generated glyph otherwise,
+ * so a choice that declares an image always has one to show.
+ */
+function choiceImageSrc(choice: OptionChoice): string | null {
+  const image = choice.image;
+  if (!image?.ref) return null;
+  if (image.kind === "url") return image.ref;
+  if (image.kind === "catalog-asset") return `/api/catalog/assets/${image.ref}`;
+  return null;
+}
+
+/**
+ * A choice's visual: its image if it has one, else its swatch, else nothing.
+ * Colours carry a swatch, hardware carries an image, and a choice with neither
+ * (a profile or a plain spec answer) renders as its label alone.
+ */
 function Swatch({ choice, className }: { choice: OptionChoice; className?: string }) {
+  const src = choiceImageSrc(choice);
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- catalog asset route, not a static import
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        className={cn("inline-block h-4 w-4 shrink-0 object-contain", className)}
+      />
+    );
+  }
   if (!choice.swatchHex) return null;
   return (
     <span
@@ -181,9 +213,9 @@ export function ToggleChoices(props: OptionControlProps) {
 
 /**
  * `select-image` — a grid popover with the option's own filter chips. Used for
- * long visual lists (colours: swatch + label; handles: image + label). Falls
- * back to the label alone when a choice carries neither swatch nor image, so a
- * seed without artwork still renders correctly.
+ * long visual lists: colours show their swatch, hardware shows a picture of the
+ * part (`choice.image` → the catalog asset route). A choice carrying neither
+ * still renders as a plain tile, so a seed without artwork is unaffected.
  */
 export function ImageChoices(props: OptionControlProps) {
   const { option, answer, tone, onChoice } = props;
@@ -251,12 +283,13 @@ export function ImageChoices(props: OptionControlProps) {
               ))}
             </div>
           )}
-          <ul role="listbox" aria-label={option.name} className="grid max-h-64 grid-cols-2 gap-1 overflow-y-auto">
+          <ul role="listbox" aria-label={option.name} className="grid max-h-80 grid-cols-3 gap-1 overflow-y-auto">
             {visible.length === 0 && (
-              <li className="col-span-2 px-2 py-3 text-xs text-slate-500">No choices match this filter.</li>
+              <li className="col-span-3 px-2 py-3 text-xs text-slate-500">No choices match this filter.</li>
             )}
             {visible.map((c) => {
               const active = answer.choice?.key === c.key;
+              const src = choiceImageSrc(c);
               return (
                 <li key={c.key} role="option" aria-selected={active}>
                   <button
@@ -267,16 +300,27 @@ export function ImageChoices(props: OptionControlProps) {
                       triggerRef.current?.focus();
                     }}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4442e3]/40",
+                      "flex w-full flex-col items-center gap-1.5 rounded p-2 text-center text-[11px] font-medium leading-tight transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4442e3]/40",
                       active ? "bg-[#e7e6ff] text-[#4442e3]" : "text-slate-700 hover:bg-slate-100",
                     )}
                   >
-                    <span
-                      aria-hidden="true"
-                      className="h-6 w-6 shrink-0 rounded border border-black/10"
-                      style={{ background: c.swatchHex ?? "#e2e8f0" }}
-                    />
-                    <span className="truncate">{c.label}</span>
+                    {src ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- catalog asset route, not a static import
+                      <img
+                        src={src}
+                        alt=""
+                        aria-hidden="true"
+                        loading="lazy"
+                        className="h-14 w-14 shrink-0 object-contain"
+                      />
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="h-14 w-14 shrink-0 rounded border border-black/10"
+                        style={{ background: c.swatchHex ?? "#e2e8f0" }}
+                      />
+                    )}
+                    <span className="line-clamp-3">{c.label}</span>
                   </button>
                 </li>
               );

@@ -30,6 +30,7 @@ import { lineItemsRouter } from "./lineitems.ts";
 import { ordersRouter } from "./orders.ts";
 import { settingsRouter } from "./settings.ts";
 import { catalogRouter } from "./catalog.ts";
+import { catalogAssetsRouter } from "./catalog-assets.ts";
 import { discountsRouter } from "./discounts.ts";
 import { usersRouter } from "./users.ts";
 import { rolesRouter } from "./roles.ts";
@@ -173,6 +174,10 @@ app.use("/api/products", requireAuth, productsRouter);
 app.use("/api/designs", requireAuth, designsRouter); // only defines "/:id"
 app.use("/api/orders", requireAuth, ordersRouter);
 app.use("/api/settings", settingsRouter); // per-route admin guards inside
+// Hardware imagery is PUBLIC (like /api/branding/logo — a browser <img> needs
+// no bearer token, and it carries no cost data). Mounted BEFORE the admin
+// router so "assets" is never mistaken for a systemId.
+app.use("/api/catalog/assets", catalogAssetsRouter);
 app.use("/api/catalog", catalogRouter); // admin-only (guards inside the router)
 app.use("/api/discounts", discountsRouter); // per-route requirePermission("discounts", …)
 app.use("/api/users", usersRouter); // per-route requirePermission("users", …)

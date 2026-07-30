@@ -18,6 +18,12 @@
 //   POST /api/catalog/:systemId/colours                 add a colour/finish
 //   PUT  /api/catalog/:systemId/colours/:key            edit a colour/finish
 //   POST /api/catalog/:systemId/import                  CSV bulk price import
+//   POST /api/catalog/:systemId/hardware/:partKey/image  upload a product photo
+//
+// The matching PUBLIC read route is mounted in server.ts:
+//   GET  /api/catalog/assets/hardware/:partKey          the photo, else a glyph
+// — public for the same reason GET /api/branding/logo is: a browser <img> must
+// load it without a bearer token, and it carries no cost data.
 // =====================================================================
 
 import express, { Router } from "express";
@@ -28,6 +34,8 @@ import { asyncHandler, HttpError, validate } from "./http.ts";
 import { requireAuth } from "./middleware/auth.ts";
 import { requirePermission } from "./middleware/authorize.ts";
 import { loadCatalog, refreshSystemCatalog } from "../catalog/index.ts";
+import { putObject } from "../services/storage.ts";
+import { hardwareAssetKey } from "./catalog-assets.ts";
 
 export const catalogRouter = Router();
 
@@ -364,3 +372,31 @@ function parseCsv(csv: string): { code: string; cost: number; price: number }[] 
   }
   return out;
 }
+
+
+// ---- Hardware imagery ------------------------------------------------
+// A real product photo for one hardware part. Storage-key existence IS the
+// override (the same trick the PDF cache and the branding logo use), so there
+// is no column and no migration: uploaded ⇒ the photo is served, absent ⇒ the
+// generated glyph. Nothing here touches cost, price or the BOM.
+catalogRouter.post(
+  "/:systemId/hardware/:partKey/image",
+  requirePermission("catalog", "update"),
+  express.raw({ type: "image/*", limit: "2mb" }),
+  asyncHandler(async (req, res) => {
+    await assertSystem(req.params.systemId);
+    const part = await prisma.hardware.findUnique({
+      where: { systemId_partKey: { systemId: req.params.systemId, partKey: req.params.partKey } },
+    });
+    if (!part) throw new HttpError(404, `Unknown hardware part: ${req.params.partKey}`);
+
+    const body = req.body as Buffer;
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      throw new HttpError(400, "Send the image as a raw body with an image/* Content-Type");
+    }
+    const contentType = req.headers["content-type"] || "image/png";
+    const key = hardwareAssetKey(req.params.partKey);
+    await putObject(key, body, contentType);
+    res.json({ ok: true, url: `/api/catalog/assets/hardware/${req.params.partKey}`, bytes: body.length });
+  }),
+);

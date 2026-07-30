@@ -44,12 +44,17 @@ gasket)?
 **Recommendation:** treat as glass-row swap (bead retained) until a calibrated reference says
 otherwise — never guess fabrication differences; phase-2 records any discovered gap here.
 
-**Q6. Add-on profiles (frame extenders) have no catalog entries.**
+**Q6. Add-on profiles (frame extenders) have no catalog entries.** ✅ RESOLVED 2026-07-30
+(`03-doors-module/phase-1`)
 Reference exposes per-side Add-ons. Manual p13 lists SPQ-2-75252 25mm extension. No calibrated
-cut rule exists for add-ons in our engine.
-**Recommendation:** phase 1 seeds the option with "No add-on" only; phase 2 (migration) adds the
-part; enabling real add-on choices requires a calibrated rule (extension adds to frame ext sizes)
-— gate on a reference job or explicit supplier doc. Documents-only until then.
+cut rule existed for add-ons in our engine.
+**Resolved by Job 169** (`collections/doors/Work Order - sunnyplast order test - 30-07-2026.pdf`,
+5 pages, 1000 × 2000): a 25 mm `SPQ-2-75252` on an edge shortens the frame by exactly 25 mm on the
+**perpendicular** axis and leaves the parallel axis alone — verified independently on all four
+edges (Top p1, Bottom p2, Left p3, Right p4). Frame prints 1005/1980 with a top or bottom add-on
+and 980/2005 with a left or right one; the overall unit stays 1000 × 2000 and split ratios are
+frame-relative (p1: 375 + 1600 = 1975). Implemented as `SolvedGeometry.frameRect`. See **Q21** for
+the one thing the document still does not answer.
 
 **Q7. Options with no calibrated fabrication effect (drainage, threshold, glazing method…).**
 Ship them as spec-recording, documents-only options (per `option-schema.md` §8), or hide until
@@ -157,6 +162,44 @@ Options: (a) phase-2 resolver drops the glass BOM/price lines for unglazed cells
 rule needed — you simply don't supply the glass); (b) leave it documents-only indefinitely.
 **Recommendation: (a)** — it is a supply decision, not a fabrication deduction, so no calibration
 is required; it just needs the resolver, which is phase 2.
+
+## Task 3 — Doors Module
+
+*(found during doors phase-1, from the Job 169 package in `collections/doors/`)*
+
+**Q21. What length is the add-on profile itself cut to?** ⚠ OWNER DECISION REQUIRED
+Job 169 proves the add-on's effect on the FRAME exactly (Q6), but its Cutting List itemises
+**no row** for `SPQ-2-75252` — the profile is selected, priced into Main Options, and never cut.
+Options: (a) print no cut row, matching the reference document byte for byte; (b) infer the bar as
+the full outer W (top/bottom) or H (left/right) on that edge and flag it uncalibrated; (c) ask the
+supplier for an itemised add-on cutting list.
+**Owner decision 2026-07-30: (a)** — match the document. Revisit if the shop floor asks for the
+bar length; that is (c), not a guess.
+
+**Q22. What does the "Mechanical" joint deduction do?** ⏳ **STILL OPEN**
+The reference offers `Joint (Structural T/Z)` = `Welded (Standard)` / `Mechanical (Standard)` per
+divider. Every reference job we hold is welded, so the mechanical cut (presumably a square butt
+with no horn, i.e. `Ext = Int`) is unevidenced.
+**Recommendation:** ship the option selectable, cut it as welded, and raise a `warning` issue that
+the D9 advisory band prints on the work order — visible to the shop, never silently wrong. Replace
+with the real deduction when a mechanically jointed reference job appears.
+
+**Q23. What are the exact reinforcement length thresholds?** ⚠ PARTIALLY ANSWERED
+The manual states `SPQ-05-20252` is reinforced only >1.5 m and `SPQ-5-30252` / `SPQ-005-30252`
+only >1 m; our `reinforcementMap` is binary. Job 169 confirms the direction — the 78 mm divider
+carries 26×26 U steel at Int 1710 (pages 3, 5) and none at Int 685/710 (pages 1, 2, 4) — but the
+document brackets the threshold between 710 and 1710, it does not pin it.
+**Recommendation:** encode the manual's printed thresholds (1000 / 1500 mm) with their page cites,
+since Job 169 is consistent with them and contradicts no other calibrated job. Flag on the part,
+not in the engine, so a corrected figure is a data edit.
+
+**Q24. Should our Gasket 01/02 rule move to the Job 169 convention?** ⏳ **STILL OPEN**
+Job 169 prints Gasket 01 = 11.26 m and Gasket 02 = 6.294 m for a 1000 × 2000 single door. Our rule
+(Gasket 01 = 2 × Σ sash outer perimeter, Gasket 02 = Σ glass perimeter) is calibrated on Jobs
+85/88/90 and reproduces those jobs exactly.
+**Recommendation:** change nothing. Two documents disagree, both are production output, and
+swapping the rule would silently re-calibrate the casement family. Reconcile as its own pass with
+a job that itemises the gasket derivation.
 
 ## Resolved during planning
 

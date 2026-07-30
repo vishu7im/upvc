@@ -15,6 +15,9 @@ const GLASS_FILL = "#ffffff"; // glazed openings (clear)
 const STROKE = "#1f2937"; // near-black outline
 const SYMBOL_STROKE = "rgba(30,30,30,0.55)"; // opening-direction chevron
 const CILL_FILL = "#c9ccd1"; // darker grey so the cill reads distinct from the frame
+// Add-on (frame extension) band between the unit edge and the frame — the same
+// darker grey as the cill, since both are profiles attached OUTSIDE the frame.
+const ADDON_FILL = "#c9ccd1";
 const JOINT_STROKE = "rgba(31,41,55,0.85)"; // mitre / joint marker line
 // Drawing-only constants (NOT fabrication values): a small horizontal overhang
 // each side gives the cill its sill silhouette below the frame.
@@ -128,12 +131,23 @@ export function renderSvg(geometry: SolvedGeometry, opts?: RenderSvgOpts): strin
 
   const shapes: string[] = [];
 
+  // The rectangle the FRAME occupies. An add-on (frame extension) on an edge
+  // pushes the frame in from that edge, and the strip between the unit and the
+  // frame is the add-on itself (Job 169). Absent ⇒ the frame fills the unit, so
+  // every drawing below is byte-identical to pre-add-on output.
+  const frameOuter = geometry.frameRect ?? geometry.outer;
+
   if (skin) {
     shapes.push(...realisticBody(geometry, skin));
   } else {
+    // Add-on band — drawn first, so the frame paints over its inner edge. Tagged
+    // like the joints layer so a reader (and the tests) can find it.
+    if (geometry.frameRect) {
+      shapes.push(`<g id="addon">${rect(geometry.outer, ADDON_FILL, ink.stroke, 1 * ink.lw)}</g>`);
+    }
     // Outer frame — the whole window starts as profile-grey; the daylight
     // opening is then "cut" as clear glass on top.
-    shapes.push(rect(geometry.outer, ink.profile, ink.stroke, 2 * ink.lw));
+    shapes.push(rect(frameOuter, ink.profile, ink.stroke, 2 * ink.lw));
     // Dual-colour hint: a thin liner just inside the frame face carries the INSIDE
     // colour, so a white-in / anthracite-out finish reads at a glance. Single
     // colour (or none) ⇒ not drawn, so the SVG is unchanged.
@@ -155,7 +169,7 @@ export function renderSvg(geometry: SolvedGeometry, opts?: RenderSvgOpts): strin
     // own cells, and painting one over the leaf's chevron would clip it.
     const symbols: string[] = [];
     for (const c of geometry.cells) {
-      drawCell(c, shapes, symbols, ink, geometry.outer);
+      drawCell(c, shapes, symbols, ink, frameOuter);
     }
     shapes.push(...symbols);
   }
@@ -348,9 +362,16 @@ function realisticBody(geometry: SolvedGeometry, skin: Skin): string[] {
   // The daylight starts as one sheet of glass; every profile is painted over it.
   out.push(glassPane(geometry.rootDaylight, skin));
 
+  // Add-on band (frame extension) — a flat face outside the frame ring, so the
+  // frame's mitres still read as the unit's corners. Absent ⇒ nothing drawn.
+  const frameOuter = geometry.frameRect ?? geometry.outer;
+  if (geometry.frameRect) {
+    out.push(`<g id="addon">${fill(geometry.outer, ADDON_FILL)}${outline(geometry.outer, REALISTIC_EDGE, 1.4)}</g>`);
+  }
+
   // Outer frame ring + the unit's own edge.
-  out.push(...bandFaces(geometry.outer, geometry.rootDaylight, skin.id, grain, skin.base));
-  out.push(outline(geometry.outer, REALISTIC_EDGE, 1.4));
+  out.push(...bandFaces(frameOuter, geometry.rootDaylight, skin.id, grain, skin.base));
+  out.push(outline(frameOuter, REALISTIC_EDGE, 1.4));
 
   for (const t of geometry.transoms) out.push(...barFaces(t.rect, "h", skin, grain));
   for (const m of geometry.mullions) out.push(...barFaces(m.rect, "v", skin, grain));
@@ -376,7 +397,7 @@ function realisticBody(geometry: SolvedGeometry, skin: Skin): string[] {
       out.push(glassPane(c.glassRect, skin));
     }
 
-    const symbol = openingSymbol(c, geometry.outer, REALISTIC_SYMBOL);
+    const symbol = openingSymbol(c, frameOuter, REALISTIC_SYMBOL);
     if (symbol) symbols.push(symbol);
   }
   out.push(...symbols);
@@ -532,15 +553,17 @@ function darken(hex: string, amount: number): string {
 function jointLayer(geometry: SolvedGeometry): string {
   const parts: string[] = [];
 
-  // Frame mitres (face = gap between outer rect and the daylight opening).
+  // Frame mitres (face = gap between the FRAME rect and the daylight opening —
+  // an add-on sits outside the frame and is not part of the welded ring).
+  const frameOuter = geometry.frameRect ?? geometry.outer;
   const face = Math.max(
     1,
     Math.min(
-      geometry.rootDaylight.x - geometry.outer.x,
-      geometry.rootDaylight.y - geometry.outer.y,
+      geometry.rootDaylight.x - frameOuter.x,
+      geometry.rootDaylight.y - frameOuter.y,
     ),
   );
-  parts.push(...mitreCorners(geometry.outer, face));
+  parts.push(...mitreCorners(frameOuter, face));
 
   // Sash mitres — the sash ring face (sashOuter → sashInner) per opening cell.
   for (const c of geometry.cells) {
@@ -641,7 +664,7 @@ function handleLayer(geometry: SolvedGeometry, mirror: (r: Rect) => Rect): strin
   const parts: string[] = [];
   for (const c of geometry.cells) {
     if (!c.sashOuter || !c.sashInner) continue;
-    const side = handleSide(c, geometry.outer);
+    const side = handleSide(c, geometry.frameRect ?? geometry.outer);
     if (!side) continue;
     const outerR = c.sashOuter;
     const innerR = c.sashInner;
@@ -714,7 +737,11 @@ function annotationLayer(
 ): string {
   const showFaces = opts.faceWidths !== false;
   const showGlass = opts.glassSizes !== false;
-  const { outer, rootDaylight: day } = geometry;
+  const { rootDaylight: day } = geometry;
+  // Frame faces are measured from the FRAME rect, not the unit — an add-on band
+  // outside it is a separate profile, not part of the frame's sightline.
+  // Identical to `outer` when no add-on is fitted.
+  const outer = geometry.frameRect ?? geometry.outer;
   const base = clampNum(Math.min(outer.w, outer.h) * 0.028, 18, 60);
   const parts: string[] = [];
 

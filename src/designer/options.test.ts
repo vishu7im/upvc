@@ -185,7 +185,7 @@ export function validateOptionSystem(expect: Expect): void {
   // ---- 5. Golden-rule bookkeeping -----------------------------------
   // Uncalibrated options must be honest: pricingMode "none" AND a helpText that
   // says why, so nothing silently pretends to fabricate.
-  const uncalibrated = ["profile.addon", "hardware.locking", "hardware.hinge", "hardware.ventilator", "general.drainage", "glazing.method"];
+  const uncalibrated = ["hardware.locking", "hardware.hinge", "hardware.ventilator", "general.drainage", "glazing.method"];
   for (const key of uncalibrated) {
     const o = options.find((x) => x.key === key);
     expect(`${key} is priced "none"`, o?.pricingMode, "none");
@@ -197,6 +197,37 @@ export function validateOptionSystem(expect: Expect): void {
     noneEffects.every((c) => c.engineEffect?.kind === "none"),
     true,
   );
+
+  // The four add-on options are a different shape of honesty: they DO fabricate
+  // (Job 169 calibrates the frame inset) but they are priced "none", because the
+  // reference Cutting List itemises no row for the add-on profile itself and its
+  // own bar length is unevidenced (questions.md Q21).
+  for (const side of ["top", "bottom", "left", "right"]) {
+    const key = `profile.addon-${side}`;
+    const o = options.find((x) => x.key === key);
+    expect(`${key} exists`, Boolean(o), true);
+    expect(`${key} is priced "none"`, o?.pricingMode, "none");
+    expect(`${key} explains itself`, (o?.presentation?.helpText ?? "").length > 0, true);
+    const mine = choices.filter((c) => c.optionKey === key);
+    expect(`${key} defaults to no add-on`, mine.find((c) => c.isDefault)?.engineEffect?.kind, "none");
+    const fitted = mine.filter((c) => !c.isDefault);
+    expect(`${key} offers at least one add-on`, fitted.length > 0, true);
+    expect(
+      `${key} choices target their own side`,
+      fitted.every((c) => c.engineEffect?.kind === "addon" && c.engineEffect.params?.side === side),
+      true,
+    );
+  }
+  // Both families must offer them — the reference shows the same four rows on
+  // windows and on doors ("they will be common for all other profile").
+  for (const side of ["top", "bottom", "left", "right"]) {
+    const o = options.find((x) => x.key === `profile.addon-${side}`);
+    expect(
+      `add-on ${side} is shared by both families`,
+      [...(o?.familyKeys ?? [])].sort().join(","),
+      "casement-window,entrance-door",
+    );
+  }
 
   // ---- 6. The public payload carries no supplier money --------------
   const moneyKey = findMoneyKey({ family, optionSystem });

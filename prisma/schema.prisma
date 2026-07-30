@@ -90,6 +90,11 @@ model ProfilePart {
   jointType    String?
   // Reinforcement
   endClearance Decimal? @db.Decimal(10, 4)
+  // Reinforcement: minimum host-bar Int length (mm) at or above which this
+  // steel is fitted. NULL ⇒ always fitted, which is every pre-Job-169 row, so
+  // the additive migration leaves engine output byte-identical.
+  // See src/types.ts Reinforcement.minBarLengthMm.
+  minBarLengthMm Decimal? @db.Decimal(10, 4)
 
   // Per-profile colour-tier prices (supplier price lists, M5.5). The supplier
   // lists visible profiles in three absolute price tiers — White (the `cost`/

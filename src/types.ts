@@ -100,6 +100,20 @@ export interface Reinforcement extends ProfileSection {
    * (sliding patio, Jobs 44/48: −15 ⇒ length = bar Int + 30 on every bar).
    */
   endClearance: number;
+  /**
+   * Minimum bar Int length (mm) at or above which this steel is fitted. The
+   * manual reinforces the lighter dividers only on long runs — T-transom
+   * SPQ-05-20252 above 1.5 m, mullion SPQ-5-30252 / Z SPQ-005-30252 above 1 m
+   * (HAWDIO p17/PDF 18; recorded under "Master PDF findings" in CLAUDE.md).
+   * Job 169 confirms the direction: its 78 mm divider carries 26×26 U steel at
+   * Int 1710 (pages 3, 5) and none at Int 685/710 (pages 1, 2, 4). The document
+   * brackets the threshold between 710 and 1710 rather than pinning it, so the
+   * printed manual figure is what is encoded (Spec/questions.md Q23).
+   *
+   * ABSENT ⇒ always reinforced, which is every pre-Job-169 behaviour, so the
+   * casement / French / sliding jobs are byte-identical.
+   */
+  minBarLengthMm?: number;
 }
 
 /**
@@ -117,6 +131,14 @@ export interface AuxiliaryProfile {
   per: "m";
   weight: number;
   financialCategory: string;
+  /**
+   * Elevation face width (mm), for the add-on (frame extension) profiles only —
+   * how far fitting this profile to a frame edge pushes the frame in from that
+   * edge (Job 169; see `SolvedGeometry.frameRect`). The sliding cut items have
+   * no face concept and leave it undefined; a profile without it cannot be
+   * selected as an add-on.
+   */
+  faceWidthMm?: number;
 }
 
 export interface Gasket {
@@ -332,6 +354,22 @@ export interface DocAdvisory {
   source?: string;
 }
 
+/**
+ * One row of the Work Order's "Main Options" block — the answered options for a
+ * line item, printed above the cut list so the shop floor can see which colour,
+ * frame, hardware and glass the numbers below belong to. The reference work
+ * order opens with exactly this table (Job 169, all 5 pages).
+ *
+ * Plain data, like `DocBranding` / `DocBasket` / `DocAdvisory`: the engine
+ * computes none of it — the Designer's resolver already knows the answers, and
+ * `src/api/orders.ts` hands them over. Omitted / empty ⇒ no block ⇒
+ * byte-identical output.
+ */
+export interface DocOption {
+  label: string;
+  value: string;
+}
+
 /** Project-level financial & display settings (Phase 1: GBP, 20% tax, 75% markup, 10% wastage). */
 export interface Settings {
   currency: string;       // "GBP"
@@ -417,6 +455,8 @@ export type CellNode =
       /** y position in millimetres FROM TOP, on a 1000-tall canonical canvas. Scaled at solve time. */
       splitAtRatio: number;
       transomKey: string;        // which transom profile to use
+      /** How this divider joins the frame; absent ⇒ "welded". See `JointMethod`. */
+      jointMethod?: JointMethod;
       top: CellNode;
       bottom: CellNode;
     }
@@ -424,6 +464,8 @@ export type CellNode =
       kind: "vsplit";
       splitAtRatio: number;
       mullionKey: string;
+      /** How this divider joins the frame; absent ⇒ "welded". See `JointMethod`. */
+      jointMethod?: JointMethod;
       left: CellNode;
       right: CellNode;
     }
@@ -456,6 +498,18 @@ export interface Design {
   name: string;              // e.g. "Casement: top sash + fixed below"
   productType: "window" | "door";
   frameKey: string;          // default frame profile to use
+  /**
+   * Per-EDGE frame profile overrides. The reference configurator offers
+   * `Frame (Standard) (Top|Bottom|Left|Right)` as four independent dropdowns
+   * (Job 169 prints all four in Main Options), and on this system they differ:
+   * `frame-5ch` is face 64 and `frame-6ch` face 68, so a mixed selection really
+   * does change the cut.
+   *
+   * An absent side falls back to `frameKey`. All four absent (or all equal) ⇒
+   * the single-profile behaviour, which is every design that exists today —
+   * byte-identical.
+   */
+  frameKeys?: FrameEdgeKeys;
   topology: CellNode;
   /** Drawing-only SVG you may have for this design (optional). */
   svgPreview?: string;
@@ -468,6 +522,31 @@ export interface Design {
    */
   defaultWidthMm?: number;
   defaultHeightMm?: number;
+}
+
+/**
+ * How a transom/mullion joins the frame — the reference's
+ * `Joint (Structural T/Z)` row, orthogonal to `TransomSection.jointType`
+ * (which selects the PROFILE: T, Z or S).
+ *
+ * "welded" is the calibrated behaviour on every reference job we hold: horns
+ * into the side walls, `Ext = Int + 2 × face`. "mechanical" (a screwed butt
+ * joint) is offered by the reference but appears in NO production document, so
+ * its deduction is unknown — the engine cuts it as welded and the resolver
+ * raises a warning that the work order prints (Spec/questions.md Q22). Absent
+ * ⇒ "welded", so every existing design is byte-identical.
+ */
+export type JointMethod = "welded" | "mechanical";
+
+/** The four outer-frame edges. */
+export type FrameEdge = "top" | "bottom" | "left" | "right";
+
+/** A frame profile partKey per outer-frame edge; absent ⇒ the design default. */
+export interface FrameEdgeKeys {
+  top?: string;
+  bottom?: string;
+  left?: string;
+  right?: string;
 }
 
 // ---------- Solved geometry: rectangles ready for SVG & cutting -----
@@ -504,6 +583,12 @@ export interface SolvedTransom {
   /** Visible Int length. */
   intLengthMm: number;
   jointType: "T" | "Z" | "S";
+  /**
+   * How this divider joins the frame (`JointMethod`). Only set when the design
+   * asks for something other than the calibrated welded joint, so absent ⇒
+   * welded ⇒ byte-identical.
+   */
+  jointMethod?: JointMethod;
 }
 
 export interface SolvedMullion {
@@ -513,11 +598,28 @@ export interface SolvedMullion {
   extLengthMm: number;
   intLengthMm: number;
   jointType: "T" | "Z" | "S";
+  /** See `SolvedTransom.jointMethod`; absent ⇒ welded ⇒ byte-identical. */
+  jointMethod?: JointMethod;
 }
 
 /** Fully solved geometry produced by the topology solver. */
 export interface SolvedGeometry {
   outer: Rect;
+  /**
+   * The rectangle the OUTER FRAME occupies. Normally identical to `outer`, but
+   * an add-on (frame extension) profile fitted to an edge pushes the frame in
+   * from that edge by the add-on's face width — so the unit still measures
+   * `outer`, while the frame (and therefore daylight, sash, bead, glass and
+   * steel) is built to this smaller rectangle.
+   *
+   * Calibrated by Job 169 (collections/doors/, 5 pages, 1000×2000, 25 mm
+   * SPQ-2-75252 on each of the four edges in turn): frame prints 1005/1980 with
+   * a top or bottom add-on and 980/2005 with a left or right one.
+   *
+   * ABSENT ⇒ the frame fills `outer`, which is every pre-add-on quote — so
+   * omitting it is byte-identical.
+   */
+  frameRect?: Rect;
   /** Daylight rect inside the frame face. */
   rootDaylight: Rect;
   cells: SolvedCell[];
@@ -781,6 +883,31 @@ export interface QuoteInput {
    * never mutated. Omitted ⇒ the design's own topology, byte-identical.
    */
   topologyOverride?: CellNode;
+  /**
+   * Per-quote add-on (frame extension) profiles, one per frame edge. The value
+   * is an `auxiliaries` partKey (e.g. "aux-ext-25"); fitting one pushes the
+   * frame in from that edge by the profile's `faceWidthMm`, leaving the overall
+   * unit size unchanged — see `SolvedGeometry.frameRect` for the Job 169
+   * calibration. The add-on itself emits NO cut row: the reference Cutting List
+   * itemises none, and its own bar length is unevidenced (Spec/questions.md
+   * Q21). Omitted/empty ⇒ the frame fills the unit, byte-identical.
+   */
+  addons?: AddonSelection;
+  /**
+   * Per-quote per-EDGE frame profile overrides, merged over the design's own
+   * `frameKeys` (which are themselves merged over `frameKey`). Same
+   * clone-on-override pattern as `frameKey`. Omitted ⇒ the design's frames,
+   * byte-identical.
+   */
+  frameKeys?: FrameEdgeKeys;
+}
+
+/** Add-on (frame extension) partKey per frame edge. */
+export interface AddonSelection {
+  top?: string;
+  bottom?: string;
+  left?: string;
+  right?: string;
 }
 
 export interface QuoteOutput {
@@ -791,6 +918,13 @@ export interface QuoteOutput {
   /** Solved geometry — everything you need to draw the preview. */
   geometry: {
     outer: Rect;
+    /**
+     * The rectangle the outer FRAME occupies — smaller than `outer` when an
+     * add-on (frame extension) is fitted to an edge (see
+     * `SolvedGeometry.frameRect`). Absent ⇒ the frame fills the unit, which is
+     * every quote without add-ons, so the payload is byte-identical.
+     */
+    frameRect?: Rect;
     cells: SolvedCell[];
     transoms: SolvedTransom[];
     mullions: SolvedMullion[];

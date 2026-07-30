@@ -12,8 +12,9 @@ BOM, Price Summary).
 The fabrication engine is **already calibrated** against real reference jobs: Quotila 85/88/90
 (casement + single door), Jobs 44/48 "Andrei UK" (sliding patio — these superseded the earlier
 Job 104 yogi-test calibration) and Job 00000264 (French door).
-`npm run validate` currently runs **950 assertions** (947 green + 3 pre-existing DB weld-drift
-failures — see memory/validate-weld-drift.md; they are not a regression signal).
+`npm run validate` currently runs **1129 assertions, all green**. (The 3 weld-drift failures that
+were red for months turned out to be DB data, not engine math — fixed by migration
+`20260730020000_fix_weld_allowance_drift`; see memory/validate-weld-drift.md.)
 
 ## Tech stack (confirmed with the owner)
 
@@ -79,8 +80,8 @@ npm run prisma:generate  # (migrate already does this)
 # 3. Seed catalog + products + 503 designs + admin user:
 npm run db:seed          # prints the seeded admin email/password
 
-# 4. Prove the engine is intact (baseline: ~481 passed, 3 pre-existing weld-drift
-#    failures — see memory/validate-weld-drift.md; price assertions SKIP until step 4b):
+# 4. Prove the engine is intact (price assertions SKIP until step 4b; everything
+#    else must be green — the baseline is 0 failures):
 npm run validate         # geometry + custom-mode + extractor + pricing + svg + supplier-price
 
 # 4b. (M5.5) Import the supplier price lists → catalog cost/price + 1P/2P tiers + provenance:
@@ -188,7 +189,8 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
   `src/designer/resolve.test.ts#validateDesigner` (Designer D2, extended in D7 with
   `validateSecondFamily`; both designer DB suites SKIP on a DB that predates the D1 seed) and the
   DB-free `src/designer/basket.test.ts#validateBasket` (D6). Current baseline:
-  **947 passed, 3 pre-existing DB weld-drift failures** (see memory/validate-weld-drift.md — not a regression).
+  **1129 passed, 0 failed** (the old 3-failure weld baseline was DB drift; see
+  memory/validate-weld-drift.md).
 - `src/designer/basket.ts` — **the only place order-level money is derived** (D6): items subtotal →
   discount → extras → tax → grand total, pure, with `basket.test.ts` (65 assertions) beside it.
   `src/api/order-basket.ts` is its I/O half (prices an order's items, loads the discount row).
@@ -353,6 +355,14 @@ sub-milestone at a time. Full breakdown in "## Phase 2 — UI frontend" below.*
       (and print on the work order), and the owner's real stock list seeds **128** hardware rows
       with finish/style/hand filter chips. A follow-up correction (Job 154) made a divider dropped
       into a sash a MIDRAIL, so the opener survives. **947 assertions.** See "## Designer — D9".
+- [x] **Doors module (Task 3) — add-ons, per-edge profiles, hardware pictures.** Calibrated from
+      the owner's `collections/doors/` package and **Job 169** (a 5-page 1000 × 2000 door Work
+      Order): `SolvedGeometry.frameRect` so an add-on can push the frame in from any edge (windows
+      AND doors), a frame profile per edge + a joint method per divider, length-dependent
+      reinforcement, a generated picture for all 128 hardware rows with an admin photo override,
+      full door option parity (37 options) and a "Main Options" block on the work order.
+      **1129 assertions, 0 failed** — the 3 weld-drift failures were DB data and are fixed. Plan and
+      audit in `Spec/03-doors-module/`. See "## Doors module (Job 169)" below.
 - [x] **D7 — Extensibility proof (`entrance-door`).** A second product family added as pure seed
       data: `src/catalog/families/entrance-door.ts` + `src/catalog/options/doors.ts`, sharing 13
       family-agnostic options through `familyKeys` instead of copying them. **Zero `web/`
@@ -1536,6 +1546,94 @@ ways) and `jobs.ts#validateAdvisories` +5 (the band prints its message/citation/
 Plus 38 live assertions against the running engine + Postgres — including the two that matter: the
 opening chevron **survives** a transom (one chevron, not one per pane, not none), and a
 **4050 × 1040 designer item now confirms** with the `HAWDIO p70` note on its work order.
+
+## Doors module (Job 169) — add-ons, per-edge profiles, hardware pictures
+
+Owner package `collections/doors/` (2026-07-30): 14 screenshots of the reference configurator's
+door product, `lineitems.json` (its own 41-row option payload), and **Job 169** — a 5-page Work
+Order + Cutting List + Glass Order, every page a 1000 × 2000 single door. Full plan and audit in
+`Spec/03-doors-module/`.
+
+**Job 169 validates the catalog rather than changing it.** Every printed number reproduces from
+values already calibrated: `frame-6ch` face 68 and `sash-door-z` face 105 / overlap 28 (Job 90),
+`Ext = Int + 2 × face` for a midrail (Job 00000264), bead = pane + 40, glass = pane + 30, sash
+steel = ring Int, and 2.5 mm per welded end. It also confirms the D9 midrail rule from a third
+party: all five pages carry ONE sash ring and ONE handle / lock / cylinder / 3 hinges, whichever
+divider button was pressed. Two findings are new.
+
+**1. Add-on (frame extension) profiles, per edge — for windows AND doors.**
+A 25 mm `SPQ-2-75252` on an edge shortens the frame by exactly 25 mm on the **perpendicular** axis
+and leaves the parallel axis alone; the unit size is unchanged. Verified independently on all four
+edges (frame prints 1005/1980 top or bottom, 980/2005 left or right). That resolves the long-open
+`Spec/questions.md` **Q6**.
+
+The engine gained ONE concept: **`SolvedGeometry.frameRect`** — the rectangle the frame occupies,
+absent (⇒ `outer`) unless an add-on pushes it in, so every pre-existing quote is byte-identical.
+`solveTopology` derives `rootDaylight` from it and walks with the FRAME's dimensions, which is why
+split ratios are now frame-relative — exactly what the document prints (p1: 375 + 1600 = 1975, the
+frame height, not the 2000 unit). `emitFrameBars` already took `W, H`, so it just receives the
+frame rect's; `renderSvg` draws a tagged `<g id="addon">` band between the unit and the frame.
+`QuoteInput.addons` + an `addon` engine effect carry the four seeded per-edge options, shared by
+both families through `adoptShared()`. **The add-on emits NO cut row** — the reference Cutting List
+itemises none and its own bar length is unevidenced (owner decision; new **Q21**).
+
+**2. Reinforcement is length-dependent.** The 78 mm `SPQ-5-30252` divider carries its 26×26 U steel
+at Int 1710 (pages 3, 5) and **none** at Int 685/710 (pages 1, 2, 4) — the manual's ">1 m" rule
+(HAWDIO p17/PDF 18), now evidenced by a production document. `Reinforcement.minBarLengthMm` (absent
+⇒ always fitted) is set on `reinf-26x26-u` only; the manual states the same rule for two other
+profiles but no production doc shows it, and the calibrated Quotila jobs win there (**Q23**).
+
+**3. A frame profile per edge, a joint method per divider.** `Design.frameKeys` /
+`QuoteInput.frameKeys` override `frameKey` one side at a time (the reference's four
+`Frame (Standard)` rows, printed in Job 169's Main Options). Each bar's Int loses the face of the
+profile at each of its two ends — the PERPENDICULAR edges — which reduces to the old
+`W − 2 × faceWidth` whenever all four match, i.e. every design that exists. `CellNode.jointMethod`
+records Welded / Mechanical; **"Mechanical" is cut as welded** and raises a warning the D9 advisory
+band prints, because no production document gives its deduction (**Q22**).
+
+**4. Every hardware choice now shows the part.** The owner's report was *"its show with ui what its
+look for example handels but in our app its just text field"*. `OptionChoice.image` was already
+typed, migrated, seeded, loaded and served — with nothing writing it and nothing rendering it.
+Closed by three small pieces: **`src/catalog/glyphs.ts`** (pure, deterministic SVG per
+financialCategory × style chip × finish chip, reusing the very chips `hardware-filters.ts` already
+derives from supplier naming, so all 128 stock rows get a picture on day one),
+**`GET /api/catalog/assets/hardware/:partKey`** (public, like `/api/branding/logo`: object storage
+first, glyph on miss) and **`POST /api/catalog/:systemId/hardware/:partKey/image`** (admin, raw
+`image/*`). Key existence IS the override, so an uploaded photo needs no column and no reseed. The
+reference's own pictures are third-party CDN JPEGs (`media.bm-touch.co.uk`), which we do not
+hotlink; the only SVG in its payload is the window elevation.
+
+**5. Door option parity, honestly gated.** `GET /api/families/entrance-door` now serves **37
+options across 6 groups** — every row the reference offers. Real: the four hardware slots (handle
+54 / lock 9 / cylinder 15 / hinges 18, each with a picture and style + finish chips), the four
+frame edges, the divider profile, bead, cill, colours, glass. **Gated** `pricingMode:"none"` with a
+helpText saying why: hinge position (the engine fits the calibrated 3), restrictor and both
+ventilators (no part exists), glass decoration and gas fill (no part, no rule), opening direction,
+threshold, door sash profile, joint method.
+
+**Deviation from the reference, on purpose:** it splits hinges into `Hinge (Door)` and
+`Hinge Colour (Door)`. Two dropdowns writing ONE 1:1 substitution slot would conflict by
+construction, so our 17 hinge rows carry a **style chip** beside the finish chips instead — same
+two axes, one answer, no possible contradiction. Locks and cylinders got the same treatment.
+
+**6. The work order prints "Main Options".** An optional `DocOption[]` on `renderWorkOrder`, styled
+inline like `DocAdvisory` so the shared `STYLE` constant stays untouched; omitted **or empty** ⇒
+byte-identical. Fed from `ResolvedLineItem.summary.mainOptions`, printed in the inspector's own
+reading order (group, then option). Our confirm aggregates an order into ONE work order, so each
+row is prefixed with its item when there is more than one — an unprefixed value would claim to
+describe the whole order.
+
+**Validation.** `jobs.ts#validateJob169` reproduces all five pages (frame 1005/1980 and 980/2005,
+sash 925/1900 and 900/1925, dividers 871 / 846 / 1871 with the steel present only above 1 m, beads,
+glass, one handle/lock/cylinder/3 hinges per page, and no cut row for the add-on on any edge);
+`validatePerEdgeFrames` proves a 64/68 mix moves only its own side and that `mechanical` changes no
+cut; `catalog/glyphs.test.ts` (new, DB-free) proves the drawing is deterministic, covers every
+substitutable category and never throws; `svg.test.ts` proves the add-on band is additive.
+**947 → 1129 passed, and the 3 long-standing weld-drift failures are GONE** — Job 169 identified
+them as DB drift (`setting.weldAllowanceMm` was 0 where the catalog says 2.5, and four profiles
+carried 3 where the catalog says "inherit"), fixed by migration
+`20260730020000_fix_weld_allowance_drift`. **Deliberately NOT adopted:** the document's Gasket
+01/02 metreage, which contradicts Jobs 85/88/90 (**Q24**).
 
 ## Conventions
 

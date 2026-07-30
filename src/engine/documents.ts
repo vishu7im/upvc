@@ -6,7 +6,7 @@
 // Puppeteer or Playwright — the HTML is already print-ready.
 // =====================================================================
 
-import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, DocColour, DocBasket, DocAdvisory, BarPiece } from "../types.ts";
+import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, DocColour, DocBasket, DocAdvisory, DocOption, BarPiece } from "../types.ts";
 
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #28323c; margin: 32px; }
@@ -169,6 +169,29 @@ function advisoryBand(advisories?: DocAdvisory[]): string {
     </div>`;
 }
 
+/**
+ * The "Main Options" block — every option answered for this item, printed as a
+ * two-column table above the cut list. The reference work order opens with
+ * exactly this (Job 169, all 5 pages), and it is what tells the shop floor which
+ * colour, frame, hardware and glass the numbers below belong to.
+ *
+ * Additive, like `DocBranding` / `DocBasket` / `DocAdvisory`: omitted OR empty
+ * ⇒ "", so a work order rendered without it is byte-identical. Styled inline
+ * for the same reason `advisoryBand` is — adding rules to the shared STYLE
+ * constant would change the bytes of every other document.
+ */
+function mainOptionsBlock(options?: DocOption[]): string {
+  if (!options || options.length === 0) return "";
+  const rows = options
+    .map(
+      (o) =>
+        `<tr><td style="width:38%;">${esc(o.label)}</td><td>${esc(o.value)}</td></tr>`,
+    )
+    .join("");
+  return `<div class="section-title">Main Options</div>
+    <table><tbody>${rows}</tbody></table>`;
+}
+
 function header(input: QuoteInput, title: string, systemName: string, designName: string, branding?: DocBranding, images?: DocImage[], cill?: DocCill, colour?: DocColour): string {
   const today = new Date().toLocaleDateString("en-GB");
   return `
@@ -200,6 +223,7 @@ export function renderWorkOrder(
   cill?: DocCill,
   colour?: DocColour,
   advisories?: DocAdvisory[],
+  mainOptions?: DocOption[],
 ): string {
   // Club identical pieces into qty rows (e.g. a frame's 4 bars → 2 rows × qty 2).
   const len = (b: BarPiece) => barLen(b, variant);
@@ -256,6 +280,7 @@ export function renderWorkOrder(
   return wrap("Work Order" + variantSuffix(variant), `
     ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill, colour)}${advisoryBand(advisories)}
     ${weldNote(variant)}
+${mainOptionsBlock(mainOptions)}
 
     <div class="section-title">Sections Required</div>
     <table>

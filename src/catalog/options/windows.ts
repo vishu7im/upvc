@@ -66,6 +66,11 @@ export const WINDOW_OPTION_GROUPS: OptionGroup[] = [
 /** Casement units never use the sliding or French-specific profiles. */
 const CASEMENT_FRAME_KEYS = ["frame-5ch", "frame-6ch"] as const;
 const CASEMENT_BEAD_KEYS = ["bead-28", "bead-32"] as const;
+/** Divider sections a casement/door unit can use (not the French stulp). */
+const CASEMENT_DIVIDER_KEYS = ["transom-t-67", "transom-z-67", "mullion-78", "mullion-75"] as const;
+
+/** The four frame edges an add-on (frame extension) can be fitted to (Job 169). */
+const ADDON_SIDES = ["top", "bottom", "left", "right"] as const;
 
 /** The sash kinds a casement cell can hold (Tilt&Turn is a separate family). */
 const CASEMENT_SASH_KINDS: { kind: SashKind; label: string }[] = [
@@ -85,6 +90,17 @@ const LOCATION_SUGGESTIONS = [
   "En-suite", "Cloakroom", "Bedroom 1", "Bedroom 2", "Bedroom 3", "Utility",
   "Garage", "Conservatory", "Porch", "Loft",
 ];
+
+/**
+ * The picture a hardware choice shows. `catalog-asset` resolves through
+ * `GET /api/catalog/assets/hardware/:partKey`, which serves an admin-uploaded
+ * product photo when one exists and the deterministic glyph from
+ * `src/catalog/glyphs.ts` otherwise — so every row has a picture immediately
+ * and a real photo can replace any one of them with no reseed.
+ */
+export function hardwareImage(partKey: string): OptionChoice["image"] {
+  return { kind: "catalog-asset", ref: `hardware/${partKey}` };
+}
 
 /** Only one choice per option may be the default (asserted by the seed). */
 function opt(def: OptionDef): OptionDef {
@@ -152,10 +168,10 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
     }
   }
 
-  // Frame chamber. The engine's per-item override is `frameKey` (order_item
-  // column), so this is an ITEM-level option — the manual publishes no per-side
-  // frame profile rule and the engine has no per-edge frame slot, so scoping it
-  // to `frame-edge` would promise something no calibrated rule can deliver.
+  // Frame chamber — the whole frame at once (the engine's `frameKey`). The
+  // per-EDGE rows below override it one side at a time; both exist because a
+  // saved draft may answer either, and answering all four edges individually to
+  // change one profile would be tedious.
   options.push(
     opt({
       key: "profile.frame-chamber",
@@ -183,6 +199,130 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
       isDefault: false, // unset ⇒ the design's baked frame (byte-identical)
       partKey: key,
       engineEffect: { kind: "profile-substitution", params: { slot: "frame" } },
+    });
+  }
+
+  // Frame profile PER EDGE — the reference's four `Frame (Standard) (Top|
+  // Bottom|Left|Right)` rows, printed in Main Options on every page of Job 169.
+  // On this system the two frames differ (frame-5ch face 64, frame-6ch face
+  // 68), so a mixed selection really does change the cut: each bar's Int loses
+  // the face of the profile at each of its two ends, which are the
+  // PERPENDICULAR edges. Unanswered ⇒ the frame chamber above ⇒ the design's
+  // own frame, byte-identical.
+  for (const [i, side] of ADDON_SIDES.entries()) {
+    const optionKey = `profile.frame-${side}`;
+    options.push(
+      opt({
+        key: optionKey,
+        groupKey: "profile-ancillary",
+        name: `Frame (Standard) (${side[0].toUpperCase()}${side.slice(1)})`,
+        order: 31 + i,
+        display: "select",
+        required: false,
+        scope: { level: "item" },
+        pricingMode: "catalog",
+        presentation: {
+          helpText:
+            `Overrides the frame chamber on the ${side} edge only. Unset ⇒ whatever the frame ` +
+            "chamber above resolves to.",
+        },
+        familyKeys: [FAMILY],
+      }),
+    );
+    for (const [j, key] of CASEMENT_FRAME_KEYS.entries()) {
+      const frame = sys.frames[key];
+      if (!frame) continue;
+      choices.push({
+        key: `frame-${side}-${key}`,
+        optionKey,
+        label: frame.name,
+        order: (j + 1) * 10,
+        isDefault: false, // unset ⇒ the design's baked frame (byte-identical)
+        partKey: key,
+        engineEffect: { kind: "profile-substitution", params: { slot: "frame", side } },
+      });
+    }
+  }
+
+  // Divider profile — swap ONE transom/mullion's section (the reference's
+  // per-divider `Transom` and `Mullion` rows). Component-scoped, because a unit
+  // with a fanlight and a sidelight can legitimately use different sections.
+  options.push(
+    opt({
+      key: "profile.divider",
+      groupKey: "profile-ancillary",
+      name: "Divider profile",
+      order: 36,
+      display: "select",
+      required: false,
+      scope: {
+        level: "component",
+        componentTypes: ["transom", "mullion"],
+        applyScopes: ["this", "all-of-type"],
+      },
+      pricingMode: "catalog",
+      presentation: {
+        helpText: "Unset ⇒ the section the design was drawn with.",
+      },
+      familyKeys: [FAMILY],
+    }),
+  );
+  for (const [i, key] of CASEMENT_DIVIDER_KEYS.entries()) {
+    const t = sys.transoms[key];
+    if (!t) continue;
+    choices.push({
+      key: `divider-${key}`,
+      optionKey: "profile.divider",
+      label: t.name,
+      order: (i + 1) * 10,
+      isDefault: false,
+      partKey: key,
+      engineEffect: { kind: "topology-edit", params: { op: "set-divider" } },
+    });
+  }
+
+  // Joint method — the reference's `Joint (Structural T/Z)` row. Orthogonal to
+  // the T/Z/S `jointType`, which the PROFILE carries.
+  //
+  // GOLDEN RULE: "Welded" is the calibrated cut on every reference job we hold
+  // (horns, Ext = Int + 2 × face). "Mechanical" appears in NO production
+  // document, so its deduction is unknown — the engine cuts it as welded and
+  // the resolver raises a warning that the work order prints, rather than
+  // inventing a length or hiding the option (questions.md Q22).
+  options.push(
+    opt({
+      key: "profile.joint-method",
+      groupKey: "profile-ancillary",
+      name: "Joint (Structural T/Z)",
+      order: 37,
+      display: "segmented",
+      required: false,
+      scope: {
+        level: "component",
+        componentTypes: ["transom", "mullion"],
+        applyScopes: ["this", "all-of-type"],
+      },
+      pricingMode: "none",
+      presentation: {
+        helpText:
+          "Welded is the calibrated joint (horned bar, Ext = Int + 2 × face). Mechanical is " +
+          "recorded and printed but has no calibrated deduction, so the bar is still cut as " +
+          "welded and the work order says so (questions.md Q22).",
+      },
+      familyKeys: [FAMILY],
+    }),
+  );
+  for (const [i, m] of ([
+    ["welded", "Welded (Standard)"],
+    ["mechanical", "Mechanical (Standard)"],
+  ] as const).entries()) {
+    choices.push({
+      key: `joint-method-${m[0]}`,
+      optionKey: "profile.joint-method",
+      label: m[1],
+      order: (i + 1) * 10,
+      isDefault: false, // unset ⇒ welded ⇒ byte-identical
+      engineEffect: { kind: "topology-edit", params: { op: "set-divider", jointMethod: m[0] } },
     });
   }
 
@@ -253,37 +393,69 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
     });
   }
 
-  // Add-on profiles (frame extenders). The 25 mm extension SPQ-2-75252 and the
-  // coupling SPQ-2-72252 EXIST in the catalog (migration phase 2, HAWDIO p13)
-  // but no calibrated cut rule does — an add-on changes the frame Ext sizes and
-  // no reference job or supplier doc gives that rule. So the option ships with
-  // "No add-on" only (questions.md Q6). Adding real choices requires the rule.
-  options.push(
-    opt({
-      key: "profile.addon",
-      groupKey: "profile-ancillary",
-      name: "Add-on profile",
-      order: 60,
-      display: "select",
-      required: false,
-      scope: { level: "component", componentTypes: ["frame-edge"], applyScopes: ["this", "all-of-type"] },
-      pricingMode: "none",
-      presentation: {
-        helpText:
-          "Frame extension / coupling profiles are in the catalog (HAWDIO p13) but have no " +
-          "calibrated cut rule yet, so no add-on can be fitted. Gated on questions.md Q6.",
-      },
-      familyKeys: [FAMILY],
-    }),
-  );
-  choices.push({
-    key: "addon-none",
-    optionKey: "profile.addon",
-    label: "No add-on",
-    order: 0,
-    isDefault: true,
-    engineEffect: { kind: "none" },
-  });
+  // Add-on profiles (frame extenders), one per frame edge — the same four rows
+  // the reference shows for windows AND doors.
+  //
+  // CALIBRATED by Job 169 (collections/doors/, 5 pages, 1000×2000, a 25 mm
+  // SPQ-2-75252 on each edge in turn): fitting one pushes the frame in by
+  // exactly the profile's face on the perpendicular axis, leaving the unit size
+  // unchanged. That resolves questions.md Q6.
+  //
+  // The choices are GENERATED from the live catalog, like every other profile
+  // option: any auxiliary carrying a `faceWidthMm` is fittable, and one that
+  // does not (the sliding cut items, the coupling and bay/bow parts) cannot be
+  // offered — there is no rule for how far it insets the frame.
+  //
+  // pricingMode "none": the reference Cutting List itemises NO row for the
+  // add-on profile itself, so we emit none either and it cannot be priced per
+  // metre. Its own bar length is unevidenced (questions.md Q21).
+  const addonParts = Object.entries(sys.auxiliaries ?? {})
+    .filter(([, a]) => a.faceWidthMm !== undefined)
+    .sort(([, a], [, b]) => a.name.localeCompare(b.name));
+
+  for (const [i, side] of ADDON_SIDES.entries()) {
+    const optionKey = `profile.addon-${side}`;
+    options.push(
+      opt({
+        key: optionKey,
+        groupKey: "profile-ancillary",
+        name: `Add-on (${side[0].toUpperCase()}${side.slice(1)})`,
+        order: 60 + i,
+        display: "select",
+        required: false,
+        scope: { level: "item" },
+        pricingMode: "none",
+        presentation: {
+          helpText:
+            `A frame extension fitted to the ${side} edge. The unit size is unchanged; the ` +
+            `frame is built ${side === "top" || side === "bottom" ? "shorter" : "narrower"} by ` +
+            "the add-on's face, and daylight, sash, bead, glass and steel all follow (Job 169). " +
+            "The profile itself is not cut-listed — the reference document itemises no row for " +
+            "it and its own bar length is unevidenced (questions.md Q21).",
+        },
+        familyKeys: [FAMILY],
+      }),
+    );
+    choices.push({
+      key: `addon-${side}-none`,
+      optionKey,
+      label: "No Add-on",
+      order: 0,
+      isDefault: true,
+      engineEffect: { kind: "none" },
+    });
+    for (const [j, [partKey, aux]] of addonParts.entries()) {
+      choices.push({
+        key: `addon-${side}-${partKey}`,
+        optionKey,
+        label: `${aux.code} ${aux.faceWidthMm}mm`,
+        order: (j + 1) * 10,
+        isDefault: false,
+        partKey,
+        engineEffect: { kind: "addon", params: { side } },
+      });
+    }
+  }
 
   // Sash type — the per-cell opening kind (a topology edit, not a part swap).
   options.push(
@@ -331,6 +503,11 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
     order: (i + 1) * 10,
     isDefault: key === "hw-handle-inline", // the calibrated pick (Jobs 85/88/90)
     filterKeys: filterKeysFor(sys.hardware[key].name, handleFamilies),
+    // The picker shows what the part looks like. `catalog-asset` resolves
+    // through GET /api/catalog/assets/hardware/:partKey, which serves an
+    // admin-uploaded photo when one exists and a generated glyph otherwise
+    // (src/catalog/glyphs.ts) — so every row has a picture from day one.
+    image: hardwareImage(key),
     partKey: key,
     engineEffect: { kind: "hardware-substitution", params: { slot: "handle" } },
   }));

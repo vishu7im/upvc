@@ -17,8 +17,12 @@
 // =====================================================================
 
 import type {
+  AddonSelection,
   CellNode,
   Design,
+  FrameEdge,
+  FrameSection,
+  JointMethod,
   ProfileSystem,
   Rect,
   SashKind,
@@ -30,21 +34,87 @@ import type {
 
 export type { SolvedGeometry };
 
+/**
+ * Where the outer frame sits inside the unit, and how big it is.
+ *
+ * Without add-ons the frame fills the unit and this is `{0, 0, W, H}` — the
+ * pre-add-on behaviour, byte for byte. An add-on (frame extension) fitted to an
+ * edge pushes the frame in from that edge by the add-on's face width, so the
+ * unit still measures W × H while everything the frame contains is built to the
+ * smaller rectangle (Job 169; see `SolvedGeometry.frameRect`).
+ */
+export function frameRectFor(
+  widthMm: number,
+  heightMm: number,
+  system: ProfileSystem,
+  addons?: AddonSelection,
+): Rect {
+  const face = (key?: string): number => {
+    if (!key) return 0;
+    const aux = system.auxiliaries?.[key];
+    if (!aux) throw new Error(`Unknown add-on profile: ${key}`);
+    if (aux.faceWidthMm === undefined) {
+      throw new Error(`Add-on profile ${key} (${aux.code}) has no faceWidthMm — it cannot be fitted to a frame edge`);
+    }
+    return aux.faceWidthMm;
+  };
+
+  const top = face(addons?.top);
+  const bottom = face(addons?.bottom);
+  const left = face(addons?.left);
+  const right = face(addons?.right);
+
+  return {
+    x: left,
+    y: top,
+    w: widthMm - left - right,
+    h: heightMm - top - bottom,
+  };
+}
+
+/**
+ * The frame profile on each outer edge.
+ *
+ * The reference configurator offers a frame profile per edge (Job 169 prints
+ * all four in Main Options), and on this system they differ — `frame-5ch` is
+ * face 64, `frame-6ch` face 68. An absent side falls back to `design.frameKey`,
+ * so every design that exists today resolves to the same profile on all four
+ * edges and the geometry below is unchanged.
+ */
+export function framesForEdges(
+  design: Design,
+  system: ProfileSystem,
+): Record<FrameEdge, FrameSection> {
+  const pick = (side: FrameEdge): FrameSection => {
+    const key = design.frameKeys?.[side] ?? design.frameKey;
+    const frame = system.frames[key];
+    if (!frame) throw new Error(`Unknown frame: ${key}`);
+    return frame;
+  };
+  return { top: pick("top"), bottom: pick("bottom"), left: pick("left"), right: pick("right") };
+}
+
 export function solveTopology(
   design: Design,
   widthMm: number,
   heightMm: number,
   system: ProfileSystem,
+  addons?: AddonSelection,
 ): SolvedGeometry {
-  const frame = system.frames[design.frameKey];
-  if (!frame) throw new Error(`Unknown frame: ${design.frameKey}`);
+  const frames = framesForEdges(design, system);
 
   const outer: Rect = { x: 0, y: 0, w: widthMm, h: heightMm };
+  // The frame need not fill the unit — an add-on on an edge pushes it in.
+  // Absent add-ons ⇒ frameRect === outer ⇒ every line below is unchanged.
+  const frameRect = frameRectFor(widthMm, heightMm, system, addons);
+  // Each edge insets by its OWN frame face. Identical to the symmetric
+  // `2 × faceWidth` form when all four edges share a profile, which is every
+  // design that exists today.
   const rootDaylight: Rect = {
-    x: frame.faceWidth,
-    y: frame.faceWidth,
-    w: widthMm - 2 * frame.faceWidth,
-    h: heightMm - 2 * frame.faceWidth,
+    x: frameRect.x + frames.left.faceWidth,
+    y: frameRect.y + frames.top.faceWidth,
+    w: frameRect.w - frames.left.faceWidth - frames.right.faceWidth,
+    h: frameRect.h - frames.top.faceWidth - frames.bottom.faceWidth,
   };
 
   const result: SolvedGeometry = {
@@ -54,16 +124,19 @@ export function solveTopology(
     transoms: [],
     mullions: [],
   };
+  if (frameRect.w !== outer.w || frameRect.h !== outer.h) result.frameRect = frameRect;
 
   // Detect root-level Z-transom — this is what causes the jambs to break (Job 85).
   if (design.topology.kind === "hsplit") {
     const transom = system.transoms[design.topology.transomKey];
     if (transom?.jointType === "Z") {
-      result.jambsBrokenAtY = design.topology.splitAtRatio * heightMm;
+      // Split ratios are FRAME-relative (Job 169 p1 prints 375 + 1600 = 1975,
+      // the frame height, not the 2000 unit height).
+      result.jambsBrokenAtY = frameRect.y + design.topology.splitAtRatio * frameRect.h;
     }
   }
 
-  walk(design.topology, "root", rootDaylight, system, result, widthMm, heightMm);
+  walk(design.topology, "root", rootDaylight, system, result, frameRect);
 
   return result;
 }
@@ -81,8 +154,14 @@ function walk(
   bounds: Rect,
   system: ProfileSystem,
   out: SolvedGeometry,
-  windowW: number,
-  windowH: number,
+  /**
+   * The rectangle the frame occupies (`{0,0,W,H}` unless an add-on pushes it
+   * in). Split ratios are fractions OF THIS RECT, which is what Job 169 p1
+   * prints: 375 + 1600 = 1975, the frame height, not the 2000 unit height.
+   * Identical to the unit when no add-on is fitted, so every pre-add-on quote
+   * is unchanged.
+   */
+  frame: Rect,
 ): void {
   if (node.kind === "leaf") {
     const cell = buildLeafCell(node, pathId, bounds, system);
@@ -91,13 +170,13 @@ function walk(
     // the sash stays one welded ring; each midrail is a horn-cut bar between
     // the sash members splitting the glazing into panes (own beads/glass each).
     if (node.cell.midrails?.length && cell.sashInner && cell.sashKey) {
-      applyMidrails(cell, node.cell.midrails, system, out, windowW, windowH);
+      applyMidrails(cell, node.cell.midrails, system, out, frame);
     }
     return;
   }
 
   if (node.kind === "sliding") {
-    buildSlidingPanels(node, pathId, bounds, system, out, windowW, windowH);
+    buildSlidingPanels(node, pathId, bounds, system, out, frame);
     return;
   }
 
@@ -107,7 +186,7 @@ function walk(
     const tFace = transom.faceWidth;
 
     // Split line in window coordinates.
-    const splitY = node.splitAtRatio * windowH;
+    const splitY = frame.y + node.splitAtRatio * frame.h;
 
     // Transom strip spans the full horizontal extent of the parent bounds,
     // centered vertically on the split line.
@@ -129,6 +208,11 @@ function walk(
       extLengthMm: extLen,
       intLengthMm: intLen,
       jointType: transom.jointType,
+      // A "mechanical" joint is CUT AS WELDED — no production document gives its
+      // deduction (Spec/questions.md Q22). Recording it here is what lets the
+      // resolver warn and the work order print the choice, without the engine
+      // inventing a length. Absent ⇒ welded ⇒ byte-identical.
+      ...(node.jointMethod && node.jointMethod !== "welded" ? { jointMethod: node.jointMethod } : {}),
     });
 
     // Children: top and bottom of the transom.
@@ -144,8 +228,8 @@ function walk(
       w: bounds.w,
       h: bounds.y + bounds.h - (splitY + tFace / 2),
     };
-    walk(node.top, pathId + ".top", topBounds, system, out, windowW, windowH);
-    walk(node.bottom, pathId + ".bottom", bottomBounds, system, out, windowW, windowH);
+    walk(node.top, pathId + ".top", topBounds, system, out, frame);
+    walk(node.bottom, pathId + ".bottom", bottomBounds, system, out, frame);
     return;
   }
 
@@ -158,7 +242,7 @@ function walk(
     if (!isMeetingStile && !mullion) throw new Error(`Unknown mullion: ${node.mullionKey}`);
     const mFace = mullion ? mullion.faceWidth : 0;
 
-    const splitX = node.splitAtRatio * windowW;
+    const splitX = frame.x + node.splitAtRatio * frame.w;
 
     if (mullion) {
       const mullionRect: Rect = {
@@ -178,6 +262,8 @@ function walk(
         extLengthMm: extLen,
         intLengthMm: intLen,
         jointType: mullion.jointType,
+        // See the transom branch: cut as welded, recorded for the warning.
+        ...(node.jointMethod && node.jointMethod !== "welded" ? { jointMethod: node.jointMethod } : {}),
       });
     } else {
       out.meetingStiles = (out.meetingStiles ?? 0) + 1;
@@ -195,8 +281,8 @@ function walk(
       w: bounds.x + bounds.w - (splitX + mFace / 2),
       h: bounds.h,
     };
-    walk(node.left,  pathId + ".left",  leftBounds,  system, out, windowW, windowH);
-    walk(node.right, pathId + ".right", rightBounds, system, out, windowW, windowH);
+    walk(node.left,  pathId + ".left",  leftBounds,  system, out, frame);
+    walk(node.right, pathId + ".right", rightBounds, system, out, frame);
     return;
   }
 }
@@ -323,8 +409,8 @@ function applyMidrails(
   midrails: { transomKey: string; atRatio: number; axis?: "horizontal" | "vertical" }[],
   system: ProfileSystem,
   out: SolvedGeometry,
-  windowW: number,
-  windowH: number,
+  /** The frame rect — midrail ratios are fractions of it (see `walk`). */
+  frame: Rect,
 ): void {
   const inner = primary.sashInner!;
   const sash = system.sashes[primary.sashKey!];
@@ -345,7 +431,8 @@ function applyMidrails(
 
   // Pane boundaries along the split axis (top→bottom, or left→right); each
   // midrail is centred on atRatio × the FULL window dimension of that axis.
-  const span = vertical ? windowW : windowH;
+  const span = vertical ? frame.w : frame.h;
+  const origin = vertical ? frame.x : frame.y;
   const start = vertical ? inner.x : inner.y;
   const end = vertical ? inner.x + inner.w : inner.y + inner.h;
   /** The bar's Int length = the sash Int span it crosses. */
@@ -357,7 +444,7 @@ function applyMidrails(
     const profile = system.transoms[m.transomKey];
     if (!profile) throw new Error(`Unknown midrail profile: ${m.transomKey}`);
     const face = profile.faceWidth;
-    const centre = m.atRatio * span;
+    const centre = origin + m.atRatio * span;
     const near = centre - face / 2;
     panes.push(
       vertical
@@ -450,8 +537,11 @@ function buildSlidingPanels(
   bounds: Rect,
   system: ProfileSystem,
   out: SolvedGeometry,
-  windowW: number,
-  windowH: number,
+  /**
+   * The frame rect. Sliding designs have no add-on rule, so this is always the
+   * unit rect for them — the calibrated Jobs 44/48 formulas below are unchanged.
+   */
+  frame: Rect,
 ): void {
   const sash = system.sashes[node.sashKey];
   if (!sash) throw new Error(`Unknown sliding sash: ${node.sashKey}`);
@@ -470,7 +560,7 @@ function buildSlidingPanels(
   // For unequal panels this is an interpolation (no unequal reference job) —
   // flagged; equal panels stay byte-identical.
   const K = node.meeting ? 79 : 10;
-  const panelExtH = windowH - 86; // Jobs 44/48: 2014 = 2100−86, 2224 = 2310−86
+  const panelExtH = frame.h - 86; // Jobs 44/48: 2014 = 2100−86, 2224 = 2310−86
   const fw = sash.faceWidth;        // 85
   const rebate = sash.glassRebate;  // 15
 
@@ -488,7 +578,7 @@ function buildSlidingPanels(
         : "sliding-fixed";
 
     const colW = fractions[i] * bounds.w;
-    const panelExtW = fractions[i] * (windowW + K) - 6;
+    const panelExtW = fractions[i] * (frame.w + K) - 6;
     const sashOuter: Rect = {
       x: colX + (colW - panelExtW) / 2,
       y: bounds.y + (bounds.h - panelExtH) / 2,

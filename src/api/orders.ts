@@ -22,7 +22,7 @@ import {
   renderWorkPlanner,
   type PlannerLine,
 } from "../engine/documents.ts";
-import type { DocAdvisory } from "../types.ts";
+import type { DocAdvisory, DocOption } from "../types.ts";
 import { DEFAULT_SETTINGS, getFamily, getSystem } from "../catalog/index.ts";
 import { resolveLineItem } from "../designer/resolve.ts";
 import type {
@@ -482,6 +482,13 @@ ordersRouter.post(
     const blocked: { id: string; position: number; issues: LineItemIssue[] }[] = [];
     /** Advisory (non-blocking) issues, printed on the work order — see below. */
     const advisories: DocAdvisory[] = [];
+    /**
+     * The Work Order's "Main Options" block (Job 169). The reference prints one
+     * page per item; we aggregate an order into ONE work order, so each row is
+     * prefixed with its item when the order has more than one designer item —
+     * an unprefixed value would claim to describe the whole order.
+     */
+    const mainOptionRows: { item: string; options: DocOption[] }[] = [];
     for (const row of designerRows) {
       const draft = row.draft as unknown as LineItemDraft;
       const { resolved, output } = resolveLineItem(draft, snapshot!);
@@ -490,6 +497,12 @@ ordersRouter.post(
         blocked.push({ id: row.id, position: row.position, issues: blockers });
       } else {
         designerSolved.push({ row, draft, resolved, output });
+        if (resolved.summary?.mainOptions?.length) {
+          mainOptionRows.push({
+            item: `${draft.dimensions.widthMm} × ${draft.dimensions.heightMm} mm`,
+            options: resolved.summary.mainOptions,
+          });
+        }
         // Advisories ride onto the paperwork so the fabricator sees, on the
         // shop floor, exactly which printed limit this job goes past.
         for (const issue of resolved.issues) {
@@ -697,6 +710,14 @@ ordersRouter.post(
             grandTotal: basket.grandTotal,
           }
         : undefined;
+    // Flatten the per-item Main Options into the single aggregated work order.
+    // One designer item ⇒ the reference's plain two-column table; several ⇒ each
+    // label carries its item, because one value cannot describe them all.
+    const multi = mainOptionRows.length > 1;
+    const mainOptions: DocOption[] = mainOptionRows.flatMap(({ item, options }) =>
+      options.map((o) => ({ label: multi ? `${item} — ${o.label}` : o.label, value: o.value })),
+    );
+
     // The 3 length-bearing docs (Work Order, Cutting List, Work Planner) are
     // rendered TWICE: a "normal" copy (finished sizes) and a "welded" copy (sizes
     // with welding-shrinkage compensation). The pricing/summary docs carry no cut
@@ -717,6 +738,7 @@ ordersRouter.post(
           undefined,
           undefined,
           advisories.length ? advisories : undefined,
+          mainOptions.length ? mainOptions : undefined,
         ),
       },
       {
@@ -733,6 +755,7 @@ ordersRouter.post(
           undefined,
           undefined,
           advisories.length ? advisories : undefined,
+          mainOptions.length ? mainOptions : undefined,
         ),
       },
       {

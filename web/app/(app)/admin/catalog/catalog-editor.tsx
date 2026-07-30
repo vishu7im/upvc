@@ -15,6 +15,7 @@ import {
   addColour,
   updateColour,
   importCatalogCsv,
+  uploadHardwareImage,
   ApiError,
 } from "@/lib/api";
 import type { CatalogColour, CatalogDump, CatalogPart, SystemSummary } from "@/lib/types";
@@ -110,6 +111,8 @@ export default function CatalogEditor({ systems, dump }: { systems: SystemSummar
         rows={dump.hardware}
         onSave={(k, p) => updateSubPart(sys, "hardware", k, p).then(() => {})}
         onSaved={() => router.refresh()}
+        systemId={sys}
+        showImage
       />
 
       <Colours systemId={sys} colours={dump.colours} onChanged={() => router.refresh()} />
@@ -126,12 +129,17 @@ function PriceTable({
   onSave,
   onSaved,
   showWeld = false,
+  showImage = false,
+  systemId,
 }: {
   title: string;
   rows: Record<string, CatalogPart>;
   onSave: SaveFn;
   onSaved: () => void;
   showWeld?: boolean;
+  /** Hardware only: show the picker's picture and let an admin replace it. */
+  showImage?: boolean;
+  systemId?: string;
 }) {
   const entries = Object.entries(rows ?? {});
   return (
@@ -154,6 +162,7 @@ function PriceTable({
         <table className={tableClass}>
           <thead>
             <tr>
+              {showImage && <th className={thClass + " w-16"}>Image</th>}
               <th className={thClass}>Code</th>
               <th className={thClass}>Name</th>
               <th className={thClass + " w-32 text-right"}>Cost</th>
@@ -170,13 +179,22 @@ function PriceTable({
           <tbody>
             {entries.length === 0 ? (
               <tr>
-                <td colSpan={showWeld ? 7 : 6} className="px-4 py-8 text-center text-sm text-slate-400">
+                <td colSpan={6 + (showWeld ? 1 : 0) + (showImage ? 1 : 0)} className="px-4 py-8 text-center text-sm text-slate-400">
                   None
                 </td>
               </tr>
             ) : (
               entries.map(([key, row]) => (
-                <PriceRow key={key} partKey={key} row={row} onSave={onSave} onSaved={onSaved} showWeld={showWeld} />
+                <PriceRow
+                  key={key}
+                  partKey={key}
+                  row={row}
+                  onSave={onSave}
+                  onSaved={onSaved}
+                  showWeld={showWeld}
+                  showImage={showImage}
+                  systemId={systemId}
+                />
               ))
             )}
           </tbody>
@@ -186,18 +204,82 @@ function PriceTable({
   );
 }
 
+/**
+ * The picture the Designer's hardware pickers show for this part, plus a way to
+ * replace it with a real product photo.
+ *
+ * The route serves an admin upload when one exists and a generated glyph
+ * otherwise (`src/catalog/glyphs.ts`), so every row already has an image —
+ * uploading is an override, never a prerequisite. `bust` re-requests after an
+ * upload, since the URL is deterministic and the browser would otherwise keep
+ * the cached glyph.
+ */
+function HardwareImageCell({
+  partKey,
+  systemId,
+  name,
+}: {
+  partKey: string;
+  systemId?: string;
+  name: string;
+}) {
+  const [bust, setBust] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const src = `/api/catalog/assets/hardware/${encodeURIComponent(partKey)}${bust ? `?v=${bust}` : ""}`;
+
+  async function pick(file: File | undefined) {
+    if (!file || !systemId) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await uploadHardwareImage(systemId, partKey, file);
+      setBust(Date.now());
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <label
+      className="group relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-white"
+      title={`Replace the picture for ${name}`}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- catalog asset route, not a static import */}
+      <img src={src} alt="" className="h-9 w-9 object-contain" />
+      <input
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        disabled={busy || !systemId}
+        onChange={(e) => pick(e.target.files?.[0])}
+      />
+      <span className="absolute inset-0 hidden items-center justify-center rounded-md bg-slate-900/60 text-[10px] font-semibold text-white group-hover:flex">
+        {busy ? "..." : "Change"}
+      </span>
+      {err && <span className="sr-only">{err}</span>}
+    </label>
+  );
+}
+
 function PriceRow({
   partKey,
   row,
   onSave,
   onSaved,
   showWeld = false,
+  showImage = false,
+  systemId,
 }: {
   partKey: string;
   row: CatalogPart;
   onSave: SaveFn;
   onSaved: () => void;
   showWeld?: boolean;
+  showImage?: boolean;
+  systemId?: string;
 }) {
   const [cost, setCost] = useState(row.cost);
   const [price, setPrice] = useState(row.price);
@@ -228,6 +310,11 @@ function PriceRow({
 
   return (
     <tr className={err ? "bg-red-50" : "transition hover:bg-slate-50"}>
+      {showImage && (
+        <td className={tdClass}>
+          <HardwareImageCell partKey={partKey} systemId={systemId} name={row.name} />
+        </td>
+      )}
       <td className={tdClass + " font-mono text-xs text-slate-600"}>{row.code}</td>
       <td className={tdClass + " font-semibold text-slate-900"}>{row.name}</td>
       <td className={tdClass}>

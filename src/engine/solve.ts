@@ -101,6 +101,17 @@ export function solve(input: QuoteInput): QuoteOutput {
     design = { ...design, frameKey: input.frameKey };
   }
 
+  // Per-quote PER-EDGE frame selection, merged over the design's own per-edge
+  // keys (which are themselves merged over `frameKey` in framesForEdges). The
+  // reference offers a frame profile per edge and Job 169 prints all four.
+  // Omitted ⇒ no clone, byte-identical.
+  if (input.frameKeys && Object.keys(input.frameKeys).length) {
+    for (const key of Object.values(input.frameKeys)) {
+      if (key && !system.frames[key]) throw new Error(`Unknown frame: ${key}`);
+    }
+    design = { ...design, frameKeys: { ...design.frameKeys, ...input.frameKeys } };
+  }
+
   // Per-quote internal split overrides (multi-span editing). Re-position each
   // transom/mullion split by its node pathId. Omitted/empty ⇒ design's baked
   // splits, so the quote stays byte-identical (and the 157 assertions hold).
@@ -118,8 +129,11 @@ export function solve(input: QuoteInput): QuoteOutput {
   if (input.cillKey && !cill) throw new Error(`Unknown cill: ${input.cillKey}`);
   const mfgHeightMm = cill ? input.heightMm - CILL_HEIGHT_DEDUCTION_MM : input.heightMm;
 
-  // 1. Topology — solve geometry (at the manufacturing height)
-  const geometry = solveTopology(design, input.widthMm, mfgHeightMm, system);
+  // 1. Topology — solve geometry (at the manufacturing height). Add-on (frame
+  // extension) profiles push the frame in from the edges they are fitted to; the
+  // unit size is unchanged (Job 169). Omitted ⇒ the frame fills the unit, so a
+  // quote without add-ons is byte-identical.
+  const geometry = solveTopology(design, input.widthMm, mfgHeightMm, system, input.addons);
 
   // Attach the cill as a bar below the frame: full product width, sitting at
   // y = manufacturing height (= geometry.outer.h). svg.ts draws it; bars.ts
@@ -211,6 +225,8 @@ export function solve(input: QuoteInput): QuoteOutput {
     designName: design.name,
     geometry: {
       outer: geometry.outer,
+      // Absent unless an add-on pushes the frame in ⇒ byte-identical payload.
+      ...(geometry.frameRect ? { frameRect: geometry.frameRect } : {}),
       cells: geometry.cells,
       transoms: geometry.transoms,
       mullions: geometry.mullions,

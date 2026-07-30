@@ -1,0 +1,13 @@
+-- Doors module phase 1 (Job 169, collections/doors/).
+--
+-- Length-dependent reinforcement: the manual fits the lighter dividers' steel
+-- only above a printed minimum bar length (HAWDIO p17/PDF 18), and Job 169
+-- shows the rule in production — its 78 mm SPQ-5-30252 divider carries 26x26 U
+-- steel at Int 1710 and none at Int 685/710.
+--
+-- NULL means "always fitted", which is what every existing row means today, so
+-- this column changes no engine output until the seed writes a threshold.
+--
+-- Plain SQL (not `migrate dev`) so it applies through a transaction-mode
+-- pooler with `prisma migrate deploy`.
+ALTER TABLE "profile_part" ADD COLUMN IF NOT EXISTS "minBarLengthMm" DECIMAL(10,4);

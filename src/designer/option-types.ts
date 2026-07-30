@@ -16,7 +16,7 @@
 // declared here.
 // =====================================================================
 
-import type { SashKind } from "../types.ts";
+import type { JointMethod, SashKind } from "../types.ts";
 
 // ---------------------------------------------------------------------
 // Shared vocabulary
@@ -79,6 +79,9 @@ export type OptionPricingMode = "catalog" | "none";
  * | `colour-key`           | `QuoteInput.colourKey` / `.colourKeyOutside` (U7 dual colour)    |
  * | `glass-key`            | `QuoteInput.glassKey` (U3 clone-on-override)                     |
  * | `cill-key`             | `QuoteInput.cillKey`                                             |
+ * | `addon`                | `QuoteInput.addons[side]` — a frame-extension profile on one     |
+ * |                        | frame edge, which pushes the frame in by that profile's face     |
+ * |                        | (Job 169). `params.side` = top/bottom/left/right                 |
  * | `profile-substitution` | a profile slot on the topology/quote (`frameKey` today; `beadKey`|
  * |                        | fill is a phase-2 resolver addition, mirroring `fillDefaultGlass`)|
  * | `hardware-substitution`| swap one hardware key in the computed hardware tally             |
@@ -94,6 +97,7 @@ export type EngineEffectKind =
   | "colour-key"
   | "glass-key"
   | "cill-key"
+  | "addon"
   | "profile-substitution"
   | "hardware-substitution"
   | "bom-line"
@@ -148,7 +152,19 @@ export type TopologyEdit =
       kind?: SashKind;
     }
   | { op: "set-sash-kind"; componentId: string; kind: SashKind }
-  | { op: "remove-divider"; componentId: string };
+  | { op: "remove-divider"; componentId: string }
+  /**
+   * Swap ONE divider's profile (the reference's per-divider Transom / Mullion
+   * dropdowns), or how it joins the frame. `jointMethod: "mechanical"` is
+   * recorded and printed but CUT AS WELDED — no production document gives its
+   * deduction (Spec/questions.md Q22) — and the resolver warns.
+   */
+  | {
+      op: "set-divider";
+      componentId: string;
+      dividerKey?: string;
+      jointMethod?: JointMethod;
+    };
 
 export type TopologyEditOp = TopologyEdit["op"];
 

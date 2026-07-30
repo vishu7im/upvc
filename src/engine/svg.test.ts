@@ -142,6 +142,29 @@ function validateRealisticStyle(expect: Expect, g: SolvedGeometry, base: string)
   expect("French renders realistically", french.startsWith("<svg"), true);
   const sliding = renderSvg(makeSlidingGeometry(), { style: "realistic" });
   expect("sliding renders realistically", sliding.startsWith("<svg"), true);
+
+  // 18. Add-on band (doors phase 1, Job 169). `frameRect` is what tells the
+  // drawing the frame does not fill the unit; absent ⇒ every SVG above is
+  // unchanged, which is the byte-identity gate for the whole feature.
+  const withAddon = {
+    ...g,
+    frameRect: { x: 0, y: 25, w: g.outer.w, h: g.outer.h - 25 },
+  } as SolvedGeometry;
+  const addonFlat = renderSvg(withAddon);
+  expect("an add-on changes the drawing", addonFlat === base, false);
+  expect("the add-on band is drawn", addonFlat.includes('id="addon"'), true);
+  expect("no add-on ⇒ no band", base.includes('id="addon"'), false);
+  // The unit still measures the same, so the viewBox is untouched — only the
+  // frame ring moves in.
+  const vb = (svg: string) => /viewBox="([^"]+)"/.exec(svg)?.[1] ?? "";
+  expect("the viewBox is unchanged (the unit size did not move)", vb(addonFlat), vb(base));
+  const addonReal = renderSvg(withAddon, { style: "realistic" });
+  expect("realistic draws the band too", addonReal.includes('id="addon"'), true);
+  expect("realistic without an add-on draws none",
+    renderSvg(g, { style: "realistic" }).includes('id="addon"'), false);
+  // (The schematic's frame-face labels must measure from the FRAME, not the
+  // unit — asserted in jobs.ts#validateJob169 against a real solve, where the
+  // daylight moves with the frame as it does in production.)
 }
 
 /**
