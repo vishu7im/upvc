@@ -14,6 +14,7 @@ import {
   renderDoorHardwareLayer,
   type DoorHardwareVisuals,
 } from "./svg-hardware.ts";
+import { CILL_OVERHANG_MM } from "./bars.ts";
 
 const PROFILE_FILL = "#e6e6e6"; // grey profile material (frame/transom/mullion/sash)
 const GLASS_FILL = "#ffffff"; // glazed openings (clear)
@@ -24,9 +25,10 @@ const CILL_FILL = "#c9ccd1"; // darker grey so the cill reads distinct from the 
 // darker grey as the cill, since both are profiles attached OUTSIDE the frame.
 const ADDON_FILL = "#c9ccd1";
 const JOINT_STROKE = "rgba(31,41,55,0.85)"; // mitre / joint marker line
-// Drawing-only constants (NOT fabrication values): a small horizontal overhang
-// each side gives the cill its sill silhouette below the frame.
-const CILL_OVERHANG = 30;
+// The cill's horizontal overhang each side. This one IS a fabrication value —
+// it is what makes the cut row `unit width + 2 × 50` (Job 173/172; see
+// `bars.ts#CILL_OVERHANG_MM`) — so the drawing and the cutting list agree.
+const CILL_OVERHANG = CILL_OVERHANG_MM;
 // Schematic (technical-drawing) palette: white fills + thin strokes, so the
 // annotation numbers are what the eye lands on.
 const SCHEMATIC_FILL = "#ffffff";

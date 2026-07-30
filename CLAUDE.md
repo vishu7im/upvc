@@ -12,7 +12,7 @@ BOM, Price Summary).
 The fabrication engine is **already calibrated** against real reference jobs: Quotila 85/88/90
 (casement + single door), Jobs 44/48 "Andrei UK" (sliding patio — these superseded the earlier
 Job 104 yogi-test calibration) and Job 00000264 (French door).
-`npm run validate` currently runs **1129 assertions, all green**. (The 3 weld-drift failures that
+`npm run validate` currently runs **1299 assertions, all green**. (The 3 weld-drift failures that
 were red for months turned out to be DB data, not engine math — fixed by migration
 `20260730020000_fix_weld_allowance_drift`; see memory/validate-weld-drift.md.)
 
@@ -189,7 +189,7 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
   `src/designer/resolve.test.ts#validateDesigner` (Designer D2, extended in D7 with
   `validateSecondFamily`; both designer DB suites SKIP on a DB that predates the D1 seed) and the
   DB-free `src/designer/basket.test.ts#validateBasket` (D6). Current baseline:
-  **1129 passed, 0 failed** (the old 3-failure weld baseline was DB drift; see
+  **1299 passed, 0 failed** (the old 3-failure weld baseline was DB drift; see
   memory/validate-weld-drift.md).
 - `src/designer/basket.ts` — **the only place order-level money is derived** (D6): items subtotal →
   discount → extras → tax → grand total, pure, with `basket.test.ts` (65 assertions) beside it.
@@ -1632,8 +1632,62 @@ substitutable category and never throws; `svg.test.ts` proves the add-on band is
 **947 → 1129 passed, and the 3 long-standing weld-drift failures are GONE** — Job 169 identified
 them as DB drift (`setting.weldAllowanceMm` was 0 where the catalog says 2.5, and four profiles
 carried 3 where the catalog says "inherit"), fixed by migration
-`20260730020000_fix_weld_allowance_drift`. **Deliberately NOT adopted:** the document's Gasket
-01/02 metreage, which contradicts Jobs 85/88/90 (**Q24**).
+`20260730020000_fix_weld_allowance_drift`. The document's Gasket 01/02 metreage was recorded here
+as "deliberately not adopted" because it seemed to contradict Jobs 85/88/90 — **it does not**: the
+engine reproduces its 11.26 m / 6.294 m exactly, so **Q24 is closed** (see below).
+
+## Jobs 172/173 — the cill, the frame-level divider, the packer count
+
+Owner package `docs/correct/` (2026-07-30): the reference configurator's paperwork for two test
+orders — **Job 173** ("some doors testing", Work Order + Cutting List + Glass Order, six
+1000 × 2000 single doors) and **Job 172** ("check door") — plus a Cutting List + Glass Order for
+the already-calibrated Job 169, which still reproduces row for row. Every item carries a **150 mm
+cill** and a 25 mm add-on on one edge, with the divider somewhere different on each.
+
+**Most of it already worked.** Frame, sash, bead, midrail, both steels, glass and hardware
+reproduced the documents exactly before any change, including the cill's 30 mm height deduction.
+Five things did not:
+
+1. **The cill is cut to unit width + 100** (50 mm of overhang each side — 1100 under a 1000 mm
+   unit, on every item, unchanged by which edge carries the add-on, so it overhangs the UNIT and
+   not the add-on-reduced frame). We cut it to the unit width. `bars.ts#CILL_OVERHANG_MM`, shared
+   with `svg.ts` so the drawing and the cut row cannot disagree.
+2. **The cill carries a 35 × 15 steel** (`SPQ-2-83997`) at its own length, printed in the cill
+   row's Reinforcing column AND as its own section row. The part existed but was mapped to
+   nothing; the `reinforcementMap` now keys all nine cill codes to it (95/180 extrapolated from
+   the documented 150 — **Q26**).
+3. **A frame-level transom breaks the jambs whatever its joint type** — p4 prints 405 + 1575 with
+   `[Y - /` / `\ - Y]`. We broke them only under a **Z**, because Quotila Job 88 (a real T
+   transom) prints continuous jambs. Owner decision: adopt the reference convention **everywhere**,
+   windows included, which re-baselines `JOB_88`'s frame rows (the Quotila values are kept in a
+   comment). A Y-notch also turned out to be a **welded** end (405 = 400 + 2 × 2.5), re-baselining
+   `validateWeldMath` — finished sizes unmoved, so every geometry assertion held.
+4. **A frame-breaking T transom is cut to the frame's full outer span**, not `Int + 2 × face`:
+   p4 prints 984 over a 975 mm frame where our rule gives 1000. The 984 is **not derivable** — it
+   needs a 72.5 mm horn per end — so the decomposition (`975 + 2 × 4.5`,
+   `bars.ts#FRAME_BREAK_WELD_MM`) is an **owner decision, not a measurement**. The **Z** branch is
+   untouched: the package contains no Z transom, so it cannot supersede Job 85's
+   1206 = 1072 + 2 × 67. Both branches cite their own production document (**Q25**).
+5. **Glazing bridge packers = 5 per pane + 6** (16 for 2 panes, 21 for p4's 3). The base was a
+   placeholder 3 with no source.
+
+**Door Sash T is now selectable.** The reference cuts `SPQ-5-47252` ("Door Sash T") with the SAME
+face 105 / overlap 28 / 2.5 mm weld / 28 × 44.5 steel as our Z leaf, verified on every printed row
+— which is the 1:1 test the frame and bead substitution slots already pass, and exactly the
+"reference job for the swapped cut" whose absence had kept `profile.door-sash-profile`
+informational. New catalog part `sash-door-t` (own entry so the French `sash-door-t-fr` keeps its
+3 mm weld), added to the M5.5 price mapping so `import:prices` prices it, a `slot: "sash"` branch
+in the resolver, and `pinAllCells`/`pinCellField` accepting `sashKey` — **dropping it on cells that
+have no sash**, so a profile swap can never hand a fixed light an opener.
+
+**Not adopted:** a root **vsplit** mullion breaking the head and sill (symmetry says it should, no
+document shows it, and it would change 181 of 516 seeded designs), and nested dividers breaking
+what they weld into (**Q25**).
+
+**Validation.** `jobs.ts#validateJob173` reproduces all seven items row for row — frame, jambs,
+divider, sash, both steels, beads, glass, both gaskets, the door set, the cill and its steel, and
+the packer counts — plus the additive check that no cill ⇒ no deduction, no bar, no steel.
+`validateJob169` now also asserts its own gasket figures. **1161 → 1299 passed, 0 failed.**
 
 ## Conventions
 

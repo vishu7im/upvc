@@ -589,6 +589,19 @@ export interface SolvedTransom {
    * welded ⇒ byte-identical.
    */
   jointMethod?: JointMethod;
+  /**
+   * True when this transom divides the FRAME itself — i.e. it is the root-level
+   * split, so it welds into the jambs and breaks them (`jambsBrokenAtY`).
+   *
+   * A frame-breaking T transom is cut differently from one that welds between
+   * two cells: Job 173 p4 prints 984 for a 78 mm SPQ-5-30252 in a 975 mm frame,
+   * which is the frame's full outer span welded at 4.5 mm per end — NOT the
+   * `Int + 2 × face` horn rule that Job 85/88 calibrate for the cell case. See
+   * `bars.ts#FRAME_BREAK_WELD_MM` and Spec/questions.md Q25.
+   *
+   * Absent for every transom nested inside a cell ⇒ byte-identical there.
+   */
+  breaksFrame?: boolean;
 }
 
 export interface SolvedMullion {
@@ -625,7 +638,15 @@ export interface SolvedGeometry {
   cells: SolvedCell[];
   transoms: SolvedTransom[];
   mullions: SolvedMullion[];
-  /** Whether the outer frame jambs are broken by a root-level Z-transom (Job 85). */
+  /**
+   * The y at which a root-level transom breaks the outer frame jambs into two
+   * pieces each.
+   *
+   * ANY frame-level transom breaks them, whatever its joint type — Job 85
+   * (Z, Quotila) and Job 173 p4 (T, 405 + 1575 with `[Y - /` / `\ - Y]`) both
+   * print the break. Owner decision 2026-07-30; this supersedes Quotila Job 88,
+   * which printed continuous jambs under a T transom (Spec/questions.md Q25).
+   */
   jambsBrokenAtY?: number;
   /**
    * Count of zero-profile "meeting-stile" dividers (French doors): two sashes

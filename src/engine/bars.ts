@@ -25,6 +25,33 @@ import type {
 } from "../types.ts";
 import { framesForEdges } from "./topology.ts";
 
+/**
+ * How far a cill overhangs the unit on EACH side.
+ *
+ * Job 173 (all six items) and Job 172 print a 1100 mm cill under a 1000 mm
+ * unit, on items whose add-on sits on every one of the four edges in turn — so
+ * the cill is cut to `unit width + 2 × 50`, independent of the frame. `svg.ts`
+ * draws the same overhang, so the drawing and the cut row agree.
+ */
+export const CILL_OVERHANG_MM = 50;
+
+/**
+ * Weld allowance per end for a transom that BREAKS THE FRAME (welded into the
+ * two Y-notched jambs), as opposed to one welded between two cells.
+ *
+ * Job 173 p4 prints 984 for a 78 mm SPQ-5-30252 in a 975 mm frame — the frame's
+ * full outer span plus 4.5 mm per end. The 4.5 is NOT derivable from any
+ * catalog value or manual page (the frame face is 68, the transom face 78, and
+ * 984 would need a 72.5 mm horn per end): it is the decomposition the owner
+ * chose on 2026-07-30 out of the two that fit. Recorded in Spec/questions.md
+ * Q25 — revisit if a second frame-split document ever appears.
+ *
+ * Only the T branch uses it. A frame-breaking Z transom keeps its Quotila
+ * length (Job 85: 1206 = 1072 + 2 × 67) and the ordinary weld, because the
+ * reference package contains no Z transom to supersede it.
+ */
+const FRAME_BREAK_WELD_MM = 4.5;
+
 export function computeParts(
   geometry: SolvedGeometry,
   design: Design,
@@ -63,20 +90,44 @@ export function computeParts(
     emitGlass(glass, cell, glassIdx++, system);
   }
 
-  // Cill (window sill) — an external profile spanning the full product width,
-  // emitted as a per-metre cut/BOM line. Source of truth is `geometry.cill`
-  // (attached by solve() when a cill is selected). Square-cut, no welded ends.
+  // Cill (window sill) — an external profile fitted below the frame, emitted as
+  // a per-metre cut/BOM line. Source of truth is `geometry.cill` (attached by
+  // solve() when a cill is selected). Square-cut, no welded ends.
+  //
+  // LENGTH = unit width + 100 (50 mm of overhang each side). Job 173 prints
+  // `Hor Cill 150mm Cill 1 1100 [-]` on all six 1000 mm items AND on Job 172 —
+  // unchanged whether the add-on sits on the left, right, top or bottom, so it
+  // is the UNIT width it overhangs, not the (add-on-reduced) frame.
   if (geometry.cill) {
     const c = geometry.cill;
-    bars.push(withWeld({
+    const cillLen = round1(widthMm + 2 * CILL_OVERHANG_MM);
+    const piece: BarPiece = withWeld({
       code: c.code,
       name: c.name,
       position: "Cill",
       orientation: "H",
-      extMm: round1(widthMm),
-      intMm: round1(widthMm),
+      extMm: cillLen,
+      intMm: cillLen,
       endPrep: "[ - ]",
-    }, 0));
+    }, 0);
+    // Cill steel — Job 173/172 fit a 35 × 15 (SPQ-2-83997) at the cill's OWN
+    // length (1100) on every item, printed both in the cill row's Reinforcing
+    // column and as its own `Hor Cill` section row.
+    const r = reinforcementFor(system, c.code, cillLen);
+    if (r) {
+      piece.reinforcementCode = r.code;
+      piece.reinforcementLengthMm = round1(cillLen - 2 * r.endClearance);
+      reinforcement.push(withWeld({
+        code: r.code,
+        name: r.name,
+        position: "Reinf for Cill",
+        orientation: "H",
+        extMm: piece.reinforcementLengthMm,
+        intMm: piece.reinforcementLengthMm,
+        endPrep: "[ - ]",
+      }, effectiveWeld(r, weldDefaultMm)));
+    }
+    bars.push(piece);
   }
 
   // Sliding-patio auxiliary profiles (track + cover caps) — no-op unless the
@@ -272,6 +323,12 @@ function barFrame(
 function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeometry, system: ProfileSystem, weldDefaultMm: number): void {
   for (const t of geom.transoms) {
     const profile = system.transoms[t.transomKey];
+    // A frame-breaking T transom welds into the two Y-notched jambs rather than
+    // between two cells, and takes a bigger allowance than a mitre: Job 173 p4
+    // prints 984 over a 975 mm frame span. See FRAME_BREAK_WELD_MM.
+    const weld = t.breaksFrame && t.jointType === "T"
+      ? FRAME_BREAK_WELD_MM
+      : effectiveWeld(profile, weldDefaultMm);
     const piece: BarPiece = withWeld({
       code: profile.code,
       name: profile.name,
@@ -280,7 +337,7 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       extMm: round1(t.extLengthMm),
       intMm: round1(t.intLengthMm),
       endPrep: "< - >",
-    }, effectiveWeld(profile, weldDefaultMm));
+    }, weld);
     // Reinforcement (e.g. Job 85: Z-transom gets 13x29 steel), skipped on runs
     // below the profile's printed minimum (Job 169 pages 1/2/4).
     const r = reinforcementFor(system, profile.code, t.intLengthMm);
@@ -486,8 +543,12 @@ function round3(n: number): number { return Math.round(n * 1000) / 1000; }
  */
 function weldedEnds(endPrep: string): number {
   let n = 0;
-  if (/^[\\/]|^</.test(endPrep)) n++;   // left/outer end is a miter or horn
-  if (/[\\/]$|>$/.test(endPrep)) n++;   // right/inner end is a miter or horn
+  // A Y-notch is a welded joint too — the jamb piece welds onto the transom
+  // that broke it, so it shrinks at that end like any other. Job 173 p4 prints
+  // 405 + 1575 for jamb pieces measuring 400 + 1570 to the transom centreline:
+  // 2 × 2.5 mm on EACH piece, not one.
+  if (/^[\\/]|^<|^\[Y/.test(endPrep)) n++;   // left/outer end is a miter, horn or Y-notch
+  if (/[\\/]$|>$|Y\]$/.test(endPrep)) n++;   // right/inner end is a miter, horn or Y-notch
   return n;
 }
 

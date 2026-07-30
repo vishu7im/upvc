@@ -126,14 +126,19 @@ export function solveTopology(
   };
   if (frameRect.w !== outer.w || frameRect.h !== outer.h) result.frameRect = frameRect;
 
-  // Detect root-level Z-transom — this is what causes the jambs to break (Job 85).
+  // A root-level transom divides the FRAME, so it welds into the jambs and
+  // breaks them into two pieces each. This holds for EVERY joint type: Job 85
+  // (Z, Quotila) and Job 173 p4 (T, printed 405 + 1575 with `[Y - /` / `\ - Y]`
+  // end preps) both show the break. Owner decision 2026-07-30 — it supersedes
+  // Quotila Job 88, which printed continuous jambs under a T transom
+  // (Spec/questions.md Q25).
+  //
+  // A root-level MULLION (vsplit) presumably breaks the head and sill the same
+  // way, but no production document shows one — left alone, and flagged in Q25.
   if (design.topology.kind === "hsplit") {
-    const transom = system.transoms[design.topology.transomKey];
-    if (transom?.jointType === "Z") {
-      // Split ratios are FRAME-relative (Job 169 p1 prints 375 + 1600 = 1975,
-      // the frame height, not the 2000 unit height).
-      result.jambsBrokenAtY = frameRect.y + design.topology.splitAtRatio * frameRect.h;
-    }
+    // Split ratios are FRAME-relative (Job 169 p1 prints 375 + 1600 = 1975,
+    // the frame height, not the 2000 unit height).
+    result.jambsBrokenAtY = frameRect.y + design.topology.splitAtRatio * frameRect.h;
   }
 
   walk(design.topology, "root", rootDaylight, system, result, frameRect);
@@ -199,8 +204,16 @@ function walk(
     // Cut sizes for this transom piece:
     //   Int = visible (between the two side-walls this transom is welded to)
     //   Ext = Int + 2 × face  (the horns that go into each side-wall)
+    //
+    // A ROOT transom is the exception: it divides the frame rather than welding
+    // between two cells, and Job 173 p4 prints a 78 mm SPQ-5-30252 in a 975 mm
+    // frame at 984 — the frame's full outer span plus 4.5 mm of weld per end
+    // (`bars.ts#FRAME_BREAK_WELD_MM`), NOT 839 + 2×78 = 995. The Z case keeps
+    // the Quotila rule: no Z transom appears in the reference package, so it
+    // cannot supersede Job 85 (1206 = 1072 + 2×67). See Spec/questions.md Q25.
+    const breaksFrame = pathId === "root";
     const intLen = bounds.w;
-    const extLen = intLen + 2 * tFace;
+    const extLen = breaksFrame && transom.jointType === "T" ? frame.w : intLen + 2 * tFace;
     out.transoms.push({
       rect: transomRect,
       parentPathId: pathId,
@@ -208,6 +221,7 @@ function walk(
       extLengthMm: extLen,
       intLengthMm: intLen,
       jointType: transom.jointType,
+      ...(breaksFrame ? { breaksFrame: true } : {}),
       // A "mechanical" joint is CUT AS WELDED — no production document gives its
       // deduction (Spec/questions.md Q22). Recording it here is what lets the
       // resolver warn and the work order print the choice, without the engine

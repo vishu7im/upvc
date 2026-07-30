@@ -53,13 +53,15 @@ export const SUNNYPLAST_70: ProfileSystem = {
   // collections/part-list/stockitems.json. Cost/price/weight ship at 0 (golden
   // rule); the owner fills them via the admin catalog CRUD / CSV import.
   //
-  // Cill REINFORCEMENT (recorded, not modelled): the manual's Window Cills page
-  // (HAWDIO 21-7-2026.pdf printed p12 / PDF 13) shows every cill (95/150/180)
-  // taking a 41.3×17.4 box steel (drawn uncoded on the Steel Reinforcements
-  // page p17), and the 95mm cill ALSO accepting the 35×15 SPQ-2-83997
-  // ("reinf-35x15" below) as an alternative. No calibrated job cuts cill steel,
-  // so cill reinforcement is not part of any cut list — data only, revisit if a
-  // production doc ever itemises it.
+  // Cill REINFORCEMENT (now MODELLED — Job 173/172, 2026-07-30): every item
+  // fits a 35×15 SPQ-2-83997 ("reinf-35x15" below) at the cill's own length.
+  // It reaches the cut list through the `reinforcementMap` entries keyed by
+  // cill CODE at the bottom of this file; `bars.ts` emits it beside the cill
+  // bar. The manual's Window Cills page (HAWDIO 21-7-2026.pdf printed p12 /
+  // PDF 13) instead draws a 41.3×17.4 box steel for all three sizes, but that
+  // section is uncoded (Steel Reinforcements page p17) and has no catalog
+  // entry — so the documented 35×15 is used, and the 95/180 mapping is an
+  // extrapolation from the 150 (owner decision; see the map's comment).
   cills: {
     "cill-95-white":         { key: "cill-95-white",         code: "GL-1-00095",         name: "95mm Cill — White",            projectionMm: 95,  cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
     "cill-95-foiled-white":  { key: "cill-95-foiled-white",  code: "GL-2-00095-1P-FCA",  name: "95mm Cill — Foiled on White",  projectionMm: 95,  cost: 0, price: 0, per: "m", weight: 0, financialCategory: "Glazing Accessories" },
@@ -169,6 +171,30 @@ export const SUNNYPLAST_70: ProfileSystem = {
       faceWidth: 105,
       overlap: 28,
       glassRebate: 15,          // door glazing rebate per side (Job 90 door)
+      weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
+      cost: 0, price: 0,
+      per: "m",
+      weight: 0,
+      financialCategory: "Sash – (Standard)",
+    },
+    // The T door sash on a SINGLE door — calibrated by Jobs 172/173
+    // (docs/correct/, 2026-07-30), which cut "Door Sash T" on seven 1000×2000
+    // single-door items. It cuts IDENTICALLY to the Z sash above: face 105,
+    // overlap 28, glass rebate 15, 2.5 mm/end weld and the same 28 × 44.5 U
+    // steel — verified on every printed row (p1 daylight 839 ⇒ sash 895 printed
+    // 900; ring Int 685/1680 = the printed steel).
+    //
+    // Same code as the French T leaf (sash-door-t-fr) but its OWN entry, for the
+    // same reason sash-door-z is separate from sash-door-z-fr: the French leaf
+    // carries a 3 mm weld from Job 00000264, and this one inherits the global
+    // 2.5 mm. Deliberate duplicate code — the M5.5 importer applies by partKey,
+    // so both are priced (see price-lists/mapping.ts).
+    "sash-door-t": {
+      code: "SPQ-5-47252",
+      name: "Door Sash T",
+      faceWidth: 105,
+      overlap: 28,
+      glassRebate: 15,
       weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)
       cost: 0, price: 0,
       per: "m",
@@ -625,6 +651,23 @@ export const SUNNYPLAST_70: ProfileSystem = {
     // Frame (5ch/6ch) and the lighter T-transom (67) are NOT reinforced in these examples.
     // The French mullion (SPQ-1-46252, "STULP 70+R1") likely carries steel too —
     // left unmapped pending an itemised French cutting list (golden rule).
+    //
+    // CILLS — Job 173 (all six items) and Job 172 fit a 35 × 15 SPQ-2-83997 at
+    // the cill's own length (1100 under a 1000 mm unit), printed both in the
+    // cill row's Reinforcing column and as its own `Hor Cill` section row. Only
+    // the 150 mm cill appears in those documents; 95 and 180 are EXTRAPOLATED
+    // from it by owner decision (2026-07-30) — the manual (HAWDIO p12/PDF 13)
+    // shows every cill taking a steel, but draws a 41.3 × 17.4 box that has no
+    // code and no catalog entry, so the documented 35 × 15 is used throughout.
+    "GL-1-00095":        "reinf-35x15",      // 95mm cill  (extrapolated, see above)
+    "GL-2-00095-1P-FCA": "reinf-35x15",
+    "GL-2-00095-2P-FCA": "reinf-35x15",
+    "GL-1-00150":        "reinf-35x15",      // 150mm cill (Job 173/172, evidenced)
+    "GL-2-00150-1P-FCA": "reinf-35x15",
+    "GL-2-00150-2P-FCA": "reinf-35x15",
+    "GL-1-00180":        "reinf-35x15",      // 180mm cill (extrapolated, see above)
+    "GL-2-00180-1P-FCA": "reinf-35x15",
+    "GL-2-00180-2P-FCA": "reinf-35x15",
   },
 
   // ---------- GASKETS ----------------------------------------------

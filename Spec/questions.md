@@ -193,13 +193,54 @@ document brackets the threshold between 710 and 1710, it does not pin it.
 since Job 169 is consistent with them and contradicts no other calibrated job. Flag on the part,
 not in the engine, so a corrected figure is a data edit.
 
-**Q24. Should our Gasket 01/02 rule move to the Job 169 convention?** ⏳ **STILL OPEN**
-Job 169 prints Gasket 01 = 11.26 m and Gasket 02 = 6.294 m for a 1000 × 2000 single door. Our rule
-(Gasket 01 = 2 × Σ sash outer perimeter, Gasket 02 = Σ glass perimeter) is calibrated on Jobs
-85/88/90 and reproduces those jobs exactly.
-**Recommendation:** change nothing. Two documents disagree, both are production output, and
-swapping the rule would silently re-calibrate the casement family. Reconcile as its own pass with
-a job that itemises the gasket derivation.
+**Q24. Should our Gasket 01/02 rule move to the Job 169 convention?** ✅ **RESOLVED — there was
+never a conflict** (2026-07-30)
+Job 169 prints Gasket 01 = 11.26 m and Gasket 02 = 6.294 m for a 1000 × 2000 single door, and this
+was recorded as contradicting our Jobs-85/88/90 rule (Gasket 01 = 2 × Σ sash outer perimeter,
+Gasket 02 = Σ glass perimeter). Solving that page through the engine gives **11260 / 6294 — exactly
+the printed figures**; the earlier comparison must have been made against a solve without the
+page's midrail, which changes the glass perimeter. Jobs 172/173 then confirm it on seven more
+items (11.140 / 6.184 on p1 and 172, 11.140 / 8.124 on p2 and p6, 11.140 / 6.234 on p3,
+9.656 / 7.826 on p4) — every one reproduced to the millimetre.
+**Outcome:** no change; the rule was already right. Asserted in `validateJob169` and
+`validateJob173` so the claim can't drift back into doubt.
+
+## Task 3 addendum — Jobs 172/173 (`docs/correct/`, 2026-07-30)
+
+**Q25. How is a divider that splits the FRAME cut, and does it break the jambs?**
+⚠ **OWNER-DECIDED, NOT DERIVED**
+Job 173 p4 puts a 78 mm `SPQ-5-30252` transom in the frame of a 975 × 1970 doorset. It prints:
+jambs broken into **405 + 1575** (`[Y - /` / `\ - Y]`), and the divider at **984**.
+
+Two conflicts with the Quotila calibration, both settled by owner decision on 2026-07-30:
+
+1. **The break.** We broke the jambs only under a **Z** joint, because Quotila Job 88 — a real
+   T-transom window — prints continuous jambs. **Decision: break under ANY frame-level divider,
+   windows included.** `JOB_88`'s frame rows are re-baselined (2 × 1200 → 400 + 800 pairs) with the
+   superseded Quotila values kept in a comment. A Y-notch also turned out to be a WELDED end
+   (405 = 400 + 2 × 2.5), which re-baselined `validateWeldMath` too — finished sizes unmoved.
+2. **The length.** Our rule is `Ext = Int + 2 × face` (839 + 156 = 995, printed 1000). 984 is not
+   derivable: it needs a 72.5 mm horn per end, and neither the 68 mm frame face nor the 78 mm
+   transom face gives it. Two decompositions fit equally well — `frame outer span 975 + 2 × 4.5`
+   and `daylight 839 + 2 × 70`. **Decision: the first**, implemented as
+   `bars.ts#FRAME_BREAK_WELD_MM = 4.5` over an Ext of the frame's outer span. The 4.5 mm has **no
+   source** — it is a chosen decomposition, not a measurement.
+
+   The **Z** branch is deliberately untouched: the reference package contains no Z transom, so it
+   cannot supersede Job 85 (1206 = 1072 + 2 × 67). The two branches are each cited to their own
+   production document. If a second frame-split document ever appears, check whether one rule
+   covers both — a single rule would be better than this fork.
+
+**Still unevidenced, deliberately not implemented:** a root **vsplit** mullion breaking the head
+and sill (symmetry says it should; no document shows it, and it would change 181 of 516 seeded
+designs), and a **nested** divider breaking whatever it welds into.
+
+**Q26. Which cills take which reinforcement?** ⚠ PARTIALLY ANSWERED
+Jobs 172/173 fit a 35 × 15 `SPQ-2-83997` at the cill's own length (1100) on all seven items — but
+every one uses the **150 mm** cill. The manual (HAWDIO p12/PDF 13) shows all three sizes taking a
+steel, but draws a 41.3 × 17.4 box that carries no code and has no catalog entry.
+**Owner decision 2026-07-30:** map the documented 35 × 15 to all three sizes, commenting 95/180 as
+extrapolated. Replace with the real sections if the supplier itemises them.
 
 ## Resolved during planning
 

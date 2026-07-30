@@ -486,6 +486,14 @@ function applyEngineEffects(args: {
           if (ev.source === "default") break;
           working = pinAllCells(working, { beadKey: partKey });
           topologyEdited = true;
+        } else if (slot === "sash") {
+          // Door sash profile (Jobs 172/173): the T and Z leaves cut
+          // identically, so this swaps the profile and moves no dimension.
+          // Same "a default answer is already the baked state" guard as bead;
+          // `pinAllCells` drops the key on cells that have no sash.
+          if (ev.source === "default") break;
+          working = pinAllCells(working, { sashKey: partKey });
+          topologyEdited = true;
         } else {
           issues.push({
             severity: "warning",

@@ -169,11 +169,17 @@ export function buildDoorsOptionSystem(
     });
   }
 
-  // Door sash profile (T vs Z). The catalog HAS both (sash-door-t-fr /
-  // sash-door-z, calibrated on Job 00000264 and the Quotila door jobs), but the
-  // engine exposes profile substitution for the FRAME and the BEAD only — there
-  // is no per-item door-sash slot, and inventing one would change a calibrated
-  // cut without a reference job. So this records the intent and prints it.
+  // Door sash profile (T vs Z) — a REAL substitution since 2026-07-30.
+  //
+  // It was informational (`pricingMode: "none"`) because no reference job cut
+  // the swapped profile. Jobs 172/173 (docs/correct/) are that job: seven
+  // single-door items cut "Door Sash T" (SPQ-5-47252) with the SAME face 105,
+  // overlap 28, 2.5 mm weld and 28 × 44.5 steel our Z leaf uses. So swapping
+  // changes the part (and its price) and leaves every dimension alone — which
+  // is exactly the 1:1 test the frame and bead slots already pass.
+  //
+  // Choices are GENERATED from the catalog's door sashes, so a new door sash
+  // profile appears here by seeding a catalog part and nothing else.
   options.push(
     opt({
       key: "profile.door-sash-profile",
@@ -183,23 +189,34 @@ export function buildDoorsOptionSystem(
       display: "select",
       required: false,
       scope: { level: "item" },
-      pricingMode: "none",
+      pricingMode: "catalog",
       presentation: {
         helpText:
-          "The design's calibrated door sash is used. Swapping the sash profile per order needs an " +
-          "engine substitution slot (the engine has one for the frame and the bead only) plus a " +
-          "reference job for the swapped cut — neither exists yet.",
+          "Unset ⇒ the sash the chosen design was calibrated with. The T and Z leaves cut " +
+          "identically (Jobs 172/173), so this swaps the profile and its price without moving a " +
+          "single dimension.",
       },
     }),
   );
-  choices.push({
-    key: "door-sash-profile-as-designed",
-    optionKey: "profile.door-sash-profile",
-    label: "As designed (calibrated)",
-    order: 10,
-    isDefault: true,
-    engineEffect: { kind: "none" },
-  });
+  {
+    // Single-door leaves only: the French variants carry Job 00000264's 3 mm
+    // weld and 20 mm overlap, so offering them on a single door would change
+    // the cut. Ordered by catalog key for a stable seed.
+    const doorSashKeys = Object.keys(sys.sashes)
+      .filter((k) => k.startsWith("sash-door-") && !k.endsWith("-fr"))
+      .sort();
+    for (const [i, key] of doorSashKeys.entries()) {
+      choices.push({
+        key: `door-sash-profile-${key}`,
+        optionKey: "profile.door-sash-profile",
+        label: sys.sashes[key].name,
+        order: (i + 1) * 10,
+        isDefault: false, // unset ⇒ the design's baked sash (byte-identical)
+        partKey: key,
+        engineEffect: { kind: "profile-substitution", params: { slot: "sash" } },
+      });
+    }
+  }
 
   // ---- hardware -----------------------------------------------------
 

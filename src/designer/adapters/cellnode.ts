@@ -431,27 +431,43 @@ export function applyEdit(topology: CellNode, edit: TopologyEdit, ctx: AdapterEd
 }
 
 // ---------------------------------------------------------------------
-// Per-cell glass/bead pinning (component-scoped selections)
+// Per-cell glass/bead/sash pinning (component-scoped selections)
 // ---------------------------------------------------------------------
+
+/** The CellSpec fields a selection may pin — a profile swap, never structure. */
+type CellPin = Partial<Pick<CellSpec, "glassKey" | "beadKey" | "sashKey">>;
+
+/**
+ * Apply a pin to ONE leaf's cell.
+ *
+ * `sashKey` is only ever a SWAP: it is dropped on a cell that has no sash, so
+ * pinning a door sash profile can never hand a fixed light a sash ring (and so
+ * can never invent an opener, a handle or a gasket run).
+ */
+function pinned(cell: CellSpec, patch: CellPin): CellSpec {
+  const next = { ...cell, ...patch };
+  if (patch.sashKey !== undefined && !cell.sashKey) delete next.sashKey;
+  return next;
+}
 
 /** Immutably pin a CellSpec field on the leaf at `path`. */
 export function pinCellField(
   topology: CellNode,
   path: string,
-  patch: Partial<Pick<CellSpec, "glassKey" | "beadKey">>,
+  patch: CellPin,
 ): CellNode {
   return replaceAt(topology, pathSegments(path), (node) => {
     const leaf = requireLeaf(node, path);
-    return { kind: "leaf", cell: { ...leaf.cell, ...patch } };
+    return { kind: "leaf", cell: pinned(leaf.cell, patch) };
   });
 }
 
-/** Immutably pin a CellSpec field on EVERY leaf (item-level bead/glass). */
+/** Immutably pin a CellSpec field on EVERY leaf (item-level bead/glass/sash). */
 export function pinAllCells(
   topology: CellNode,
-  patch: Partial<Pick<CellSpec, "glassKey" | "beadKey">>,
+  patch: CellPin,
 ): CellNode {
-  if (topology.kind === "leaf") return { kind: "leaf", cell: { ...topology.cell, ...patch } };
+  if (topology.kind === "leaf") return { kind: "leaf", cell: pinned(topology.cell, patch) };
   if (topology.kind === "sliding") {
     throw new AdapterError("Sliding topologies use the sliding adapter, not cellnode");
   }

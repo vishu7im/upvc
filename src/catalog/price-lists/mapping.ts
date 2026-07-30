@@ -56,6 +56,8 @@ export const PRICE_MAPPINGS: PriceMapping[] = [
     "French Z leaf = same physical SPQ-5-45252 as sash-door-z. Both priced."),
   tri("profile_part", "SASH", "sash-door-t-fr", A, ["SPQ-5-47252", "SPQ-5-47398", "SPQ-5-47267"],
     "Exact code — Doc A 'T Door Sash outward' = sash-door-t-fr (Job 00000264)."),
+  tri("profile_part", "SASH", "sash-door-t", A, ["SPQ-5-47252", "SPQ-5-47398", "SPQ-5-47267"],
+    "Single-door T leaf = same physical SPQ-5-47252 as sash-door-t-fr (own entry only because its weld allowance differs — Jobs 172/173). Both priced."),
   tri("profile_part", "SASH", "sash-sliding", D, ["SPQ-GL-20252", "SPQ-GL-20398", "SPQ-GL-20267"],
     "Exact code — Doc D 'Sliding Sash' = sash-sliding (Jobs 44/48)."),
 

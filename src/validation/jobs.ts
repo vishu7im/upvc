@@ -8,7 +8,7 @@
 import { solve } from "../engine/solve.ts";
 import { getDesign, getSystem, loadCatalog } from "../catalog/index.ts";
 import { renderWorkOrder } from "../engine/documents.ts";
-import type { CellSpec, QuoteOutput } from "../types.ts";
+import type { CellNode, CellSpec, QuoteOutput } from "../types.ts";
 import { validateExtractor } from "../tools/extract-topology.test.ts";
 import { validatePricing } from "../engine/pricing.test.ts";
 import { validateSvg } from "../engine/svg.test.ts";
@@ -98,13 +98,25 @@ const JOB_88: ExpectedJob = {
   widthMm: 800,
   heightMm: 1200,
   bars: [
-    // Frame
+    // Frame — head and sill.
     { code: "SPQ-5-10252", ext: 800,  int: 672,  orientation: "H" },
     { code: "SPQ-5-10252", ext: 800,  int: 672,  orientation: "H" },
-    { code: "SPQ-5-10252", ext: 1200, int: 1072, orientation: "V" },
-    { code: "SPQ-5-10252", ext: 1200, int: 1072, orientation: "V" },
-    // T-transom
-    { code: "SPQ-05-20252", ext: 806, int: 672, orientation: "H" },
+    // Frame — jambs, BROKEN by the root transom into 400 + 800 per side.
+    //
+    // RE-BASELINED 2026-07-30 (owner decision). Quotila's Job 88 doc printed
+    // continuous jambs here — `{ ext: 1200, int: 1072, orientation: "V" } × 2`
+    // — but the reference configurator breaks the jambs under ANY frame-level
+    // divider, T as well as Z, and the owner chose that convention for every
+    // product. Job 173 p4 is the evidence (405 + 1575 under a T transom in a
+    // 1970 frame); Job 85 already printed the break under a Z. Spec/questions.md
+    // Q25 records the conflict.
+    { code: "SPQ-5-10252", ext: 400,  int: 336,  orientation: "V" },
+    { code: "SPQ-5-10252", ext: 800,  int: 736,  orientation: "V" },
+    // T-transom. RE-BASELINED with the jambs: Quotila printed 806 (= Int 672 +
+    // 2 × 67, the cell-to-cell horn rule). A frame-BREAKING T transom instead
+    // spans the frame's full outer width (Job 173 p4: 984 over a 975 frame),
+    // so Ext = 800 here and the saw size is 809 (4.5 mm of weld per end).
+    { code: "SPQ-05-20252", ext: 800, int: 672, orientation: "H" },
     // Top sash (728 × 358.5 outer)
     { code: "SPQ-05-30252", ext: 728,   int: 570,   orientation: "H" },
     { code: "SPQ-05-30252", ext: 728,   int: 570,   orientation: "H" },
@@ -689,7 +701,7 @@ function validateSlidingWeld(): void {
 // ---------- Welding-shrinkage check --------------------------------
 // Proves weldedExtMm = extMm + weldAllowanceMm × weldedEndCount, that extMm is
 // UNTOUCHED (so the geometry assertions above stay valid), and that the welded-end
-// count is derived correctly per joint (frame corner=2, Z-jamb=1, transom=2,
+// count is derived correctly per joint (frame corner=2, broken jamb=2, transom=2,
 // bead/steel=0). Per-profile allowance seeds to 0 (inherit) and the global
 // Settings default seeds to 2.5, so the effective allowance is 2.5 mm/end.
 function validateWeldMath(): void {
@@ -712,13 +724,20 @@ function validateWeldMath(): void {
   expect("frame top weldedEndCount = 2", frameTop?.weldedEndCount ?? -1, 2);
   expect("frame top weldedExtMm = 1205", frameTop?.weldedExtMm ?? -1, 1205);
 
-  // Z-broken jamb ("\ - Y]"): only the mitered end is welded → 1 end.
-  // extMm 400 → welded = 400 + 1×2.5 = 402.5.
+  // Broken jamb ("\ - Y]"): BOTH ends are welded — the mitred corner and the
+  // Y-notch that welds onto the transom → 2 ends. extMm 400 → 400 + 2×2.5 = 405.
+  //
+  // RE-BASELINED 2026-07-30. This counted 1 end (402.5) on the assumption that a
+  // Y-notch is a dry joint; Job 173 p4 prints 405 + 1575 for jamb pieces that
+  // measure 400 + 1570 to the transom centreline, i.e. 5 mm on EACH piece. The
+  // finished sizes (extMm) are untouched, so every geometry assertion above —
+  // including Job 85's own 400/800 — is unaffected.
   const jambTop = job85.parts.bars.find(
     (b) => b.code === "SPQ-5-10252" && b.position === "Frame left top",
   );
-  expect("Z-jamb weldedEndCount = 1", jambTop?.weldedEndCount ?? -1, 1);
-  expect("Z-jamb weldedExtMm = 402.5", jambTop?.weldedExtMm ?? -1, 402.5);
+  expect("broken-jamb weldedEndCount = 2", jambTop?.weldedEndCount ?? -1, 2);
+  expect("broken-jamb extMm untouched = 400", jambTop?.extMm ?? -1, 400);
+  expect("broken-jamb weldedExtMm = 405", jambTop?.weldedExtMm ?? -1, 405);
 
   // Z-transom (horns "< - >"): 2 welded ends; extMm 1206 → welded = 1211.
   const transom = job85.parts.bars.find((b) => b.code === "SPQ-005-30252");
@@ -942,10 +961,10 @@ function validateViews(): void {
 // pages carry ONE sash ring and ONE handle / lock / cylinder / 3 hinges,
 // whichever divider button was pressed.
 //
-// NOT asserted (open reconciliation, never silently adopted): the document's
-// Gasket 01 / 02 metreage (11.26 m / 6.294 m on p1), which follows a different
-// derivation from our Jobs-85/88/90 rule (questions.md Q24), and its "Run Up
-// Block" accessory, which has no catalog part.
+// The document's Gasket 01 / 02 metreage (11.26 m / 6.294 m on p1) was recorded
+// here as an open reconciliation against our Jobs-85/88/90 rule. It is not one:
+// the engine reproduces both figures exactly, and Jobs 172/173 confirm the rule
+// on seven more items. Asserted on p1 below; questions.md Q24 closed 2026-07-30.
 //
 // The divider POSITIONS are read straight off each drawing: the dimension the
 // page prints (375 on p1, 1100 on p4, "500 | 475" on p3, "500 | 500" on p5) is
@@ -1080,6 +1099,13 @@ function validateJob169(): void {
   expect("p1: glass 740 × 221 and 740 × 1446", glassRows(p1), "740×1446 740×221");
   expect("p1: no cut row for the add-on profile",
     p1.parts.bars.filter((b) => b.code === "SPQ-2-75252").length, 0);
+  // Our Jobs-85/88/90 gasket rule reproduces this page EXACTLY, which is what
+  // closed questions.md Q24 — the recorded "conflict" came from comparing the
+  // document against a solve that omitted the page's midrail.
+  expect("p1: Gasket 01 = 11.260 m (the printed figure)",
+    round1(p1.parts.gaskets.find((g) => g.code === "GKT-01")?.lengthMm ?? -1), 11260);
+  expect("p1: Gasket 02 = 6.294 m (the printed figure)",
+    round1(p1.parts.gaskets.find((g) => g.code === "GKT-02")?.lengthMm ?? -1), 6294);
   assertOnePerPage("p1", p1);
 
   // ---- p2: add-on BOTTOM — same frame, divider lower --------------------
@@ -1158,6 +1184,313 @@ function validateJob169(): void {
   expect("no add-on ⇒ no frameRect on the geometry", plain.geometry.frameRect, undefined);
   expect("no add-on ⇒ the frame fills the unit",
     `${printed(plain, FRAME, "H").join()}|${printed(plain, FRAME, "V").join()}`, "1005|2005");
+}
+
+// =====================================================================
+// JOBS 172 + 173 — the CILL, the frame-level divider, and the packer count.
+// Reference documents in `docs/correct/` (2026-07-30):
+//   Work Order / Cutting List / Glass Order — "some doors testing", job 173
+//   Work Order — "check door", job 172
+//
+// Seven 1000 × 2000 single-door items, every one with a 150 mm cill
+// (GL-1-00150) and a 25 mm add-on on one edge, with the divider in a different
+// place on each:
+//
+//   173 p1  add-on right   left hung    horizontal midrail IN the sash
+//   173 p2  add-on bottom  right hung   vertical   midrail IN the sash
+//   173 p3  add-on top     right hung   horizontal midrail IN the sash
+//   173 p4  add-on left    left hung    transom in the FRAME + a midrail
+//   173 p6  add-on top     left hung    vertical   midrail IN the sash
+//   172 p1  add-on left    right hung   horizontal midrail IN the sash
+//
+// (173 p5 is the continuation page of p4, not a seventh item.)
+//
+// FOUR THINGS THIS PACKAGE ESTABLISHES — everything else reproduces from values
+// already calibrated, so like Job 169 it mostly validates the catalog:
+//
+// 1. The CILL IS CUT TO THE UNIT WIDTH + 100 (50 mm of overhang each side).
+//    All seven items print 1100 under a 1000 mm unit, unchanged by which edge
+//    carries the add-on — so it overhangs the UNIT, not the reduced frame.
+//
+// 2. The CILL CARRIES A 35 × 15 STEEL at its own length (1100), printed both in
+//    the cill row's Reinforcing column and as its own `Hor Cill` section row.
+//    Previously the part existed but was mapped to nothing.
+//
+// 3. A FRAME-LEVEL TRANSOM BREAKS THE JAMBS whatever its joint type (p4:
+//    405 + 1575 with `[Y - /` / `\ - Y]`), and is cut to the frame's full outer
+//    span rather than the cell-to-cell horn rule (984 over a 975 mm frame).
+//    Both are owner decisions where this package and Quotila disagree — see
+//    Spec/questions.md Q25 and the re-baselined JOB_88 above.
+//
+// 4. GLAZING BRIDGE PACKERS = 5 per pane + 6 (16 for a 2-pane unit, 21 for the
+//    3-pane p4). The base was a placeholder 3 with no source.
+//
+// The DOOR SASH is printed as "Door Sash T" (SPQ-5-47252) throughout, cut
+// identically to our Z leaf — which is what promoted `profile.door-sash-profile`
+// from an informational option to a real substitution. Asserted below on p1.
+//
+// Divider POSITIONS are read off each page the same way Job 169's are: the pane
+// heights the beads and glass imply, converted to a centreline fraction of the
+// frame. That the whole printed table then falls out is the check.
+function validateJob173(): void {
+  console.log("\n==================================================");
+  console.log("Jobs 172/173: 1000×2000 single doors — cill, frame divider, packers");
+  console.log("==================================================");
+
+  const base = getDesign("door-single-left");
+  const sys = getSystem("sunnyplast-70")!;
+  if (!base || !sys.cills?.["cill-150-white"]) {
+    console.log("  (skipped — door design or 150mm cill not seeded)");
+    return;
+  }
+  const CILL = sys.cills["cill-150-white"].code;          // GL-1-00150
+  const CILL_STEEL = sys.reinforcement["reinf-35x15"].code; // SPQ-2-83997
+  if (sys.reinforcementMap[CILL] !== "reinf-35x15") {
+    console.log("  (skipped — cills are not mapped to a reinforcement; reseed the catalog)");
+    return;
+  }
+  const FRAME = sys.frames["frame-6ch"].code;
+  const SASH = sys.sashes["sash-door-z"].code;
+  const DIVIDER = sys.transoms["mullion-78"].code;
+  const BEAD = sys.beads["bead-28"].code;
+  const SASH_STEEL = sys.reinforcement["reinf-28x44.5-u"].code;
+  const DIV_STEEL = sys.reinforcement["reinf-26x26-u"].code;
+
+  const W = 1000, H = 2000;
+  type Midrail = { transomKey: string; atRatio: number; axis?: "horizontal" | "vertical" };
+  const leaf = (content: string, midrails?: Midrail[]) => ({
+    kind: "leaf" as const,
+    cell: {
+      content: content as CellSpec["content"],
+      sashKey: "sash-door-z",
+      beadKey: "bead-28",
+      ...(midrails ? { midrails } : {}),
+    },
+  });
+  const run = (hand: "left" | "right", addons: Record<string, string>, topology: CellNode) =>
+    solve({
+      orderNo: "TEST", customer: "Validation",
+      designId: `door-single-${hand}`,
+      widthMm: W, heightMm: H, systemId: "sunnyplast-70",
+      cillKey: "cill-150-white",
+      addons,
+      topologyOverride: topology,
+    });
+
+  /** Printed (saw) sizes for one profile code, deduped and sorted. */
+  const printed = (out: ReturnType<typeof solve>, code: string, orient?: "H" | "V") =>
+    [...new Set(
+      out.parts.bars
+        .filter((b) => b.code === code && (!orient || b.orientation === orient))
+        .map((b) => round1(b.weldedExtMm)),
+    )].sort((a, b) => a - b).join("/");
+  const steel = (out: ReturnType<typeof solve>, code: string) =>
+    [...new Set(out.parts.reinforcement.filter((b) => b.code === code).map((b) => round1(b.extMm)))]
+      .sort((a, b) => a - b).join("/");
+  const beads = (out: ReturnType<typeof solve>) =>
+    [...new Set(out.parts.bars.filter((b) => b.code === BEAD).map((b) => round1(b.extMm)))]
+      .sort((a, b) => a - b).join("/");
+  const glassRows = (out: ReturnType<typeof solve>) =>
+    out.parts.glass.map((g) => `${g.widthMm}×${g.heightMm}`).sort().join(" ");
+  const gasket = (out: ReturnType<typeof solve>, code: string) =>
+    round1(out.parts.gaskets.find((g) => g.code === code)?.lengthMm ?? -1);
+  const hw = (out: ReturnType<typeof solve>, key: string) =>
+    out.parts.hardware
+      .filter((h) => h.code === sys.hardware[key].code)
+      .reduce((n, h) => n + h.qty, 0);
+
+  /** Every item prints the same cill row and the same door-set. */
+  const assertCillAndSet = (page: string, out: ReturnType<typeof solve>, hand: "left" | "right") => {
+    expect(`${page}: cill printed 1100 (unit width + 100)`, printed(out, CILL), "1100");
+    const cillBar = out.parts.bars.find((b) => b.code === CILL);
+    expect(`${page}: cill is square-cut`, cillBar?.endPrep, "[ - ]");
+    expect(`${page}: cill row names its 35 × 15 steel`, cillBar?.reinforcementCode, CILL_STEEL);
+    expect(`${page}: cill steel is 1100, the cill's own length`, steel(out, CILL_STEEL), "1100");
+    expect(`${page}: ONE sash ring (4 bars)`, out.parts.bars.filter((b) => b.code === SASH).length, 4);
+    expect(`${page}: one handle`, hw(out, "hw-door-handle"), 1);
+    expect(`${page}: one lock`, hw(out, "hw-door-lock"), 1);
+    expect(`${page}: one cylinder`, hw(out, "hw-cylinder-brass"), 1);
+    expect(`${page}: three hinges`, hw(out, "hw-flag-hinge-white"), 3);
+    expect(`${page}: one run-up block`, hw(out, "hw-runup-block"), 1);
+    // The reference fits the keep set to the hinge side: "Door left hung" ⇒
+    // L/H Keep Set (p1, p4, p6), "Door right hung" ⇒ R/H (p2, p3, 172).
+    expect(`${page}: ${hand === "left" ? "L/H" : "R/H"} keep set`,
+      `${hw(out, "hw-keep-lh")}${hw(out, "hw-keep-rh")}`, hand === "left" ? "10" : "01");
+  };
+
+  // ---- 173 p1: add-on RIGHT, left hung, horizontal midrail --------------
+  // Cill −30 and add-on −25 ⇒ frame 975 × 1970 ⇒ daylight 839 × 1834 ⇒ ring
+  // 895 × 1890 ⇒ Int 685 × 1680. Beads 1456/226 ⇒ panes 1416/186 (+78 = 1680),
+  // so the midrail centreline sits 370 below the frame head.
+  const p1 = run("left", { right: "aux-ext-25" }, leaf("door-left", [
+    { transomKey: "mullion-78", atRatio: 370 / 1970 },
+  ]));
+  // The customer's height is preserved on the input and printed on the header;
+  // it is the MANUFACTURING height (2000 − 30) that the geometry is built to.
+  expect("p1: the customer height is unchanged", p1.input.heightMm, H);
+  expect("p1: the cill takes 30 mm off the manufacturing height", p1.geometry.outer.h, 1970);
+  expect("p1: …and the add-on takes 25 mm more off the width",
+    round1(p1.geometry.frameRect?.w ?? 0), 975);
+  expect("p1: frame Hor printed 980 (1005 − 25 add-on)", printed(p1, FRAME, "H"), "980");
+  expect("p1: frame Vert printed 1975 (2005 − 30 cill)", printed(p1, FRAME, "V"), "1975");
+  expect("p1: frame jambs are CONTINUOUS (no frame-level divider)",
+    p1.parts.bars.filter((b) => b.code === FRAME && b.orientation === "V").length, 2);
+  expect("p1: sash printed 900 / 1895", `${printed(p1, SASH, "H")}|${printed(p1, SASH, "V")}`, "900|1895");
+  expect("p1: sash steel 685 / 1680", steel(p1, SASH_STEEL), "685/1680");
+  const p1div = p1.parts.bars.find((b) => b.code === DIVIDER);
+  expect("p1: midrail printed 846 (685 + 2×78 + 5)", round1(p1div?.weldedExtMm ?? 0), 846);
+  expect("p1: midrail Int 685 = the ring Int", round1(p1div?.intMm ?? 0), 685);
+  expect("p1: the SHORT midrail is NOT reinforced", steel(p1, DIV_STEEL), "");
+  expect("p1: beads 226 / 725 / 1456", beads(p1), "226/725/1456");
+  expect("p1: glass 715 × 216 and 715 × 1446", glassRows(p1), "715×1446 715×216");
+  expect("p1: Gasket 01 = 11.140 m", gasket(p1, "GKT-01"), 11140);
+  expect("p1: Gasket 02 = 6.184 m", gasket(p1, "GKT-02"), 6184);
+  expect("p1: 16 glazing bridge packers (2 panes)", hw(p1, "hw-glazing-bridge-pack"), 16);
+  expect("p1: no cut row for the add-on profile",
+    p1.parts.bars.filter((b) => b.code === "SPQ-2-75252").length, 0);
+  assertCillAndSet("p1", p1, "left");
+
+  // The reference cuts the leaf as "Door Sash T" (SPQ-5-47252). It is the SAME
+  // cut as our Z leaf on every printed row — which is what makes the sash a
+  // legitimate 1:1 substitution slot rather than a re-calibration.
+  const p1t = run("left", { right: "aux-ext-25" }, {
+    kind: "leaf",
+    cell: { content: "door-left" as CellSpec["content"], sashKey: "sash-door-t", beadKey: "bead-28",
+            midrails: [{ transomKey: "mullion-78", atRatio: 370 / 1970 }] },
+  });
+  const T_SASH = sys.sashes["sash-door-t"].code;   // SPQ-5-47252
+  expect("p1: the T leaf is named Door Sash T",
+    p1t.parts.bars.find((b) => b.code === T_SASH)?.name, "Door Sash T");
+  expect("p1: the T leaf cuts IDENTICALLY to the Z leaf",
+    `${printed(p1t, T_SASH, "H")}|${printed(p1t, T_SASH, "V")}`, "900|1895");
+  expect("p1: …and takes the same 28 × 44.5 steel", steel(p1t, SASH_STEEL), "685/1680");
+  expect("p1: …and moves no other dimension", glassRows(p1t), glassRows(p1));
+
+  // ---- 173 p2: add-on BOTTOM, right hung, VERTICAL midrail ---------------
+  // Frame 1000 × 1945 ⇒ daylight 864 × 1809 ⇒ ring 920 × 1865 ⇒ Int 710 × 1655.
+  // Beads 356 ⇒ panes 316 + 316 (+78 = 710): the midrail is centred on the frame.
+  const p2 = run("right", { bottom: "aux-ext-25" }, leaf("door-right", [
+    { transomKey: "mullion-78", atRatio: 500 / 1000, axis: "vertical" },
+  ]));
+  expect("p2: frame printed 1005 / 1950 (cill + bottom add-on)",
+    `${printed(p2, FRAME, "H")}|${printed(p2, FRAME, "V")}`, "1005|1950");
+  expect("p2: sash printed 925 / 1870", `${printed(p2, SASH, "H")}|${printed(p2, SASH, "V")}`, "925|1870");
+  expect("p2: sash steel 710 / 1655", steel(p2, SASH_STEEL), "710/1655");
+  const p2div = p2.parts.bars.find((b) => b.code === DIVIDER);
+  expect("p2: vertical midrail printed 1816 (1655 + 2×78 + 5)", round1(p2div?.weldedExtMm ?? 0), 1816);
+  expect("p2: printed as a VERT bar", p2div?.orientation, "V");
+  expect("p2: the >1 m midrail IS reinforced (26 × 26 U 1655)", steel(p2, DIV_STEEL), "1655");
+  expect("p2: beads 356 / 1695", beads(p2), "356/1695");
+  expect("p2: glass 346 × 1685, twice", glassRows(p2), "346×1685 346×1685");
+  expect("p2: Gasket 01 / 02 = 11.140 / 8.124 m",
+    `${gasket(p2, "GKT-01")}|${gasket(p2, "GKT-02")}`, "11140|8124");
+  expect("p2: 16 glazing bridge packers", hw(p2, "hw-glazing-bridge-pack"), 16);
+  assertCillAndSet("p2", p2, "right");
+
+  // ---- 173 p3: add-on TOP, right hung, horizontal midrail -----------------
+  // Same frame as p2 but offset 25 mm down. Beads 956/701 ⇒ panes 916/661
+  // (+78 = 1655) ⇒ the midrail centreline 1100 below the FRAME head.
+  const p3 = run("right", { top: "aux-ext-25" }, leaf("door-right", [
+    { transomKey: "mullion-78", atRatio: 1100 / 1945 },
+  ]));
+  expect("p3: top add-on gives the SAME frame as bottom",
+    `${printed(p3, FRAME, "H")}|${printed(p3, FRAME, "V")}`, "1005|1950");
+  expect("p3: the frame is offset 25 mm from the top", round1(p3.geometry.frameRect?.y ?? -1), 25);
+  expect("p3: sash printed 925 / 1870", `${printed(p3, SASH, "H")}|${printed(p3, SASH, "V")}`, "925|1870");
+  const p3div = p3.parts.bars.find((b) => b.code === DIVIDER);
+  expect("p3: midrail printed 871 (710 + 2×78 + 5)", round1(p3div?.weldedExtMm ?? 0), 871);
+  expect("p3: beads 701 / 750 / 956", beads(p3), "701/750/956");
+  expect("p3: glass 740 × 946 and 740 × 691", glassRows(p3), "740×691 740×946");
+  expect("p3: Gasket 01 / 02 = 11.140 / 6.234 m",
+    `${gasket(p3, "GKT-01")}|${gasket(p3, "GKT-02")}`, "11140|6234");
+  assertCillAndSet("p3", p3, "right");
+
+  // ---- 173 p4: add-on LEFT, a transom in the FRAME + a midrail ------------
+  // THE page this whole exercise turns on. Frame 975 × 1970 ⇒ daylight
+  // 839 × 1834. The top light is 293 high and the leaf daylight 1463, so the
+  // 78 mm transom is centred 400 below the frame head — and the jambs break
+  // there into 400 + 1570 (printed 405 + 1575).
+  const p4 = run("left", { left: "aux-ext-25" }, {
+    kind: "hsplit",
+    splitAtRatio: 400 / 1970,
+    transomKey: "mullion-78",
+    top: { kind: "leaf", cell: { content: "fixed" as CellSpec["content"], beadKey: "bead-28" } },
+    bottom: leaf("door-left", [{ transomKey: "mullion-78", atRatio: 1271 / 1970 }]),
+  });
+  expect("p4: frame Hor printed 980", printed(p4, FRAME, "H"), "980");
+  expect("p4: the jambs are BROKEN into 405 + 1575, twice",
+    printed(p4, FRAME, "V"), "405/1575");
+  expect("p4: four jamb pieces, not two",
+    p4.parts.bars.filter((b) => b.code === FRAME && b.orientation === "V").length, 4);
+  const p4top = p4.parts.bars.find((b) => b.position === "Frame left top");
+  const p4bot = p4.parts.bars.find((b) => b.position === "Frame left bottom");
+  expect("p4: the upper jamb piece is mitred then Y-notched", p4top?.endPrep, "\\ - Y]");
+  expect("p4: the lower jamb piece is Y-notched then mitred", p4bot?.endPrep, "[Y - /");
+  expect("p4: a Y-notch is a WELDED end — both pieces gain 5 mm",
+    `${round1(p4top?.weldedExtMm ?? 0)}/${round1(p4bot?.weldedExtMm ?? 0)}`, "405/1575");
+  expect("p4: the two pieces sum to the frame height", round1((p4top?.extMm ?? 0) + (p4bot?.extMm ?? 0)), 1970);
+  const p4frameDiv = p4.parts.bars.find((b) => b.position === "Transom (root)");
+  expect("p4: the FRAME transom is printed 984 (975 frame span + 2 × 4.5)",
+    round1(p4frameDiv?.weldedExtMm ?? 0), 984);
+  expect("p4: …cut to the frame's full outer span, not Int + 2 × face",
+    round1(p4frameDiv?.extMm ?? 0), 975);
+  expect("p4: …with Int still the daylight it spans", round1(p4frameDiv?.intMm ?? 0), 839);
+  const p4mid = p4.parts.bars.find((b) => b.position === "Transom (root.bottom)");
+  expect("p4: the midrail inside the leaf is unaffected — 846",
+    round1(p4mid?.weldedExtMm ?? 0), 846);
+  expect("p4: sash printed 900 / 1524", `${printed(p4, SASH, "H")}|${printed(p4, SASH, "V")}`, "900|1524");
+  expect("p4: sash steel 685 / 1309", steel(p4, SASH_STEEL), "685/1309");
+  expect("p4: beads 333 / 555 / 725 / 756 / 879", beads(p4), "333/555/725/756/879");
+  expect("p4: glass 869 × 323, 715 × 545 and 715 × 746",
+    glassRows(p4), "715×545 715×746 869×323");
+  expect("p4: Gasket 01 / 02 = 9.656 / 7.826 m",
+    `${gasket(p4, "GKT-01")}|${gasket(p4, "GKT-02")}`, "9656|7826");
+  expect("p4: 21 glazing bridge packers (3 panes)", hw(p4, "hw-glazing-bridge-pack"), 21);
+  expect("p4: still ONE sash ring, ONE handle — the frame split did not clone the leaf",
+    `${p4.parts.bars.filter((b) => b.code === SASH).length}/${hw(p4, "hw-door-handle")}`, "4/1");
+  assertCillAndSet("p4", p4, "left");
+
+  // ---- 173 p6: add-on TOP, left hung, VERTICAL midrail --------------------
+  // Geometrically p2's twin on the other hand — the check is that the keep set
+  // follows the leaf and nothing else moves.
+  const p6 = run("left", { top: "aux-ext-25" }, leaf("door-left", [
+    { transomKey: "mullion-78", atRatio: 500 / 1000, axis: "vertical" },
+  ]));
+  expect("p6: frame printed 1005 / 1950",
+    `${printed(p6, FRAME, "H")}|${printed(p6, FRAME, "V")}`, "1005|1950");
+  expect("p6: vertical midrail printed 1816 + its 1655 steel",
+    `${printed(p6, DIVIDER)}|${steel(p6, DIV_STEEL)}`, "1816|1655");
+  expect("p6: glass 346 × 1685, twice", glassRows(p6), "346×1685 346×1685");
+  assertCillAndSet("p6", p6, "left");
+
+  // ---- 172 p1: add-on LEFT, right hung, horizontal midrail ----------------
+  // Frame 975 × 1970 like 173 p1, midrail lower: beads 856/826 ⇒ panes 816/786
+  // (+78 = 1680) ⇒ centreline 1000 below the frame head.
+  const j172 = run("right", { left: "aux-ext-25" }, leaf("door-right", [
+    { transomKey: "mullion-78", atRatio: 1000 / 1970 },
+  ]));
+  expect("172: frame printed 980 / 1975",
+    `${printed(j172, FRAME, "H")}|${printed(j172, FRAME, "V")}`, "980|1975");
+  expect("172: sash printed 900 / 1895",
+    `${printed(j172, SASH, "H")}|${printed(j172, SASH, "V")}`, "900|1895");
+  expect("172: sash steel 685 / 1680", steel(j172, SASH_STEEL), "685/1680");
+  expect("172: midrail printed 846", printed(j172, DIVIDER), "846");
+  expect("172: beads 725 / 826 / 856", beads(j172), "725/826/856");
+  expect("172: glass 715 × 846 and 715 × 816", glassRows(j172), "715×816 715×846");
+  expect("172: Gasket 01 / 02 = 11.140 / 6.184 m",
+    `${gasket(j172, "GKT-01")}|${gasket(j172, "GKT-02")}`, "11140|6184");
+  assertCillAndSet("172", j172, "right");
+
+  // ---- the cill stays additive ------------------------------------------
+  // No cill ⇒ no 30 mm deduction, no cill bar and no cill steel, which is what
+  // keeps every pre-cill job (85/88/90, French, sliding, 169) byte-identical.
+  const noCill = solve({
+    orderNo: "TEST", customer: "Validation", designId: "door-single-left",
+    widthMm: W, heightMm: H, systemId: "sunnyplast-70",
+  });
+  expect("no cill ⇒ the frame keeps the full height", printed(noCill, FRAME, "V"), "2005");
+  expect("no cill ⇒ no cill bar", noCill.parts.bars.filter((b) => b.code === CILL).length, 0);
+  expect("no cill ⇒ no cill steel", steel(noCill, CILL_STEEL), "");
 }
 
 // =====================================================================
@@ -1400,6 +1733,7 @@ function validateAdvisories(): void {
   validateViews();
   validateJob154();
   validateJob169();
+  validateJob173();
   validatePerEdgeFrames();
   validateAdvisories();
   validateExtractor(expect);

@@ -22,16 +22,28 @@
 //     1 R/H or L/H keep set
 //     1 run-up block
 //
-// Glazing Bridge Packers: 5 per glass + 3 base overhead (placeholder rule
-// — tune `glazingBridgePackerPerGlass` and `glazingBridgePackerBase` below
-// against more sample jobs as you gather them).
+// Glazing Bridge Packers: 5 per glass + 6 base overhead (Jobs 172/173).
 // =====================================================================
 
 import type { HardwarePiece, ProfileSystem, SolvedGeometry } from "../types.ts";
 
+/**
+ * Glazing bridge packer quantity.
+ *
+ * Calibrated 2026-07-30 against `docs/correct/` — Job 173's six items and Job
+ * 172 print 16 packers for a 2-pane unit and 21 for a 3-pane one, which is
+ * exactly `5 × panes + 6`. The base was 3 before (a placeholder with no source),
+ * so this is the first evidence the rule has ever had.
+ *
+ * REJECTED alternative: "8 per pane inside a sash + 5 per fixed pane" fits the
+ * same seven items (p4's three panes = 8 + 8 + 5 = 21) and would match the
+ * French docs' 8-per-pane rule — but that rule is for `SP_GBRIDGE`, a DIFFERENT
+ * part code, and no available document has three SASH panes to tell the two
+ * formulas apart. Revisit if one appears.
+ */
 const TUNING = {
   glazingBridgePackerPerGlass: 5,
-  glazingBridgePackerBase: 3,
+  glazingBridgePackerBase: 6,
 };
 
 export function computeHardware(
@@ -178,7 +190,7 @@ export function computeHardware(
     add("hw-inverter-cap", 2 * stulps, `2 inverter caps per French mullion (${stulps})`);
   }
 
-  // Glazing bridge packer — placeholder rule (tune as you gather more data).
+  // Glazing bridge packer — 5 per pane + 6 base (Jobs 172/173; see TUNING).
   const glassCount = geom.cells.length;
   add(
     "hw-glazing-bridge-pack",
