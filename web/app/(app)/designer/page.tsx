@@ -15,6 +15,7 @@ import type {
   DesignDetail,
   FamilyResponse,
   LineItemDraft,
+  LineItemIssue,
   OrderDetail,
 } from "@/lib/types";
 import { newDraft } from "@/lib/designer-draft";
@@ -35,6 +36,8 @@ export default async function DesignerPage({
     system?: string;
     orderId?: string;
     itemId?: string;
+    /** A LEGACY OrderItem being converted — see the load below. */
+    fromItem?: string;
     name?: string;
   }>;
 }) {
@@ -77,10 +80,24 @@ export default async function DesignerPage({
   // Reopening a persisted item: the SAVED DRAFT is the state, so the workspace
   // restores exactly what was stored (no re-derivation from query params).
   let savedDraft: LineItemDraft | null = null;
+  let importIssues: LineItemIssue[] = [];
   if (sp.orderId && sp.itemId) {
     const order = await serverApiGet<OrderDetail>(`/api/orders/${sp.orderId}`).catch(() => null);
     savedDraft = order?.designerItems?.find((d) => d.id === sp.itemId)?.draft ?? null;
     if (!savedDraft) notFound();
+  } else if (sp.orderId && sp.fromItem) {
+    // A LEGACY item. The server converts it (pure, `designer/legacy-import.ts`)
+    // and hands back the draft it WOULD become plus anything that could not be
+    // carried over. Read-only: nothing is written until the user saves, so
+    // backing out of the studio leaves the original item untouched.
+    const converted = await serverApiGet<{
+      draft?: LineItemDraft;
+      issues: LineItemIssue[];
+      blocking: boolean;
+    }>(`/api/orders/${sp.orderId}/items/${sp.fromItem}/draft`).catch(() => null);
+    if (!converted?.draft || converted.blocking) notFound();
+    savedDraft = converted.draft;
+    importIssues = converted.issues;
   }
 
   const systemId = sp.system ?? family.family.systemIds[0];
@@ -99,13 +116,15 @@ export default async function DesignerPage({
   return (
     <Workspace
       // Remount per design/item so per-design defaults reset cleanly.
-      key={`${sp.itemId ?? "new"}:${design.designId}`}
+      key={`${sp.itemId ?? sp.fromItem ?? "new"}:${design.designId}`}
       family={family}
       initialDraft={initialDraft}
       designName={sp.name ?? design.name}
       fallbackSvg={design.imageSvg}
       orderId={sp.orderId}
       itemId={sp.itemId}
+      replacesItemId={sp.fromItem}
+      importIssues={importIssues}
     />
   );
 }

@@ -40,6 +40,19 @@
     formula), no hardware slot over the approximate patio tally, and no `structure.component-type`
     for French. Reasons in the seed files; open questions filed as Q28–Q32 in `../questions.md`.
 
+- **An action option may carry CHOICES (2026-08-05).** Previously `display:"action"` meant "a
+  `TopologyEdit` template and no choices". It now means "a template, plus optionally the catalog
+  sections the edit may use" — the divider picker on `structure.add-*`, so a fabricator chooses the
+  67 mm or 78 mm bar as they insert it instead of changing it afterwards. Each such choice MUST name
+  a `partKey` (enforced in `option-integrity.ts`), and each action's `isDefault` MUST match the
+  adapter's own fallback so an untouched picker is byte-identical. `mullion-75` is offered nowhere —
+  no deduction source, no price (Q33).
+- **A confirmed order can be REOPENED (2026-08-05).** `POST /api/orders/:id/reopen` returns it to
+  draft. This ends the "a confirmed order is immutable" invariant that the PDF cache was built on:
+  reopening deletes the 7 `Document` rows plus the frozen basket in one transaction and purges the
+  cached PDFs, and the PDF route now checks the document ROW before the object-storage key. Any new
+  cache keyed on confirmed-order immutability must account for this.
+
 ## Phases & dependency graph
 
 ```

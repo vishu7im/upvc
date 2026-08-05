@@ -137,11 +137,36 @@ export function validateOptionSystem(expect: Expect): void {
   }
   expect("no option has more than one default", [...defaults.values()].every((n) => n <= 1), true);
 
-  // display:"action" ⇒ a TopologyEdit template and no choices; everything else
-  // that offers a list must actually offer one.
-  const actions = options.filter((o) => o.display === "action");
+  // display:"action" ⇒ a TopologyEdit template; its choices (if any) qualify the
+  // edit with a catalog section. Everything else that offers a list must
+  // actually offer one.
+  // The SERVED options (each with its choices attached) — `options` above is
+  // narrowed to the bare definition type.
+  const served = groups.flatMap((g) => g.options);
+  const actions = served.filter((o) => o.display === "action");
   expect("action options exist (instant actions)", actions.length > 0, true);
   expect("every action option carries a template", actions.every((o) => o.action !== undefined), true);
+  expect("every choice on an action option names a catalog part",
+    actions.flatMap((o) => o.choices).every((c) => Boolean(c.partKey)), true);
+  // The insert-time divider picker (owner 2026-08-05). Its default MUST match
+  // the adapter's fallback, or an untouched picker would silently re-cut.
+  const addTransom = actions.find((o) => o.key === "structure.add-transom");
+  expect("add-transom offers the stocked sections",
+    addTransom?.choices.map((c) => c.partKey).join(",") ?? "(missing)",
+    "transom-t-67,transom-z-67,mullion-78");
+  expect("add-transom defaults to the adapter's fallback",
+    addTransom?.choices.find((c) => c.isDefault)?.partKey ?? "(none)", "transom-t-67");
+  expect("add-mullion defaults to the adapter's fallback",
+    actions.find((o) => o.key === "structure.add-mullion")?.choices.find((c) => c.isDefault)?.partKey
+      ?? "(none)", "mullion-78");
+  expect("add-midrail defaults to the adapter's fallback",
+    actions.find((o) => o.key === "structure.add-midrail")?.choices.find((c) => c.isDefault)?.partKey
+      ?? "(none)", "midrail-67");
+  // mullion-75 has no deduction source, no reinforcement mapping and no price —
+  // it must not be selectable anywhere (golden rule).
+  expect("mullion-75 is offered by no option",
+    choices.filter((c) => c.partKey === "mullion-75").map((c) => c.key).join(",") || "(none)",
+    "(none)");
   const listDisplays = ["select", "select-image", "segmented"];
   const emptyLists = groups
     .flatMap((g) => g.options)
@@ -385,8 +410,16 @@ function validateEveryFamily(expect: Expect, catalogKeys: Set<string>): void {
       os.every((o) => o.choices.filter((c) => c.isDefault).length <= 1), true);
     expect(`${key}: every action option carries a template`,
       os.filter((o) => o.display === "action").every((o) => o.action !== undefined), true);
-    expect(`${key}: an action option offers no choices`,
-      os.filter((o) => o.display === "action").every((o) => o.choices.length === 0), true);
+    // An action option MAY offer choices — the divider-section picker on
+    // `structure.add-*`, where the template gives the op and the choice gives
+    // the SECTION. What it may never do is offer a choice that names no catalog
+    // part, which would be a dropdown entry that changes nothing.
+    expect(`${key}: every choice on an action option names a catalog part`,
+      os.filter((o) => o.display === "action")
+        .flatMap((o) => o.choices)
+        .filter((c) => !c.partKey)
+        .map((c) => c.key).join(",") || "(none)",
+      "(none)");
     expect(`${key}: no list option is served empty`,
       os.filter((o) => listDisplays.includes(o.display) && o.choices.length === 0)
         .map((o) => o.key).join(",") || "(none)",

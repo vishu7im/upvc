@@ -31,7 +31,7 @@ import type {
   OptionDef,
   TopologyEditTemplate,
 } from "@/lib/types";
-import { describeEdit } from "@/lib/designer-draft";
+import { defaultChoiceKey, describeEdit } from "@/lib/designer-draft";
 
 /** Sub-components ("cell:root.top/glass") indent under their parent. */
 function isSubComponent(componentId: string): boolean {
@@ -108,7 +108,7 @@ export function ComponentActions({
   actions: OptionDef[];
   /** The unit's outer size — the denominator `atRatio` is a fraction OF. */
   frameMm: { widthMm: number; heightMm: number };
-  onAction: (option: OptionDef, atRatio?: number) => void;
+  onAction: (option: OptionDef, atRatio?: number, choiceKey?: string) => void;
 }) {
   if (actions.length === 0) return null;
   return (
@@ -118,7 +118,7 @@ export function ComponentActions({
           key={option.key}
           option={option}
           frameMm={frameMm}
-          onRun={(ratio) => onAction(option, ratio)}
+          onRun={(ratio, choiceKey) => onAction(option, ratio, choiceKey)}
         />
       ))}
     </div>
@@ -126,15 +126,20 @@ export function ComponentActions({
 }
 
 /**
- * One instant action. An action whose template asks for an explicit position
- * prompts for it inline; an "equal" action applies straight away (the divider
- * is then draggable on the canvas like any other).
+ * One instant action. An action that needs a decision — an explicit position, a
+ * choice of section, or both — prompts for it inline; a bare action applies
+ * straight away (the divider is then draggable on the canvas like any other).
  *
- * The prompt is in MILLIMETRES, because that is what a fabricator measures — a
- * transom drop of 400 mm, not "33%". `atRatio` is a fraction of the WHOLE unit
- * (CellSpec/splitAtRatio contract), so the conversion is a plain divide by the
- * outer dimension on the split's axis: no new geometry, and it round-trips with
- * the canvas drag handles, which write the same fraction.
+ * The position prompt is in MILLIMETRES, because that is what a fabricator
+ * measures — a transom drop of 400 mm, not "33%". `atRatio` is a fraction of the
+ * WHOLE unit (CellSpec/splitAtRatio contract), so the conversion is a plain
+ * divide by the outer dimension on the split's axis: no new geometry, and it
+ * round-trips with the canvas drag handles, which write the same fraction.
+ *
+ * The SECTION prompt appears whenever the option carries choices — the option
+ * system's way of saying "this edit has more than one profile to cut from"
+ * (owner 2026-08-05: two stocked transoms, 67 mm and 78 mm). Which option that
+ * is, and which sections it offers, is entirely seed data; this file names none.
  */
 function ActionButton({
   option,
@@ -143,23 +148,26 @@ function ActionButton({
 }: {
   option: OptionDef;
   frameMm: { widthMm: number; heightMm: number };
-  onRun: (atRatio?: number) => void;
+  onRun: (atRatio?: number, choiceKey?: string) => void;
 }) {
   const template = option.action as TopologyEditTemplate | undefined;
   const needsRatio =
     template !== undefined && "position" in template && template.position === "at-ratio";
+  const choices = option.choices ?? [];
+  const needsChoice = choices.length > 0;
   // A horizontal split is a DROP from the head; a vertical one is a distance
   // from the left jamb.
   const horizontal =
     template !== undefined && "axis" in template && template.axis === "horizontal";
   const span = horizontal ? frameMm.heightMm : frameMm.widthMm;
   const [mmText, setMmText] = useState(() => String(Math.round(span / 2)));
+  const [choiceKey, setChoiceKey] = useState(() => defaultChoiceKey(option) ?? "");
   const [open, setOpen] = useState(false);
 
   const chip =
     "inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-[var(--shadow-xs)] transition hover:border-[#4442e3] hover:text-[#4442e3] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4442e3]/40";
 
-  if (!needsRatio) {
+  if (!needsRatio && !needsChoice) {
     return (
       <button type="button" onClick={() => onRun()} title={option.presentation?.helpText} className={chip}>
         <Icon name="plus" className="h-3 w-3 shrink-0" />
@@ -167,6 +175,17 @@ function ActionButton({
       </button>
     );
   }
+
+  const apply = () => {
+    let ratio: number | undefined;
+    if (needsRatio) {
+      const mm = Number.parseFloat(mmText);
+      if (!Number.isFinite(mm) || mm <= 0 || mm >= span) return;
+      ratio = mm / span;
+    }
+    setOpen(false);
+    onRun(ratio, needsChoice ? choiceKey || undefined : undefined);
+  };
 
   return (
     <div className="relative">
@@ -181,39 +200,59 @@ function ActionButton({
         <span className="truncate">{option.name}</span>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 w-60 rounded-lg border border-slate-200 bg-white p-2 shadow-[var(--shadow-lg)]">
+        <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-slate-200 bg-white p-2 shadow-[var(--shadow-lg)]">
+          {needsChoice && (
+            <div className="mb-2">
+              <label htmlFor={`act-sec-${option.key}`} className={cn("mb-1 block", labelClass)}>
+                Section
+              </label>
+              <select
+                id={`act-sec-${option.key}`}
+                value={choiceKey}
+                onChange={(e) => setChoiceKey(e.target.value)}
+                className={cn(fieldClass, "h-8 w-full px-2 text-sm")}
+              >
+                {choices.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex items-center gap-2">
-            <label htmlFor={`act-${option.key}`} className={labelClass}>
-              {horizontal ? "Drop" : "From left"}
-            </label>
-            <input
-              id={`act-${option.key}`}
-              type="number"
-              min={1}
-              max={Math.max(1, Math.round(span) - 1)}
-              step={1}
-              value={mmText}
-              onChange={(e) => setMmText(e.target.value)}
-              className={cn(fieldClass, "h-8 w-20 px-2 font-mono text-sm")}
-            />
-            <span className="text-[11px] font-semibold text-slate-400">mm</span>
+            {needsRatio && (
+              <>
+                <label htmlFor={`act-${option.key}`} className={labelClass}>
+                  {horizontal ? "Drop" : "From left"}
+                </label>
+                <input
+                  id={`act-${option.key}`}
+                  type="number"
+                  min={1}
+                  max={Math.max(1, Math.round(span) - 1)}
+                  step={1}
+                  value={mmText}
+                  onChange={(e) => setMmText(e.target.value)}
+                  className={cn(fieldClass, "h-8 w-20 px-2 font-mono text-sm")}
+                />
+                <span className="text-[11px] font-semibold text-slate-400">mm</span>
+              </>
+            )}
             <button
               type="button"
-              onClick={() => {
-                const mm = Number.parseFloat(mmText);
-                if (!Number.isFinite(mm) || mm <= 0 || mm >= span) return;
-                setOpen(false);
-                onRun(mm / span);
-              }}
+              onClick={apply}
               className="ml-auto rounded-md bg-[#4442e3] px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-[#3634c0]"
             >
               Apply
             </button>
           </div>
-          <p className="mt-1.5 text-[10px] leading-3 text-slate-400">
-            Centreline, measured from the {horizontal ? "head" : "left jamb"} of the {Math.round(span)} mm
-            frame.
-          </p>
+          {needsRatio && (
+            <p className="mt-1.5 text-[10px] leading-3 text-slate-400">
+              Centreline, measured from the {horizontal ? "head" : "left jamb"} of the{" "}
+              {Math.round(span)} mm frame.
+            </p>
+          )}
         </div>
       )}
     </div>

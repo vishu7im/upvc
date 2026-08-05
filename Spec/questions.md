@@ -338,6 +338,38 @@ casement/door jobs (see `system-sunnyplast.ts`). The pair's cut list is identica
 so the disagreement has never mattered — for a sidelight it would. One French cutting list WITH a
 sidelight settles it.
 
+## Task 4 addendum — divider picker, order editing (2026-08-05)
+
+**Q33. `mullion-75` (SPQ-050-30252) — enable it, or leave it out?**
+
+It is now offered by **no** option. It was in `profile.divider`'s list until 2026-08-05, which meant
+the studio could cut it — despite the catalog comment saying explicitly not to
+(`system-sunnyplast.ts`): the deduction pages cover `SPQ-5-30252` / `SPQ-005-30252` only, it has no
+`reinforcementMap` entry, and it is absent from the M5.5 price lists, so a unit built with it cut on
+an unevidenced deduction and priced at **£0**. Removing it is the golden-rule-consistent state.
+
+To enable it we need either a glass-deduction page for the profile, or one production cutting list
+that uses it. Is it stocked at all? If it is not, the catalog row can also be retired.
+
+**Q34. Should a `mode:"custom"` legacy item ever be convertible to a studio item?**
+
+`legacy-import.ts` refuses it. A Custom-mode `OrderItem` carries an `EngineOverrides` blob of
+per-profile allowance tweaks (`engine/overrides.ts`), and the option system exposes no equivalent —
+converting would silently re-cut the item with the catalog's own allowances. The item stays
+editable the old way (remove + re-add).
+
+Two ways out if this bites: seed the allowance overrides as real options (they are fabrication
+values, so each needs a source), or carry the blob on the draft untouched and hand it back to
+`solve()`. The second is a small additive change but makes a draft partly opaque to the option
+system. No decision needed until someone actually hits it.
+
+**Q35. Reopening a confirmed order — is a permission of its own wanted?**
+
+`POST /api/orders/:id/reopen` currently requires `orders:create`, the same permission as confirm, on
+the reasoning that whoever may confirm may un-confirm. But reopening **destroys** the 7 generated
+documents and their cached PDFs, which confirm does not. If reopening should be a supervisor
+action, it needs its own action slug in `src/rbac/registry.ts` and a permissions re-sync.
+
 ## Resolved during planning
 
 - **Screenshots gap** — `collections/windows/` subfolders were initially empty; owner supplied 13

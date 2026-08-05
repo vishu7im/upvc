@@ -269,6 +269,13 @@ export interface OrderItem {
   cillKey?: string | null;
   design?: { name: string };
   product?: { name: string };
+  /**
+   * The designer family this legacy item can be reopened against, or null when
+   * it cannot be (no configurable family claims the product, or it was quoted
+   * in Custom extraction mode). The server answers it with the pure converter
+   * (`src/designer/legacy-import.ts`) so the UI never reimplements the rule.
+   */
+  studioFamilyKey?: string | null;
 }
 export interface OrderDetail extends OrderSummary {
   items: OrderItem[];

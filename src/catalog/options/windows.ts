@@ -68,8 +68,35 @@ const CASEMENT_FRAME_KEYS = ["frame-5ch", "frame-6ch"] as const;
 /** Owner decision 2026-08-04: the studio starts on 6 chamber for windows AND doors. */
 const DEFAULT_FRAME_KEY = "frame-6ch";
 const CASEMENT_BEAD_KEYS = ["bead-28", "bead-32"] as const;
-/** Divider sections a casement/door unit can use (not the French stulp). */
-const CASEMENT_DIVIDER_KEYS = ["transom-t-67", "transom-z-67", "mullion-78", "mullion-75"] as const;
+/**
+ * Divider sections a casement/door unit can use (not the French stulp) — the two
+ * the owner stocks: 67 mm (SPQ-05-20252 "T" / SPQ-005-30252 "Z") and 78 mm
+ * (SPQ-5-30252).
+ *
+ * `mullion-75` (SPQ-050-30252) is deliberately NOT offered. It exists in the
+ * catalog as inert manual data only: the deduction pages cover SPQ-5-30252 /
+ * SPQ-005-30252 alone, it carries no `reinforcementMap` entry and it is absent
+ * from the M5.5 price lists (system-sunnyplast.ts:298-317). Offering it would
+ * let the studio cut an uncalibrated bar and price it silently at £0 — the
+ * golden rule forbids exactly that. Re-add it here the day a deduction source
+ * or a priced supplier line arrives (questions.md Q33).
+ */
+const CASEMENT_DIVIDER_KEYS = ["transom-t-67", "transom-z-67", "mullion-78"] as const;
+
+/** The divider a horizontal split gets when the picker is left alone. */
+const DEFAULT_TRANSOM_KEY = "transom-t-67";
+/** The divider a vertical split gets when the picker is left alone. */
+const DEFAULT_MULLION_KEY = "mullion-78";
+/** The bar a midrail gets when the picker is left alone (French-calibrated). */
+const DEFAULT_MIDRAIL_KEY = "midrail-67";
+/**
+ * Sections a midrail can be cut from. Job 154 (705 × 705, 5 pages) prints the
+ * `Ext = Int + 2 × face` midrail rule on the 67 mm SPQ-005-30252 (609) and on
+ * the 78 mm SPQ-5-30252 (631), on both axes — so both are calibrated. This
+ * mirrors `adapters/cellnode.ts`, which already defaults a vertical midrail to
+ * the 78 and a horizontal one to the 67.
+ */
+const MIDRAIL_KEYS = ["midrail-67", "mullion-78"] as const;
 
 /** The four frame edges an add-on (frame extension) can be fitted to (Job 169). */
 const ADDON_SIDES = ["top", "bottom", "left", "right"] as const;
@@ -743,6 +770,47 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
       familyKeys: [FAMILY],
     }),
   );
+
+  // Which SECTION the new bar is cut from, chosen at insert time.
+  //
+  // Owner report 2026-08-05: "we have two types of transom in warehouse … so
+  // when we add a transom we have also option to select the transom". Until now
+  // every inserted bar took the adapter's hardcoded default and had to be
+  // changed afterwards through `profile.divider`.
+  //
+  // These are CHOICES ON AN ACTION option — the one place the option system lets
+  // a choice qualify an edit rather than answer a question. The choice's own
+  // `partKey` is folded into the edit's `dividerKey` (split) / `transomKey`
+  // (midrail), both of which `TopologyEdit` has always declared and
+  // `adapters/cellnode.ts` has always honoured. The `isDefault` below MATCHES the
+  // adapter's fallback exactly, so an untouched picker reproduces the previous
+  // cut list byte for byte.
+  const DIVIDER_ACTIONS: { optionKey: string; keys: readonly string[]; def: string }[] = [
+    { optionKey: "structure.add-transom", keys: CASEMENT_DIVIDER_KEYS, def: DEFAULT_TRANSOM_KEY },
+    { optionKey: "structure.add-transom-at", keys: CASEMENT_DIVIDER_KEYS, def: DEFAULT_TRANSOM_KEY },
+    { optionKey: "structure.add-mullion", keys: CASEMENT_DIVIDER_KEYS, def: DEFAULT_MULLION_KEY },
+    { optionKey: "structure.add-mullion-at", keys: CASEMENT_DIVIDER_KEYS, def: DEFAULT_MULLION_KEY },
+    // A midrail is cut Ext = Int + 2 × face; Job 154 prints that on BOTH the
+    // 67 mm bar (609) and the 78 mm one (631), so both are calibrated here.
+    { optionKey: "structure.add-midrail", keys: MIDRAIL_KEYS, def: DEFAULT_MIDRAIL_KEY },
+  ];
+  for (const { optionKey, keys, def } of DIVIDER_ACTIONS) {
+    for (const [i, key] of keys.entries()) {
+      const t = sys.transoms[key];
+      if (!t) continue;
+      choices.push({
+        key: `${optionKey}-${key}`,
+        optionKey,
+        label: t.name,
+        order: (i + 1) * 10,
+        isDefault: key === def,
+        partKey: key,
+        // The op comes from the option's own `action` template; the choice only
+        // says WHICH SECTION, so it carries no op of its own.
+        engineEffect: { kind: "none" },
+      });
+    }
+  }
 
   // Component type switcher (reference UI: Glass / Sash / Flat panel). The legal
   // conversions come from the family descriptor's componentConversions.

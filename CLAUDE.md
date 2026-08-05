@@ -206,7 +206,8 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
   `NotImplementedError`) and `adapters/index.ts` (the registry). **Pure, no I/O** — same rule as
   the engine; the catalog reaches the resolver as a `CatalogSnapshot`. Seed sources are
   `src/catalog/families/*` + `src/catalog/options/*`. **A family must never be seeded ahead of its
-  adapter** — `resolve.ts` calls `getAdapter` unguarded.
+  adapter** — `resolve.ts` calls `getAdapter` unguarded. `legacy-import.ts` is the one-way bridge
+  from a pre-Designer `OrderItem` to a `LineItemDraft` (pure; the API half is in `src/api/orders.ts`).
 - `web/app/(app)/designer/` + `web/components/designer/*` — the Designer UI: `workspace.tsx`
   (the draft reducer + debounced resolve + the component selection + the D5 view switch/cache),
   `measurements.tsx`, `options.tsx` (scope-aware), `structure.tsx` (D4 tree/actions/history),
@@ -1843,6 +1844,89 @@ component contract, the boundary drag, and every rejected op yielding one issue 
 gates (no empty list option, no dangling partKey, ≤1 default, every `pricingMode:"none"` explains
 itself, every component-scoped option targets a producible type, no money in the public payload) now
 apply to a fifth family the day it is registered. New owner questions **Q28–Q32**.
+
+## Field fixes — 2026-08-05 (divider picker, order editing, one-page work order)
+
+Three more reports from real use. **1405 → 1568 passed, 0 failed** (the jump also includes the
+french-door/sliding-patio suites, which had been SKIPping until the DB was reseeded).
+
+**1. You can pick the transom SECTION when you add it.** Owner: *"we have two types of transom in
+warehouse — SPQ-05-20252/SPQ-005-30252 67mm and SPQ-5-30252 78mm; when we add a transom we have
+also option to select the transom and edit the type."* Both were **already in the catalog**
+(`transom-t-67`, `transom-z-67`, `mullion-78`) and already swappable AFTER insertion through
+`profile.divider`. What was missing was the choice at INSERT time: the five `structure.add-*` action
+templates carried no `dividerKey`, so every inserted bar took the adapter's fallback.
+
+The plumbing already existed end to end — `TopologyEdit.split.dividerKey` /
+`add-midrail.transomKey` have always been declared, `cellnode.ts` has always resolved
+`edit.dividerKey ?? DEFAULT_*_KEY` and rejected an unknown profile. The change is that **an action
+option may now carry CHOICES**: the option's `action` template supplies the op, the choice supplies
+the section (`partKey`). `option-integrity.ts` enforces the new rule — a choice on an action option
+MUST name a catalog part, or it is a dropdown entry that changes nothing. `ActionButton` renders a
+Section select whenever `choices.length > 0`, and `web/lib/designer-draft.ts#withChosenPart` folds
+the part onto the field the **op** declares. Keyed on the op, never an option key, so **no option
+key appears under `web/`** — still true.
+
+Each action's `isDefault` MATCHES the adapter's fallback (`transom-t-67` / `mullion-78` /
+`midrail-67`), so an untouched picker reproduces the previous cut list exactly — asserted in
+`options.test.ts` and verified live (default ⇒ `SPQ-05-20252` T; picking Z ⇒ `SPQ-005-30252` with
+jointType **Z**, which legitimately changes the length too because a Z breaks the jamb; picking 78
+⇒ `SPQ-5-30252`).
+
+**`mullion-75` (SPQ-050-30252) is now offered by NO option.** It was in `profile.divider`'s list
+despite the catalog comment forbidding exactly that: no deduction page covers it, it has no
+`reinforcementMap` entry and it is in no price list — so the studio could cut it on an unevidenced
+deduction and price it at **£0**. Removing it is the golden-rule-consistent state; **Q33** records
+what would let it back in. Also renamed `transom-z-67` "Chasement Z Sash" → **"Z Transom 67mm"** (a
+typo, and it read as a sash beside "T Transom 67mm"). The word *Transom* is load-bearing:
+`documents.ts#section()` classifies by substring and the old name only reached the Frame section via
+a literal `"chasement"` test.
+
+**2. An order can be edited after it is placed.** Four pieces:
+
+- **Discoverability** — every informational cell in the orders list is a link to the order (one
+  tab stop per row, the Actions cell excluded so the Delete button is not a trap).
+- **Legacy items open in the studio.** `src/designer/legacy-import.ts` (PURE, catalog via
+  `CatalogSnapshot`) converts an `OrderItem`'s named columns into a `LineItemDraft`: the family
+  comes from `designSource.productIds`, and `frameKey`/`cillKey`/`colourKeyInside`/`Outside` become
+  `selections[]` by **reverse lookup** on each choice's own `partKey` + `engineEffect` — so no
+  option key is hardcoded and an unmatched value is a reported issue, never a silent drop.
+  `GET /api/orders/:id/items/:itemId/draft` is read-only; the swap happens on **save**
+  (`POST …/line-items?replaces=<orderItemId>`, create + delete in ONE transaction), so opening the
+  studio and backing out changes nothing. `GET /api/orders/:id` carries `studioFamilyKey` per legacy
+  item (null ⇒ no Edit link).
+  **The frame needed care**: a legacy item with `frameKey: null` was cut with the design's baked
+  frame (casement bakes `frame-5ch`, face 64), but a studio draft with no frame answer gets
+  `profile.frame-chamber`'s `isDefault` of `frame-6ch` — and the resolver's frame branch applies a
+  DEFAULT-sourced answer. The converter therefore pins the design's own frame explicitly. Verified
+  live: converted item nets **£82.03**, identical to the legacy quote.
+  **Refused, not guessed:** `mode:"custom"` (an `EngineOverrides` blob the option system cannot
+  express) blocks conversion rather than re-cutting with catalog allowances (**Q34**).
+- **`POST /api/orders/:id/reopen`** puts a confirmed order back to draft. This **deliberately breaks
+  the "confirmed is immutable" invariant** the document cache rested on, so it cleans up everything
+  that invariant licensed: the 7 `Document` rows and the frozen basket in ONE transaction, then the
+  cached PDFs under `orders/{id}/` via the existing `deleteObjectsWithPrefix` (logged, not fatal —
+  the DELETE route's pattern). **Forced fix:** the PDF route checked object-storage existence
+  BEFORE the document row; it now looks up the row first, so a stale object left by a failed purge
+  can never be served. Permission is `orders:create` (same as confirm) — **Q35** asks whether it
+  should be its own.
+- **`PUT /api/orders/:id`** for customer / reference (draft-only, like every order mutation).
+
+Live-verified: confirm → 10 docs → PDF cached (341 KB) → reopen → docs 0, `totalPrice`/
+`basketTotals` cleared, PDF **404**, second reopen 409 → rename → re-confirm → PDF regenerated
+carrying the new name.
+
+**3. The work order fits on one page.** No `@page` rule or page-break machinery existed; pagination
+was purely Puppeteer's A4 default, and a single-item work order ran ~1060 px against ~968 px of
+usable height. `wrap()` gained a 4th `extraCss` parameter (default `""` ⇒ byte-identical) and
+`renderWorkOrder` is the **only** caller that passes one — a ~280 px recovery from a smaller preview
+card, a body margin that no longer duplicates the PDF's own, tighter rows and a slightly smaller row
+font, plus `table-header-group` / `break-inside: avoid` so a genuine spill breaks between rows.
+Measured: casement 819 px, door 734 px, French midrail 904 px — **all 1 page**, where the untouched
+cutting list and BOM remain 2. **24/24 renders of the other six documents are byte-identical**
+(proved by diffing against `git show HEAD:` before/after). NOT a guarantee: confirm aggregates a
+multi-item order into ONE work order with a preview per item, so a large order still paginates —
+deliberately, since shrinking it to fit would make it unreadable on the shop floor.
 
 ## Conventions
 

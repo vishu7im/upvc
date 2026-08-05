@@ -4,7 +4,9 @@
 // =====================================================================
 
 import { Router } from "express";
-import { DocumentType, type Prisma } from "@prisma/client";
+// `Prisma` is imported as a VALUE (not `import type`) because clearing the
+// nullable `basketTotals` Json column on reopen needs `Prisma.DbNull`.
+import { DocumentType, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../db/client.ts";
 import { solve } from "../engine/solve.ts";
@@ -35,6 +37,7 @@ import {
   buildOrderLineItemsRouter,
   liveCatalogSnapshot,
 } from "./lineitems.ts";
+import { legacyItemToDraft } from "../designer/legacy-import.ts";
 import {
   buildQuoteInput,
   computeOrderBasket,
@@ -160,6 +163,31 @@ ordersRouter.post(
   }),
 );
 
+// Correcting who an order is for is not a fabrication change — but it IS
+// printed on all 7 documents, so it is a DRAFT-only edit like every other
+// mutation. A confirmed order must be reopened first.
+const updateOrderSchema = z.object({
+  customerName: z.string().min(1).optional(),
+  reference: z.string().max(200).nullable().optional(),
+});
+
+ordersRouter.put(
+  "/:id",
+  requirePermission("orders", "create"),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const order = await ownDraftOrder(req, req.params.id);
+    const body = validate(updateOrderSchema, req.body);
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        ...(body.customerName !== undefined ? { customerName: body.customerName } : {}),
+        ...(body.reference !== undefined ? { reference: body.reference } : {}),
+      },
+    });
+    res.json(updated);
+  }),
+);
+
 ordersRouter.get(
   "/",
   requirePermission("orders", "read"),
@@ -236,11 +264,37 @@ ordersRouter.get(
     if (!order) throw new HttpError(404, "Order not found");
     // Designer items ship draft + a light summary of the cached resolve — the
     // full ResolvedLineItem (incl. SVG) is fetched via a re-resolve when needed.
-    const { designerItems, ...rest } = order;
+    const { designerItems, items, ...rest } = order;
     // Live for drafts, frozen snapshot for confirmed orders (phase 6).
     const basket = await computeOrderBasket(order as unknown as OrderCommercialRow);
+    // Can this legacy item be opened in the studio, and against which family?
+    // Answered here, with the pure converter, so the UI never reimplements what
+    // makes an item convertible (no configurable family claims its product;
+    // Custom extraction mode) — a null key simply means no Edit link. The key
+    // is what the /designer route needs in its query string.
+    const snap = liveCatalogSnapshot();
     res.json({
       ...rest,
+      items: items.map((i) => {
+        const conv = legacyItemToDraft(
+          {
+            productId: i.productId,
+            designId: i.designId,
+            systemId: i.systemId,
+            widthMm: i.widthMm,
+            heightMm: i.heightMm,
+            qty: i.qty,
+            mode: i.mode,
+            splitRatios: i.splitRatios as Record<string, number> | null,
+            frameKey: i.frameKey,
+            cillKey: i.cillKey,
+            colourKeyInside: i.colourKeyInside,
+            colourKeyOutside: i.colourKeyOutside,
+          },
+          snap,
+        );
+        return { ...i, studioFamilyKey: conv.blocking ? null : conv.draft!.familyKey };
+      }),
       basket,
       designerItems: designerItems.map((d) => {
         const r = d.resolved as ResolvedLineItem | null;
@@ -390,6 +444,47 @@ ordersRouter.delete(
   }),
 );
 
+/**
+ * The draft a legacy item WOULD become in the studio — read-only, so opening
+ * the studio on a legacy item changes nothing until the user saves.
+ *
+ * The conversion itself is pure (`designer/legacy-import.ts`); this is only its
+ * I/O half. `issues` is part of the response on purpose: a colour or cill that
+ * the family's option system does not offer must be visible before the user
+ * saves over the original.
+ */
+ordersRouter.get(
+  "/:id/items/:itemId/draft",
+  requirePermission("orders", "read"),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const order = await ownOrder(req, req.params.id);
+    const item = await prisma.orderItem.findFirst({
+      where: { id: req.params.itemId, orderId: order.id },
+    });
+    if (!item) throw new HttpError(404, "Order item not found");
+
+    const result = legacyItemToDraft(
+      {
+        productId: item.productId,
+        designId: item.designId,
+        systemId: item.systemId,
+        widthMm: item.widthMm,
+        heightMm: item.heightMm,
+        qty: item.qty,
+        mode: item.mode,
+        overrides: item.overrides,
+        splitRatios: item.splitRatios as Record<string, number> | null,
+        frameKey: item.frameKey,
+        cillKey: item.cillKey,
+        colourKeyInside: item.colourKeyInside,
+        colourKeyOutside: item.colourKeyOutside,
+      },
+      liveCatalogSnapshot(),
+    );
+    res.json(result);
+  }),
+);
+
 // ---- designer line items (Task 1 phase 2) ---------------------------
 // CRUD for persisted LineItemDrafts; coexists with the legacy items above.
 ordersRouter.use("/:id/line-items", buildOrderLineItemsRouter(ownDraftOrder));
@@ -442,6 +537,67 @@ ordersRouter.put(
 
     const basket = await computeOrderBasket(updated as unknown as OrderCommercialRow);
     res.json({ order: updated, basket });
+  }),
+);
+
+// ---- reopen: confirmed → draft -------------------------------------
+
+/**
+ * Put a confirmed order back into draft so its items can be corrected
+ * (owner 2026-08-05). Until now `confirmed` was terminal and the only escape
+ * was deleting the order.
+ *
+ * This DELIBERATELY BREAKS the "a confirmed order is immutable" invariant that
+ * the document cache was built on, so it has to clean up everything that
+ * invariant licensed:
+ *
+ *   - the 7 stored `Document` rows (their HTML is a snapshot of items that are
+ *     about to change),
+ *   - the frozen basket (`basketTotals` / `discountAmount` / `totalPrice`),
+ *     which must be re-derived live while the order is a draft again,
+ *   - the cached PDFs under `orders/{id}/` in object storage.
+ *
+ * Re-confirming regenerates all of it. The PDF route additionally had to stop
+ * trusting key-existence alone — see the comment there.
+ */
+ordersRouter.post(
+  "/:id/reopen",
+  requirePermission("orders", "create"),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const order = await ownOrder(req, req.params.id);
+    if (order.status !== "confirmed") {
+      throw new HttpError(409, "Only a confirmed order can be reopened");
+    }
+
+    // The document rows and the status flip must land together: a moment where
+    // the order reads "draft" while stale documents are still served would
+    // show the old paperwork as if it were current.
+    await prisma.$transaction([
+      prisma.document.deleteMany({ where: { orderId: order.id } }),
+      prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status: "draft",
+          totalPrice: null,
+          discountAmount: null,
+          basketTotals: Prisma.DbNull,
+        },
+      }),
+    ]);
+
+    // Object storage is not transactional and is not the source of truth, so a
+    // purge failure is logged rather than turned into a misleading 500 — the
+    // same call the DELETE route makes. The PDF route now checks for the
+    // Document row first, so a survivor of a failed purge is never served.
+    if (storageConfigured()) {
+      try {
+        await deleteObjectsWithPrefix(`orders/${order.id}/`);
+      } catch (err) {
+        console.error(`[storage] failed to purge cached PDFs for order ${order.id}`, err);
+      }
+    }
+
+    res.json({ id: order.id, status: "draft" });
   }),
 );
 
@@ -932,8 +1088,15 @@ ordersRouter.get(
 );
 
 // PDF of a document — lazily rendered on first request, then cached in object
-// storage. The confirmed order (and thus its stored HTML) is immutable, so the
-// cached PDF never goes stale. Key existence IS the cache.
+// storage under a deterministic, variant-keyed name.
+//
+// The cache used to be keyed on existence ALONE, because a confirmed order was
+// immutable. `POST /:id/reopen` ended that: an order can now go back to draft,
+// have its items changed, and be re-confirmed. The DOCUMENT ROW is therefore
+// checked FIRST — reopen deletes those rows in the same transaction as the
+// status flip, so a stale object left behind by a failed purge can never be
+// served. On a live document the extra lookup is one indexed read, and the
+// cache still saves the Puppeteer render, which is the expensive part.
 ordersRouter.get(
   "/:id/documents/:type/pdf",
   requirePermission("orders", "read"),
@@ -944,18 +1107,18 @@ ordersRouter.get(
       throw new HttpError(400, `Unknown document type: ${req.params.type}`);
     const variant = parseVariant(req.query.variant);
 
-    // Variant-keyed cache: existence == cached, and confirmed orders are immutable.
+    const doc = await findDoc(req.params.id, type, variant);
+    if (!doc)
+      throw new HttpError(
+        404,
+        "Document not generated yet (confirm the order first)",
+      );
+
     const key = `orders/${req.params.id}/${type}__${variant}__catalog-preview-v1.pdf`;
     let pdf: Buffer;
     if (await objectExists(key)) {
       pdf = (await getObject(key)).body; // cache hit
     } else {
-      const doc = await findDoc(req.params.id, type, variant);
-      if (!doc)
-        throw new HttpError(
-          404,
-          "Document not generated yet (confirm the order first)",
-        );
       const html = await hydrateDocumentPreviews(req.params.id, doc.html);
       pdf = await htmlToPdf(html);
       await putObject(key, pdf, "application/pdf"); // cache for next time

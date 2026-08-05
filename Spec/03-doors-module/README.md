@@ -66,6 +66,12 @@ Two findings are genuinely new, and both are phase 1:
   doorset. French dodged it by scoping to `["sash"]` only; the door has not. Filed as **Q28** in
   `../questions.md`; the fix is one family-supplied default on the descriptor.
 
+- **Divider section is chosen at insert time (2026-08-05).** `entrance-door` adopts
+  `structure.add-transom` / `-at` / `add-mullion` / `-at`, so it inherits the new section picker with
+  no seed change of its own: **T 67 (SPQ-05-20252), Z 67 (SPQ-005-30252), 78 (SPQ-5-30252)**, the
+  78 defaulting on mullions — which is what Job 169 prints as a doorset's divider.
+  `mullion-75` is withdrawn everywhere (no deduction source, no price — Q33).
+
 ## Phases & dependency graph
 
 ```

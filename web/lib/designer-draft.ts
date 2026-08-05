@@ -214,6 +214,31 @@ export function optionAppliesTo(option: OptionDef, component: ComponentRef): boo
   return (option.scope.componentTypes ?? []).includes(component.type);
 }
 
+/**
+ * Fold an action option's chosen SECTION into the edit it produces.
+ *
+ * An action option may carry choices that qualify its template rather than
+ * answer a question — today that is the divider-section picker on
+ * `structure.add-*` (owner 2026-08-05: "when we add a transom we have also
+ * option to select the transom"). The catalog part rides on the choice, exactly
+ * as it does for `profile.divider`; this puts it on the field the edit's OWN OP
+ * declares.
+ *
+ * Keyed on the op, never on an option key — so a newly seeded action inherits
+ * the behaviour and `web/` still names no option (the D3/D8 rule).
+ */
+export function withChosenPart(edit: TopologyEdit, partKey: string | undefined): TopologyEdit {
+  if (!partKey) return edit;
+  if (edit.op === "split") return { ...edit, dividerKey: partKey };
+  if (edit.op === "add-midrail") return { ...edit, transomKey: partKey };
+  return edit;
+}
+
+/** The section an action option inserts when its picker is left alone. */
+export function defaultChoiceKey(option: OptionDef): string | undefined {
+  return option.choices.find((c) => c.isDefault)?.key ?? option.choices[0]?.key;
+}
+
 /** The instant actions (display "action") this component accepts. */
 export function actionOptionsFor(
   groups: OptionGroupWithOptions[],

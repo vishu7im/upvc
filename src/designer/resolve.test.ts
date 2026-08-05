@@ -23,6 +23,7 @@ import {
   getFamily,
   getOptionSystem,
   getSystem,
+  listFamilies,
 } from "../catalog/index.ts";
 import { solve } from "../engine/solve.ts";
 import { computeHardware } from "../engine/hardware.ts";
@@ -45,6 +46,7 @@ function snapshot(): CatalogSnapshot {
     getOptionSystem,
     getSystem,
     getDesign,
+    listFamilies,
   };
 }
 

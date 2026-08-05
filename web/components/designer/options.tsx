@@ -71,7 +71,7 @@ export interface OptionsTabProps {
   onSelectComponent: (componentId: string | null) => void;
   /** Instant actions the selected component's type declares. */
   actions: OptionDef[];
-  onAction: (option: OptionDef, atRatio?: number) => void;
+  onAction: (option: OptionDef, atRatio?: number, choiceKey?: string) => void;
   edits: DraftTopologyEdit[];
   onRemoveEdit: (editId: string) => void;
   onChoice: (option: OptionDef, choiceKey: string, scope?: string) => void;

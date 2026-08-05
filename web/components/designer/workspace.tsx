@@ -49,6 +49,7 @@ import {
   pruneSelections,
   removeEdit,
   setSelection,
+  withChosenPart,
   type IssueFix,
 } from "@/lib/designer-draft";
 import { normalizeSvgForPreview } from "@/lib/svg-preview";
@@ -183,6 +184,17 @@ export interface WorkspaceProps {
   orderId?: string;
   /** Present ⇒ editing a persisted designer line item (PUT instead of POST). */
   itemId?: string;
+  /**
+   * Present ⇒ this draft was CONVERTED from the legacy `OrderItem` with this id
+   * and saving swaps one for the other. Mutually exclusive with `itemId`.
+   */
+  replacesItemId?: string;
+  /**
+   * Anything the legacy conversion could not carry over (an unmatched colour,
+   * cill or frame). Shown once, above the inspector, because the user is about
+   * to save over the original.
+   */
+  importIssues?: LineItemIssue[];
   productId?: string;
 }
 
@@ -193,6 +205,8 @@ export default function Workspace({
   fallbackSvg,
   orderId,
   itemId,
+  replacesItemId,
+  importIssues,
 }: WorkspaceProps) {
   const router = useRouter();
   const { family: descriptor, optionSystem } = family;
@@ -329,15 +343,23 @@ export default function Workspace({
     [optionSystem, selectedComponent],
   );
 
-  /** Run an instant action: append its own edit template, targeted at the selection. */
-  const runAction = (option: OptionDef, atRatio?: number) => {
+  /**
+   * Run an instant action: append its own edit template, targeted at the
+   * selection. When the action offered a section picker, the chosen choice's
+   * catalog part is folded onto whichever field the edit's op declares
+   * (`withChosenPart`) — so the studio cuts the profile that was picked.
+   */
+  const runAction = (option: OptionDef, atRatio?: number, choiceKey?: string) => {
     if (!option.action || !selectedComponent) return;
-    const edit = {
+    const base = {
       ...option.action,
       componentId: selectedComponent.componentId,
       ...(atRatio !== undefined ? { atRatio } : {}),
     } as TopologyEdit;
-    dispatch({ type: "addEdit", edit });
+    const partKey = choiceKey
+      ? option.choices.find((c) => c.key === choiceKey)?.partKey
+      : undefined;
+    dispatch({ type: "addEdit", edit: withChosenPart(base, partKey) });
   };
 
   // A split mode the resolver reports as unimplemented is HIDDEN rather than
@@ -423,7 +445,10 @@ export default function Workspace({
         target = (await createOrder({ customerName: customer.trim() })).id;
       }
       if (itemId && orderId) await updateDesignerLineItem(orderId, itemId, toSave);
-      else await addDesignerLineItem(target, toSave);
+      // Converting a legacy item: create + delete in one server transaction.
+      // This is the FIRST write of the whole conversion — until now the studio
+      // has only read, so abandoning it left the original item alone.
+      else await addDesignerLineItem(target, toSave, orderId ? replacesItemId : undefined);
       router.push(`/orders/${target}`);
     } catch (e) {
       setSaveError(e instanceof ApiError ? e.message : "Could not save this item");
@@ -527,7 +552,13 @@ export default function Workspace({
             className="h-9 min-w-0 flex-1 whitespace-nowrap"
             title={quotable ? undefined : "This family is previewable but not orderable"}
           >
-            {saving ? "Saving…" : itemId ? "Update item" : orderId ? "Add to order" : "Create order"}
+            {saving
+              ? "Saving…"
+              : itemId || replacesItemId
+                ? "Update item"
+                : orderId
+                  ? "Add to order"
+                  : "Create order"}
           </Button>
         </div>
       </div>
@@ -537,6 +568,27 @@ export default function Workspace({
   return (
     <div className="-mt-5 space-y-3">
       <ToastViewport toast={toast} onExpire={expireToast} />
+
+      {/* Converting a legacy item: say what did not survive the conversion
+          BEFORE the user saves over the original. Shown once, not per resolve —
+          these are properties of the import, not of the current draft. */}
+      {replacesItemId && (
+        <Card className="border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-semibold text-amber-900">
+            Converting an older item to a studio item
+          </p>
+          <p className="mt-1 text-xs leading-5 text-amber-800">
+            Nothing changes until you save. Saving replaces the original line on this order.
+          </p>
+          {importIssues && importIssues.length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-5 text-amber-900">
+              {importIssues.map((iss, i) => (
+                <li key={i}>{iss.message}</li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
 
       {/* ---- Header ---------------------------------------------------- */}
       <Card className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">

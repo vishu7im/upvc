@@ -225,6 +225,42 @@ function header(input: QuoteInput, title: string, systemName: string, designName
   `;
 }
 
+/**
+ * Work-order-only layout compaction (owner 2026-08-05: "adjust work order in
+ * single page instead of 2 pages").
+ *
+ * A single-item work order ran ~1060 px of content against ~968 px of usable A4
+ * height (297 mm − Puppeteer's 12 mm top/bottom margins − 64 px of body margin),
+ * so it spilled onto a second page by a small margin. This recovers ~280 px:
+ * a smaller preview card, a body margin that no longer duplicates the PDF's own,
+ * tighter table rows and a slightly smaller row font.
+ *
+ * Applied through `wrap`'s `extraCss` seam so the other six documents keep the
+ * shared STYLE byte for byte — they are not part of this request, and the
+ * confirmed-order documents already in the database were rendered with it.
+ *
+ * NOT a guarantee. Confirm aggregates a multi-item order into ONE work order
+ * with a preview per line item (api/orders.ts), so a large order still
+ * paginates — deliberately, since shrinking it to fit would make it unreadable
+ * on the shop floor. The break rules below are what make that spill land
+ * between rows, with the table header repeated, instead of through one.
+ */
+const WORK_ORDER_COMPACT_CSS = `
+  body { margin: 8px; font-size: 11px; }
+  h1 { font-size: 16px; margin: 0 0 6px; }
+  .header { gap: 2px 10px; padding: 5px 10px; margin-bottom: 8px; }
+  table { margin-bottom: 8px; }
+  th, td { padding: 2px 5px; font-size: 10.5px; }
+  .section-title { padding: 3px 6px; }
+  .previews { gap: 8px; margin-bottom: 8px; }
+  .preview { padding: 5px; }
+  .preview .preview-svg { width: 110px; height: 95px; }
+  .preview figcaption { margin-top: 3px; font-size: 9.5px; }
+  .meta { margin-bottom: 8px; }
+  thead { display: table-header-group; }
+  tr, .preview { break-inside: avoid; }
+`;
+
 // ---------- WORK ORDER ----------------------------------------------
 export function renderWorkOrder(
   input: QuoteInput,
@@ -319,7 +355,7 @@ ${mainOptionsBlock(mainOptions)}
       <thead><tr><th>Description</th><th class="right">Qty</th><th class="right">Width</th><th class="right">Length</th></tr></thead>
       <tbody>${glassRow}</tbody>
     </table>
-  `, branding);
+  `, branding, WORK_ORDER_COMPACT_CSS);
 }
 
 // ---------- CUTTING LIST --------------------------------------------
@@ -670,9 +706,14 @@ function groupPieces(
   return Array.from(map.values());
 }
 
-function wrap(title: string, body: string, branding?: DocBranding): string {
+/**
+ * `extraCss` is appended after the shared STYLE (and after any branding CSS), so
+ * a single document can tighten its own layout without touching the bytes of the
+ * other six. Default "" ⇒ byte-identical to before the parameter existed.
+ */
+function wrap(title: string, body: string, branding?: DocBranding, extraCss = ""): string {
   const extra = hasBranding(branding) ? brandCss(branding) : "";
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>${STYLE}${extra}</style></head><body>${body}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>${STYLE}${extra}${extraCss}</style></head><body>${body}</body></html>`;
 }
 function esc(s: string): string {
   return String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as any)[m]);

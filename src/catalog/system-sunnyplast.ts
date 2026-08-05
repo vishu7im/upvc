@@ -275,7 +275,12 @@ export const SUNNYPLAST_70: ProfileSystem = {
     },
     "transom-z-67": {
       code: "SPQ-005-30252",
-      name: "Chasement Z Sash",
+      // Was "Chasement Z Sash" (a transcription typo for "Casement", and it read
+      // as a SASH beside "T Transom 67mm" in the studio's divider picker).
+      // Renamed 2026-08-05. The word "Transom" is load-bearing: documents.ts
+      // #section() classifies by substring, and this bar must stay in the Frame
+      // section — the old name only landed there via a literal "chasement" test.
+      name: "Z Transom 67mm",
       faceWidth: 67,
       jointType: "Z",
       weldAllowanceMm: 0,       // 0 = inherit global Settings.weldAllowanceMm (default 2.5)

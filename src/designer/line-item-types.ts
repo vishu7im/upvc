@@ -327,4 +327,10 @@ export interface CatalogSnapshot {
   getOptionSystem(familyKey: string): OptionSystem | undefined;
   getSystem(systemId: string): ProfileSystem | undefined;
   getDesign(designId: string): Design | undefined;
+  /**
+   * Every registered family. Needed to go the OTHER way — from a product to the
+   * family that claims it (`legacy-import.ts`), which `getFamily(key)` cannot do
+   * because the key is what you are looking for.
+   */
+  listFamilies(): ProductFamilyDescriptor[];
 }

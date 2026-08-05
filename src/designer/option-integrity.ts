@@ -45,10 +45,26 @@ export function assertOptionSystemIntegrity(
     if (o.visibility) assertValidRule(o.visibility, `option ${o.key}`);
   }
 
+  // Options whose choices QUALIFY an edit instead of answering a question.
+  const actionOptionKeys = new Set(
+    seed.options.filter((o) => o.display === "action").map((o) => o.key),
+  );
+
   const defaultsPerOption = new Map<string, number>();
   for (const c of seed.choices) {
     if (!optionKeys.has(c.optionKey)) {
       throw new Error(`Choice "${c.key}" references unknown option "${c.optionKey}"`);
+    }
+    // An action option MAY carry choices (the divider-section picker on
+    // `structure.add-*`): the option's `action` template supplies the op and the
+    // choice supplies the SECTION. A choice with no `partKey` therefore says
+    // nothing the template does not already say, and would render as a
+    // dropdown entry that silently changes nothing.
+    if (actionOptionKeys.has(c.optionKey) && !c.partKey) {
+      throw new Error(
+        `Choice "${c.key}" qualifies action option "${c.optionKey}" but carries no partKey — ` +
+          `a choice on an action option must name the catalog part the edit uses.`,
+      );
     }
     if (c.isDefault) {
       defaultsPerOption.set(c.optionKey, (defaultsPerOption.get(c.optionKey) ?? 0) + 1);

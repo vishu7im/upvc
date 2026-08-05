@@ -27,6 +27,7 @@ import {
   getFamily,
   getOptionSystem,
   getSystem,
+  listFamilies,
 } from "../catalog/index.ts";
 import { resolveLineItem } from "../designer/resolve.ts";
 import type { CatalogSnapshot, LineItemDraft } from "../designer/line-item-types.ts";
@@ -46,6 +47,7 @@ export function liveCatalogSnapshot(): CatalogSnapshot {
     getOptionSystem,
     getSystem,
     getDesign,
+    listFamilies,
   };
 }
 
@@ -168,12 +170,29 @@ export function buildOrderLineItemsRouter(
       const draft = parseDraft(req.body);
       const { resolved } = resolveLineItem(draft, liveCatalogSnapshot());
 
+      // `?replaces=<orderItemId>` completes a legacy-item conversion: the studio
+      // opened a draft derived from a legacy OrderItem (GET …/items/:id/draft)
+      // and the user has now saved it. Creating the designer row and deleting
+      // the legacy one is ONE transaction, so the order can never momentarily
+      // hold both (double-priced) or neither (silently lost).
+      //
+      // The conversion deliberately happens HERE, on save, and not when Edit is
+      // clicked — opening the studio and backing out must change nothing.
+      const replaces = typeof req.query.replaces === "string" ? req.query.replaces : undefined;
+      if (replaces) {
+        const legacy = await prisma.orderItem.findFirst({
+          where: { id: replaces, orderId: order.id },
+          select: { id: true },
+        });
+        if (!legacy) throw new HttpError(404, "Order item to replace not found");
+      }
+
       const last = await prisma.designerLineItem.findFirst({
         where: { orderId: order.id },
         orderBy: { position: "desc" },
         select: { position: true },
       });
-      const item = await prisma.designerLineItem.create({
+      const create = prisma.designerLineItem.create({
         data: {
           orderId: order.id,
           position: (last?.position ?? 0) + 1,
@@ -182,6 +201,14 @@ export function buildOrderLineItemsRouter(
           catalogVersion: resolved.catalogVersion,
         },
       });
+      const item = replaces
+        ? (
+            await prisma.$transaction([
+              create,
+              prisma.orderItem.deleteMany({ where: { id: replaces, orderId: order.id } }),
+            ])
+          )[0]
+        : await create;
       res.status(201).json({ id: item.id, position: item.position, resolved });
     }),
   );

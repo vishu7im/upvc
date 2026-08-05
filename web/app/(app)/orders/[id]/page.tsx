@@ -6,7 +6,13 @@ import { can } from "@/lib/permissions";
 import type { OrderDetail } from "@/lib/types";
 import { money, dateShort, docLabel } from "@/lib/format";
 import { StatusBadge } from "../page";
-import { RemoveItemButton, RemoveDesignerItemButton, ConfirmOrderButton } from "./order-actions";
+import {
+  RemoveItemButton,
+  RemoveDesignerItemButton,
+  ConfirmOrderButton,
+  ReopenOrderButton,
+  EditOrderDetails,
+} from "./order-actions";
 import { DocumentViewer } from "./document-viewer";
 import {
   Badge,
@@ -97,9 +103,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 Add item from gallery
               </ButtonLink>
             ) : (
-              <ButtonLink href="/orders" variant="secondary" icon="orders">
-                All orders
-              </ButtonLink>
+              <>
+                <ReopenOrderButton orderId={order.id} orderNo={order.orderNo} />
+                <ButtonLink href="/orders" variant="secondary" icon="orders">
+                  All orders
+                </ButtonLink>
+              </>
             )}
             {canDeleteOrder && (
               <DeleteOrderButton orderId={order.id} orderNo={order.orderNo} status={order.status} />
@@ -120,6 +129,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <p className="text-xs font-semibold uppercase text-slate-500">Customer</p>
           <p className="mt-2 text-xl font-bold text-slate-950">{order.customerName}</p>
           <p className="mt-1 text-sm text-slate-500">{order.reference || "No reference supplied"}</p>
+          {isDraft && (
+            <EditOrderDetails
+              orderId={order.id}
+              customerName={order.customerName}
+              reference={order.reference ?? null}
+            />
+          )}
         </Card>
         <Card className="p-5">
           <p className="text-xs font-semibold uppercase text-slate-500">Order value</p>
@@ -200,7 +216,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       </td>
                       {isDraft && (
                         <td className={tdClass + " text-right"}>
-                          <RemoveItemButton orderId={order.id} itemId={item.id} />
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Older items were added straight from the gallery
+                                and have no studio draft. Editing one CONVERTS it
+                                — the studio says so, and nothing is written
+                                until the user saves there. */}
+                            {item.studioFamilyKey && (
+                              <Link
+                                href={`/designer?family=${encodeURIComponent(item.studioFamilyKey)}&design=${encodeURIComponent(item.designId)}&system=${encodeURIComponent(item.systemId)}&orderId=${order.id}&fromItem=${item.id}`}
+                                className="inline-flex h-8 items-center rounded-md px-2 text-sm font-semibold text-[#4442e3] transition hover:bg-[#e7e6ff]"
+                              >
+                                Edit
+                              </Link>
+                            )}
+                            <RemoveItemButton orderId={order.id} itemId={item.id} />
+                          </div>
                         </td>
                       )}
                     </tr>

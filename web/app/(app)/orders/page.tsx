@@ -8,6 +8,7 @@
 // Both are plain GET links/forms — no client JS, like the pager.
 // =====================================================================
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { getCurrentUser, serverApiGet } from "@/lib/server-api";
 import type { OrderSummary, Paginated } from "@/lib/types";
@@ -31,6 +32,39 @@ const STATUS_TABS: { key: string; label: string }[] = [
   { key: "draft", label: "Drafts" },
   { key: "confirmed", label: "Confirmed" },
 ];
+
+/**
+ * One table cell whose whole area navigates to the order — the padding moves
+ * off the `<td>` and onto the `<a>` so the click target really is the cell, not
+ * just the text inside it.
+ *
+ * `primary` marks the ONE cell per row that stays keyboard-reachable; the rest
+ * are `tabIndex={-1}` and `aria-hidden`, so a screen reader or a Tab key sees
+ * one link per order rather than six identical ones.
+ */
+function RowCell({
+  href,
+  children,
+  className = "",
+  primary = false,
+}: {
+  href: string;
+  children: ReactNode;
+  className?: string;
+  primary?: boolean;
+}) {
+  return (
+    <td className="border-b border-slate-100 p-0">
+      <Link
+        href={href}
+        className={`block px-4 py-3 text-sm ${className}`}
+        {...(primary ? {} : { tabIndex: -1, "aria-hidden": true })}
+      >
+        {children}
+      </Link>
+    </td>
+  );
+}
 
 export default async function OrdersPage({
   searchParams,
@@ -178,24 +212,32 @@ export default async function OrdersPage({
                         const items = (o._count?.items ?? 0) + (o._count?.designerItems ?? 0);
                         const total = o.basketTotal ?? o.totalPrice;
                         return (
+                          // Owner 2026-08-05: "click on order [to] edit". Every
+                          // informational cell is a link to the order, so the
+                          // whole row is clickable; only the first is in the tab
+                          // order, so keyboard users still get ONE stop per row.
+                          // The Actions cell stays a plain cell — a Delete
+                          // button inside a link would be a trap.
                           <tr key={o.id} className="transition hover:bg-slate-50">
-                            <td className={tdClass}>
-                              <Link href={`/orders/${o.id}`} className="font-semibold text-[#4442e3] hover:underline">
-                                {o.orderNo}
-                              </Link>
-                            </td>
-                            <td className={tdClass}>
+                            <RowCell href={`/orders/${o.id}`} primary>
+                              <span className="font-semibold text-[#4442e3]">{o.orderNo}</span>
+                            </RowCell>
+                            <RowCell href={`/orders/${o.id}`}>
                               <div className="font-semibold text-slate-900">{o.customerName}</div>
                               {o.reference && <div className="text-xs text-slate-500">{o.reference}</div>}
-                            </td>
-                            <td className={tdClass}>
+                            </RowCell>
+                            <RowCell href={`/orders/${o.id}`}>
                               <StatusBadge status={o.status} />
-                            </td>
-                            <td className={tdClass + " text-right font-semibold"}>
+                            </RowCell>
+                            <RowCell href={`/orders/${o.id}`} className="text-right font-semibold">
                               {o._count ? items : "--"}
-                            </td>
-                            <td className={tdClass + " text-right font-semibold"}>{money(total)}</td>
-                            <td className={tdClass + " text-slate-500"}>{dateShort(o.createdAt)}</td>
+                            </RowCell>
+                            <RowCell href={`/orders/${o.id}`} className="text-right font-semibold">
+                              {money(total)}
+                            </RowCell>
+                            <RowCell href={`/orders/${o.id}`} className="text-slate-500">
+                              {dateShort(o.createdAt)}
+                            </RowCell>
                             {canDeleteOrders && (
                               <td className={tdClass + " text-right"}>
                                 <DeleteOrderButton

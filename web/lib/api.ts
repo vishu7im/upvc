@@ -263,6 +263,23 @@ export function confirmOrder(orderId: string): Promise<unknown> {
   return apiSend(`/api/orders/${orderId}/confirm`, "POST");
 }
 
+/** Correct the customer / reference on a draft (owner 2026-08-05). */
+export function updateOrder(
+  orderId: string,
+  body: { customerName?: string; reference?: string | null },
+): Promise<OrderSummary> {
+  return apiSend<OrderSummary>(`/api/orders/${orderId}`, "PUT", body);
+}
+
+/**
+ * Put a confirmed order back into draft so its items can be corrected. Deletes
+ * the 7 stored documents and purges their cached PDFs — re-confirming
+ * regenerates both.
+ */
+export function reopenOrder(orderId: string): Promise<{ id: string; status: string }> {
+  return apiSend(`/api/orders/${orderId}/reopen`, "POST");
+}
+
 // ---------- Designer line items (D2 API, D3 UI) ----------------------
 
 /**
@@ -296,8 +313,15 @@ export function resolveLineItem(
 export function addDesignerLineItem(
   orderId: string,
   draft: LineItemDraft,
+  /**
+   * The legacy `OrderItem` this draft was converted FROM. Passing it makes the
+   * save a swap: the designer row is created and the legacy row deleted in one
+   * transaction, so the order never holds both or neither.
+   */
+  replacesItemId?: string,
 ): Promise<{ id: string; position: number; resolved: ResolvedLineItem }> {
-  return apiSend(`/api/orders/${orderId}/line-items`, "POST", draft);
+  const q = replacesItemId ? `?replaces=${encodeURIComponent(replacesItemId)}` : "";
+  return apiSend(`/api/orders/${orderId}/line-items${q}`, "POST", draft);
 }
 
 export function updateDesignerLineItem(
