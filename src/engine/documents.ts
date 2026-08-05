@@ -7,6 +7,7 @@
 // =====================================================================
 
 import type { QuoteInput, SolvedParts, CuttingPlan, Pricing, SolvedGeometry, ProfileSystem, DocBranding, DocImage, DocCill, DocColour, DocBasket, DocAdvisory, DocOption, BarPiece } from "../types.ts";
+import { weldedEnds } from "./bars.ts";
 
 const STYLE = `
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #28323c; margin: 32px; }
@@ -38,6 +39,19 @@ export type DocVariant = "normal" | "welded";
 /** Pick the length column to print for the chosen variant. */
 function barLen(b: { extMm: number; weldedExtMm?: number }, variant: DocVariant): number {
   return variant === "welded" ? b.weldedExtMm ?? b.extMm : b.extMm;
+}
+
+/**
+ * Every printed LENGTH is a whole millimetre (owner, 2026-08-04): 30.5 → 31,
+ * 30.4 → 30. `Math.round` is half-up, which is exactly that rule.
+ *
+ * This is PRESENTATION ONLY. The engine keeps its calibrated 0.1 mm precision
+ * (`bars.ts#round1`) — fractions are real: an odd profile face halved at a split
+ * (67 → 33.5, 75 → 37.5) and the sliding panel formula both produce them. Do NOT
+ * push this rounding back into the engine; the calibrated jobs assert the .1 values.
+ */
+function mm(n: number | null | undefined): string {
+  return n === null || n === undefined ? "" : String(Math.round(n));
 }
 
 /** A banner clarifying that welded lengths already include the weld allowance. */
@@ -126,7 +140,7 @@ function cillRows(cill?: DocCill): string {
   if (!cill) return "";
   return `
       <b>Cill:</b><span>${esc(cill.name)}</span>
-      <b>Mfg. Height:</b><span>${cill.manufacturingHeightMm} mm</span>`;
+      <b>Mfg. Height:</b><span>${mm(cill.manufacturingHeightMm)} mm</span>`;
 }
 
 /**
@@ -204,7 +218,7 @@ function header(input: QuoteInput, title: string, systemName: string, designName
       <b>Print Date:</b><span>${today}</span>
       <b>System:</b><span>${esc(systemName)}</span>
       <b>Design:</b><span>${esc(designName)}</span>
-      <b>Width × Height:</b><span>${input.widthMm > 0 && input.heightMm > 0 ? `${input.widthMm} × ${input.heightMm} mm` : "—"}</span>
+      <b>Width × Height:</b><span>${input.widthMm > 0 && input.heightMm > 0 ? `${mm(input.widthMm)} × ${mm(input.heightMm)} mm` : "—"}</span>
       <b>Quote#:</b><span>${esc(input.orderNo)}</span>${cillRows(cill)}${colourRows(colour)}
     </div>
     ${previewBand(images)}
@@ -233,10 +247,10 @@ export function renderWorkOrder(
       <td>${section(b)}</td>
       <td>${esc(b.name)}</td>
       <td class="right">${qty}</td>
-      <td class="right">${lenMm}</td>
+      <td class="right">${mm(lenMm)}</td>
       <td>${b.endPrep}</td>
       <td>${b.reinforcementCode ? esc(b.reinforcementCode) : ""}</td>
-      <td class="right">${b.reinforcementLengthMm ?? ""}</td>
+      <td class="right">${mm(b.reinforcementLengthMm)}</td>
     </tr>
   `).join("");
 
@@ -246,7 +260,7 @@ export function renderWorkOrder(
       <td>Sash</td>
       <td>${esc(r.name)}</td>
       <td class="right">${qty}</td>
-      <td class="right">${lenMm}</td>
+      <td class="right">${mm(lenMm)}</td>
       <td>${r.endPrep}</td>
       <td></td>
       <td></td>
@@ -257,14 +271,18 @@ export function renderWorkOrder(
     <tr>
       <td>${esc(h.name)}</td>
       <td class="right">${h.qty}</td>
-      <td>${h.code.startsWith("GKT") ? "Metres" : "Unit"}</td>
+      <td>${h.code.startsWith("GKT") ? "mm" : "Unit"}</td>
     </tr>
   `).join("");
+  // Gaskets are stored and printed in MILLIMETRES (GasketPiece.lengthMm) — the
+  // reference Quotila docs print the mm figure too (see system-sunnyplast.ts,
+  // "printed 22576"). Only pricing converts to metres. The unit label used to
+  // read "Metres" beside a mm number; the number is right, the label was not.
   const gasketRow = parts.gaskets.map((g) => `
     <tr>
       <td>${esc(g.name)}</td>
-      <td class="right">${g.lengthMm}</td>
-      <td>Metres</td>
+      <td class="right">${mm(g.lengthMm)}</td>
+      <td>mm</td>
     </tr>
   `).join("");
 
@@ -272,8 +290,8 @@ export function renderWorkOrder(
     <tr>
       <td>${esc(g.label)} ${esc(g.name)}</td>
       <td class="right">1</td>
-      <td class="right">${g.widthMm}</td>
-      <td class="right">${g.heightMm}</td>
+      <td class="right">${mm(g.widthMm)}</td>
+      <td class="right">${mm(g.heightMm)}</td>
     </tr>
   `).join("");
 
@@ -333,8 +351,8 @@ export function renderCuttingList(
         <td>${section(b)}</td>
         <td>${esc(b.name)}</td>
         <td class="right">${qty}</td>
-        <td class="right">${b.intMm}</td>
-        <td class="right">${lenMm}</td>
+        <td class="right">${mm(b.intMm)}</td>
+        <td class="right">${mm(lenMm)}</td>
         <td>${b.orientation === "H" ? "Hor" : "Vert"}</td>
         <td>${b.endPrep}</td>
       </tr>
@@ -496,27 +514,34 @@ export function renderWorkPlanner(
 
   const cutRows = cut.map((g, i) => `
     <tr><td>${i + 1}</td><td>${section({ name: g.name })}</td><td>${esc(g.name)}</td>
-        <td class="right">${g.qty}</td><td class="right">${g.extMm}</td><td>${g.endPrep}</td><td></td></tr>
+        <td class="right">${g.qty}</td><td class="right">${mm(g.extMm)}</td><td>${g.endPrep}</td><td></td></tr>
   `).join("");
 
   const reinfRows = reinf.map((g, i) => `
-    <tr><td>${i + 1}</td><td>${esc(g.name)}</td><td class="right">${g.qty}</td><td class="right">${g.extMm}</td><td></td></tr>
+    <tr><td>${i + 1}</td><td>${esc(g.name)}</td><td class="right">${g.qty}</td><td class="right">${mm(g.extMm)}</td><td></td></tr>
   `).join("");
 
-  const frameWelds = parts.bars.filter((b) => /frame/i.test(b.name)).length;
-  const sashWelds = parts.bars.filter((b) => /sash/i.test(b.name) && !/reinf/i.test(b.name)).length;
+  // Only bars with a mitre / horn / Y-notch end actually get welded — `weldedEnds`
+  // is the same test bars.ts uses to apply the shrinkage allowance. Square-cut
+  // pieces (the French stulp, every sliding auxiliary cap and track) have no
+  // welded corner, so they must not be counted here: the aux profiles were being
+  // tallied as frame and sash welds purely because their names contain the words.
+  const welded = parts.bars.filter((b) => weldedEnds(b.endPrep) > 0);
+  const frameWelds = welded.filter((b) => /frame/i.test(b.name)).length;
+  const sashWelds = welded.filter((b) => /sash/i.test(b.name) && !/reinf/i.test(b.name)).length;
   const weldRows = `
     <tr><td>Weld &amp; clean outer frame corners</td><td class="right">${frameWelds}</td><td></td></tr>
     <tr><td>Weld &amp; clean sash corners</td><td class="right">${sashWelds}</td><td></td></tr>
   `;
 
   const glazeRows = parts.glass.map((g, i) => `
-    <tr><td>${i + 1}</td><td>${esc(g.label)} ${esc(g.name)}</td><td class="right">${g.widthMm} × ${g.heightMm}</td><td></td></tr>
+    <tr><td>${i + 1}</td><td>${esc(g.label)} ${esc(g.name)}</td><td class="right">${mm(g.widthMm)} × ${mm(g.heightMm)}</td><td></td></tr>
   `).join("");
 
   const accRows = [
     ...parts.hardware.map((h) => `<tr><td>${esc(h.name)}</td><td class="right">${h.qty}</td><td>Unit</td><td></td></tr>`),
-    ...parts.gaskets.map((g) => `<tr><td>${esc(g.name)}</td><td class="right">${g.lengthMm}</td><td>Metres</td><td></td></tr>`),
+    // Gaskets print millimetres — see the Work Order's Accessories table.
+    ...parts.gaskets.map((g) => `<tr><td>${esc(g.name)}</td><td class="right">${mm(g.lengthMm)}</td><td>mm</td><td></td></tr>`),
   ].join("");
 
   return wrap("Work Planner" + variantSuffix(variant), `
@@ -605,7 +630,7 @@ export function renderPlannerList(
       <td>${l.lineNo}</td>
       <td>${esc(l.productName)}</td>
       <td>${esc(l.designName)}</td>
-      <td class="right">${l.widthMm} × ${l.heightMm}</td>
+      <td class="right">${mm(l.widthMm)} × ${mm(l.heightMm)}</td>
       <td class="right">${l.qty}</td>
       <td>${esc(l.mode)}</td>
       <td class="right">${c}${l.totalPrice.toFixed(2)}</td>
@@ -654,6 +679,10 @@ function esc(s: string): string {
 }
 function section(b: any): string {
   const n = b.name as string;
+  // Sliding auxiliaries (track + cover caps) are their own section — they are
+  // square-cut trim, not frame or sash members. Checked FIRST because several
+  // of them legitimately carry "Frame"/"Sash" in their name ("Frame Slide Cap").
+  if (/\bcaps?\b|\btrack\b/i.test(n)) return "Auxiliary";
   if (n.toLowerCase().includes("bead")) return "Bead";
   if (n.toLowerCase().includes("frame") || n.toLowerCase().includes("transom") || n.toLowerCase().includes("mullion") || n.toLowerCase().includes("chasement")) return "Frame";
   if (n.toLowerCase().includes("sash")) return "Sash";

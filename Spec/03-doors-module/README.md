@@ -46,6 +46,25 @@ Two findings are genuinely new, and both are phase 1:
 - **Option scope: full parity, honestly gated.** Every reference row appears; anything with no
   catalog part and no calibrated rule ships `pricingMode:"none"` + a helpText saying why.
 - **Per-edge frame profiles and per-divider joint method: build now.**
+- **SUPERSEDED 2026-08-04 — the per-edge frame ROWS are withdrawn from the studio.** Field feedback:
+  a doorset is fabricated from one profile type, so offering `Frame (Standard) (Top|Bottom|Left|
+  Right)` let a user mix a 5-chamber head with a 6-chamber sill. `entrance-door` now shares the
+  single `profile.frame-chamber` row with `casement-window` (`src/catalog/options/doors.ts`
+  `SHARED_OPTION_KEYS`), defaulting to **6 chamber** — which is what the door designs already bake,
+  so door output is unchanged. **Phase 2's engine work stands and is NOT reverted**: `frameKeys`,
+  `framesForEdges()` and the per-edge cut math remain, validated by `validatePerEdgeFrames`. Only
+  the seeded UI rows are gone. Full rationale in `../01-windows-module/README.md`.
+- **`french-door` is its OWN family, not a variant of this one (2026-08-04).** It shares 23 options
+  with the windows and doors seeds via `familyKeys`, but declares its own leaf role, its own leaf
+  profile and its own divider constraints, and it is given **no frame option** (`frame-french` at
+  face 48 is the only calibrated French frame; the shared `profile.frame-chamber` row carries a
+  default the resolver applies, which would re-cut all 12 designs). Seeds:
+  `src/catalog/families/french-door.ts` + `src/catalog/options/french.ts`.
+- **⚠ Open defect on THIS family: `profile.door-leaf` is scoped `["sash", "glass"]`, and converting
+  a fixed cell hands it the CASEMENT `sash-t`** — `cellnode.ts#applyEdit`'s `DEFAULT_SASH_KEY`
+  fallback. So converting a fanlight into a door leaf builds a face-79 casement sash inside a
+  doorset. French dodged it by scoping to `["sash"]` only; the door has not. Filed as **Q28** in
+  `../questions.md`; the fix is one family-supplied default on the descriptor.
 
 ## Phases & dependency graph
 

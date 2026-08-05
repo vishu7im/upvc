@@ -1003,11 +1003,11 @@ function annotationLayer(
     ];
     for (const f of faces) {
       if (f.v <= 0) continue;
-      put(f.r, String(num(f.v)), f.rot ? f.r.w : f.r.h, f.rot);
+      put(f.r, mmLabel(f.v), f.rot ? f.r.w : f.r.h, f.rot);
     }
 
-    for (const t of geometry.transoms) put(t.rect, String(num(t.rect.h)), t.rect.h, false);
-    for (const m of geometry.mullions) put(m.rect, String(num(m.rect.w)), m.rect.w, true);
+    for (const t of geometry.transoms) put(t.rect, mmLabel(t.rect.h), t.rect.h, false);
+    for (const m of geometry.mullions) put(m.rect, mmLabel(m.rect.w), m.rect.w, true);
 
     // Sash ring face — annotated on the sash's top rail (the "overlap figure at
     // the junction" between a leaf and whatever it closes against).
@@ -1015,7 +1015,7 @@ function annotationLayer(
       if (!c.sashOuter || !c.sashInner) continue;
       const face = c.sashInner.y - c.sashOuter.y;
       if (face <= 0) continue;
-      put({ x: c.sashOuter.x, y: c.sashOuter.y, w: c.sashOuter.w, h: face }, String(num(face)), face, false);
+      put({ x: c.sashOuter.x, y: c.sashOuter.y, w: c.sashOuter.w, h: face }, mmLabel(face), face, false);
     }
   }
 
@@ -1023,7 +1023,7 @@ function annotationLayer(
     for (const c of geometry.cells) {
       const g = c.glassRect;
       if (!g || g.w <= 0 || g.h <= 0) continue;
-      put(g, `${round1(g.w)} × ${round1(g.h)}`, g.h, false);
+      put(g, `${mmLabel(g.w)} × ${mmLabel(g.h)}`, g.h, false);
     }
   }
 
@@ -1055,8 +1055,15 @@ function clampNum(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
+/**
+ * A printed DIMENSION LABEL, in whole millimetres (owner, 2026-08-04) — so the
+ * schematic annotation and the cutting-list row beside it in the same PDF can
+ * never show different numbers. `documents.ts#mm` uses the identical rule.
+ *
+ * NOT `num()`: that one formats SVG COORDINATES and must keep its 2 dp.
+ */
+function mmLabel(n: number): string {
+  return String(Math.round(n));
 }
 
 /** A thin coloured liner just inside a rect's edge (dual-colour inside hint). */

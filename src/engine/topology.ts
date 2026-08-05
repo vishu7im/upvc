@@ -529,13 +529,9 @@ function grow(r: Rect, by: number): Rect {
 // confirmed the Andrei docs are current production settings):
 //   • Frame face 48 (handled by the frame profile in emitFrameBars);
 //     frame Ext = W/H exactly on both docs (finished; printed adds 3mm/end weld).
-//   • Panel outer width (Ext, finished):
-//       bypass (OX/XO/OXO/OOX/XOO):  (W + 10)/n − 6
-//         [exact for n=2: 949 = 1910/2−6 (Job 44), 1104 = 2220/2−6 (Job 48).
-//          n=3 is the same formula EXTENDED — no 3-panel Andrei doc yet.]
-//       centre-meeting (OXXO):       (W + 79)/4 − 6     [K=79 is still the old
-//         Job 104 single data point; only the height/steel corrections carry
-//         over. UNCALIBRATED against the new settings — needs an OXXO doc.]
+//   • Panel outer width (Ext, finished): (W + K)/n − 6, where K is calibrated
+//     PER CONFIGURATION — see PANEL_WIDTH_K below. It is NOT one bypass value:
+//     the 2-, 3- and 4-panel documents each print a different constant.
 //   • Panel outer height (Ext, finished): H − 86  (2014 @ H2100, 2224 @ H2310).
 //   • Sash face 85 ⇒ sash Int = Ext − 170; glass rebate 15 ⇒ glass = beadInt + 30
 //     (both rules unchanged from Job 104 and exact on the Andrei docs).
@@ -545,6 +541,49 @@ function grow(r: Rect, by: number): Rect {
 // Panels are laid out left→right across the daylight for the PREVIEW only; cut
 // lengths use the explicit panel envelope (panelExtW/H), never the x position.
 // ---------------------------------------------------------------------
+
+/**
+ * The panel-width constant K in `panelExt = (W + K)/n − 6`, TRANSCRIBED per
+ * configuration. Each value is read straight off a production document by
+ * inverting the printed bead (`bead Int + 170 = panel Ext`) — no interpolation.
+ *
+ * | Config      | Document                          | W    | n | Printed panel | K  |
+ * |-------------|-----------------------------------|------|---|---------------|----|
+ * | OX (bypass) | Job 44 (patio-docs/), 1900×2100    | 1900 | 2 | 949           | 10 |
+ * | OX (bypass) | Job 48 (patio-docs/), 2210×2310    | 2210 | 2 | 1104          | 10 |
+ * | OX (bypass) | patio_calibration.pdf F1, 2000×2000| 2000 | 2 | 999           | 10 |
+ * | XOO         | patio_calibration.pdf F2, 3000×2000| 3000 | 3 | 995           |  3 |
+ * | OXO         | patio_calibration.pdf F4, 3500×2000| 3500 | 3 | 1161.7        |  3 |
+ * | OXXO        | patio_calibration.pdf F3, 4000×2000| 4000 | 4 | 1017          | 92 |
+ *
+ * Two independent 3-panel items — different widths, different slider position —
+ * agree on K = 3, so that row is solid. K = 92 rests on F3 alone, but it
+ * REPLACES 79, which rested on the superseded Job 104 alone and was recorded as
+ * uncalibrated. n = 2 is unchanged and still reproduces all three of its docs.
+ *
+ * There is no derived formula behind these numbers and none is invented: an
+ * unlisted panel count falls back to the bypass value and is flagged below.
+ */
+const PANEL_WIDTH_K = {
+  /** 2 panels, one bypassing the other. Jobs 44/48 + patio_calibration F1. */
+  bypass2: 10,
+  /** 3 panels, one slider (XOO / OXO / OOX). patio_calibration F2 + F4. */
+  bypass3: 3,
+  /** 4 panels, the two centre leaves meeting (OXXO). patio_calibration F3. */
+  meeting4: 92,
+} as const;
+
+/**
+ * Pick K for a panel row. `meeting` marks the centre-meeting (OXXO) layout.
+ * Counts with no document reuse the nearest calibrated bypass value — the
+ * pre-existing behaviour — and are the subject of Spec/questions.md Q27.
+ */
+function panelWidthK(n: number, meeting: boolean | undefined): number {
+  if (meeting) return PANEL_WIDTH_K.meeting4; // only n=4 exists in the seed
+  if (n === 3) return PANEL_WIDTH_K.bypass3;
+  return PANEL_WIDTH_K.bypass2;
+}
+
 function buildSlidingPanels(
   node: Extract<CellNode, { kind: "sliding" }>,
   pathId: string,
@@ -567,13 +606,13 @@ function buildSlidingPanels(
   // applySplitRatios), from which fᵢ = bᵢ − bᵢ₋₁ (b₀=0, bₙ=1).
   const fractions = panelFractions(node.boundaries, n);
 
-  // Total panel material span is calibrated: Σ panelExt = (W + K) − 6n
-  // (K = 10 bypass [Jobs 44/48] / 79 OXXO [old Job 104, uncalibrated against
-  // the new settings]). Distribute it per fraction so panelExtᵢ = fᵢ·(W+K) − 6,
-  // which reduces to (W+K)/n − 6 when equal (exact on Jobs 44/48, n=2).
-  // For unequal panels this is an interpolation (no unequal reference job) —
-  // flagged; equal panels stay byte-identical.
-  const K = node.meeting ? 79 : 10;
+  // Total panel material span is calibrated: Σ panelExt = (W + K) − 6n, with K
+  // transcribed per configuration (see PANEL_WIDTH_K). Distribute it per
+  // fraction so panelExtᵢ = fᵢ·(W+K) − 6, which reduces to (W+K)/n − 6 when
+  // equal (exact on every calibrated document). For unequal panels this is an
+  // interpolation (no unequal reference job) — flagged; equal panels stay
+  // byte-identical.
+  const K = panelWidthK(n, node.meeting);
   const panelExtH = frame.h - 86; // Jobs 44/48: 2014 = 2100−86, 2224 = 2310−86
   const fw = sash.faceWidth;        // 85
   const rebate = sash.glassRebate;  // 15

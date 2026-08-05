@@ -13,6 +13,7 @@
 import type {
   AddonSelection,
   CellNode,
+  CellSpec,
   Design,
   DocOption,
   FrameEdgeKeys,
@@ -242,6 +243,23 @@ export interface AdapterEditContext {
   system: ProfileSystem;
 }
 
+/**
+ * The CellSpec fields a component-scoped or item-level selection may pin — a
+ * profile/glazing SWAP, never structure. Declared here rather than inside an
+ * adapter because it is part of the contract every adapter implements.
+ */
+export type CellPin = Partial<Pick<CellSpec, "glassKey" | "beadKey" | "sashKey">>;
+
+/**
+ * Everything the resolver needs from a product family's topology model.
+ *
+ * The resolver holds NO family knowledge: it calls these six methods and turns
+ * whatever they throw into Issues. A family whose topology cannot express one
+ * of them (a sliding row has no per-panel glass slot, and no divider to space
+ * equally) throws an `AdapterError` explaining why, and the resolver degrades
+ * to a `not-implemented` warning — it never silently applies the answer
+ * somewhere else and never crashes the request.
+ */
 export interface EngineAdapter {
   /** Apply one topology edit immutably; returns a NEW tree. Throws on an illegal edit. */
   applyEdit(topology: CellNode, edit: TopologyEdit, ctx: AdapterEditContext): CellNode;
@@ -254,9 +272,25 @@ export interface EngineAdapter {
     workingTopology: CellNode;
     topologyEdited: boolean;
     effects: EngineEffectOutputs;
+    /** Per-quote span overrides (drag-to-resize); omitted ⇒ the design's own. */
+    splitRatios?: Record<string, number>;
     /** Extra elevations to render (phase 5); omitted ⇒ external only. */
     views?: QuoteView[];
+    /** How they are DRAWN (phase 8); request-only, never draft data. */
+    svgStyle?: QuoteInput["svgStyle"];
   }): QuoteInput;
+  /** Pin a CellSpec field on the ONE component at `path` (component-scoped answers). */
+  pinCellField(topology: CellNode, path: string, patch: CellPin): CellNode;
+  /** Pin a CellSpec field on every cell (item-level bead/glass/sash answers). */
+  pinAllCells(topology: CellNode, patch: CellPin): CellNode;
+  /** splitRatios that share each run of daylight equally (`splitMode: "equalSplit"`). */
+  equalSplitRatios(
+    topology: CellNode,
+    widthMm: number,
+    heightMm: number,
+    system: ProfileSystem,
+    frameFaceWidth: number,
+  ): Record<string, number>;
 }
 
 /** What mapping the effective selections through their engineEffects produced. */

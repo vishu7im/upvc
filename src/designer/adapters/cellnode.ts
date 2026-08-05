@@ -36,8 +36,6 @@ import type {
   CellNode,
   CellSpec,
   ProfileSystem,
-  QuoteInput,
-  QuoteView,
   Rect,
   SashKind,
   SolvedGeometry,
@@ -45,20 +43,18 @@ import type {
 import type { ComponentType, TopologyEdit } from "../option-types.ts";
 import type {
   AdapterEditContext,
+  CellPin,
   ComponentRef,
   EngineAdapter,
-  EngineEffectOutputs,
-  LineItemDraft,
 } from "../line-item-types.ts";
-import type { Design } from "../../types.ts";
+import { AdapterError } from "./errors.ts";
+import { cillComponent, frameEdgeComponents, toQuoteInput } from "./shared.ts";
 
-/** Thrown for illegal edits / unknown componentIds, so callers can convert to Issues. */
-export class AdapterError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AdapterError";
-  }
-}
+// Re-exported: `AdapterError` and `toQuoteInput` lived here until the sliding
+// adapter arrived, and every existing importer still reaches for them through
+// this module. Their definitions now sit in the files named above, because
+// neither is specific to a CellNode tree.
+export { AdapterError, toQuoteInput };
 
 // ---------------------------------------------------------------------
 // ComponentId parsing & tree walking
@@ -128,19 +124,8 @@ function cellLabel(path: string, content: SashKind): string {
 }
 
 export function listComponents(geometry: SolvedGeometry): ComponentRef[] {
-  const out: ComponentRef[] = [];
-  const { outer, rootDaylight: day } = geometry;
-
-  // Frame edges: the strips between the outer rect and the root daylight.
-  const edges: { side: string; rect: Rect }[] = [
-    { side: "top", rect: { x: 0, y: 0, w: outer.w, h: day.y } },
-    { side: "bottom", rect: { x: 0, y: day.y + day.h, w: outer.w, h: outer.h - day.y - day.h } },
-    { side: "left", rect: { x: 0, y: day.y, w: day.x, h: day.h } },
-    { side: "right", rect: { x: day.x + day.w, y: day.y, w: outer.w - day.x - day.w, h: day.h } },
-  ];
-  for (const e of edges) {
-    out.push({ componentId: `edge:${e.side}`, type: "frame-edge", label: `Frame ${e.side}`, rect: e.rect, path: e.side });
-  }
+  // Frame edges are family-agnostic (adapters/shared.ts).
+  const out: ComponentRef[] = frameEdgeComponents(geometry);
 
   for (const cell of geometry.cells) {
     const isSash = Boolean(cell.sashOuter);
@@ -175,9 +160,8 @@ export function listComponents(geometry: SolvedGeometry): ComponentRef[] {
   for (const t of geometry.transoms) divider(t.parentPathId, "transom", t.rect, t.jointType);
   for (const m of geometry.mullions) divider(m.parentPathId, "mullion", m.rect, m.jointType);
 
-  if (geometry.cill) {
-    out.push({ componentId: "cill", type: "cill", label: geometry.cill.name, rect: geometry.cill.rect, path: "cill" });
-  }
+  const cill = cillComponent(geometry);
+  if (cill) out.push(cill);
 
   return out;
 }
@@ -434,9 +418,6 @@ export function applyEdit(topology: CellNode, edit: TopologyEdit, ctx: AdapterEd
 // Per-cell glass/bead/sash pinning (component-scoped selections)
 // ---------------------------------------------------------------------
 
-/** The CellSpec fields a selection may pin — a profile swap, never structure. */
-type CellPin = Partial<Pick<CellSpec, "glassKey" | "beadKey" | "sashKey">>;
-
 /**
  * Apply a pin to ONE leaf's cell.
  *
@@ -568,46 +549,11 @@ function walkEqual(
   }
 }
 
-// ---------------------------------------------------------------------
-// toQuoteInput
-// ---------------------------------------------------------------------
-
-export function toQuoteInput(args: {
-  draft: LineItemDraft;
-  design: Design;
-  workingTopology: CellNode;
-  topologyEdited: boolean;
-  effects: EngineEffectOutputs;
-  splitRatios?: Record<string, number>;
-  views?: QuoteView[];
-  svgStyle?: QuoteInput["svgStyle"];
-}): QuoteInput {
-  const { draft, workingTopology, topologyEdited, effects, splitRatios, views, svgStyle } = args;
-  return {
-    orderNo: "DESIGNER",
-    customer: "Designer",
-    designId: draft.designId,
-    widthMm: draft.dimensions.widthMm,
-    heightMm: draft.dimensions.heightMm,
-    systemId: draft.systemId,
-    ...(splitRatios && Object.keys(splitRatios).length ? { splitRatios } : {}),
-    ...(effects.glassKey ? { glassKey: effects.glassKey } : {}),
-    ...(effects.colourKey ? { colourKey: effects.colourKey } : {}),
-    ...(effects.colourKeyOutside ? { colourKeyOutside: effects.colourKeyOutside } : {}),
-    ...(effects.cillKey ? { cillKey: effects.cillKey } : {}),
-    ...(effects.frameKey ? { frameKey: effects.frameKey } : {}),
-    ...(effects.frameKeys && Object.keys(effects.frameKeys).length ? { frameKeys: effects.frameKeys } : {}),
-    ...(effects.addons && Object.keys(effects.addons).length ? { addons: effects.addons } : {}),
-    ...(effects.hardwareOverrides && Object.keys(effects.hardwareOverrides).length
-      ? { hardwareOverrides: effects.hardwareOverrides }
-      : {}),
-    ...(effects.doorOpeningDirection
-      ? { doorOpeningDirection: effects.doorOpeningDirection }
-      : {}),
-    ...(topologyEdited ? { topologyOverride: workingTopology } : {}),
-    ...(views?.length ? { views } : {}),
-    ...(svgStyle ? { svgStyle } : {}),
-  };
-}
-
-export const cellnodeAdapter: EngineAdapter = { applyEdit, listComponents, toQuoteInput };
+export const cellnodeAdapter: EngineAdapter = {
+  applyEdit,
+  listComponents,
+  toQuoteInput,
+  pinCellField,
+  pinAllCells,
+  equalSplitRatios,
+};

@@ -8,6 +8,37 @@
 
 - **Build alongside**: new route; `/quote` + its API stay untouched.
 - **Full basket scope**: fitting/survey/delivery/discount/tax layer is in scope (phase 6).
+- **Chamber is a WHOLE-UNIT choice (2026-08-04).** A unit is fabricated from one profile type —
+  chambers are never mixed across the head, sill and jambs. The studio therefore shows exactly
+  **one** Frame row (`profile.frame-chamber`, `src/catalog/options/windows.ts`), shared with
+  `entrance-door`, and it **defaults to 6 chamber**. The four per-edge `Frame (Standard)
+  (Top|Bottom|Left|Right)` rows that mirrored the reference configurator are **removed from the
+  seed**. The engine keeps its per-edge capability (`Design.frameKeys` / `QuoteInput.frameKeys`,
+  calibrated on Job 169 — see `../03-doors-module/phase-2-per-edge-profiles.md`); it simply has no
+  UI writer. Do not re-add the per-edge rows without a new owner decision.
+  Consequence, recorded deliberately: the casement designs bake `frame-5ch` (face 64), so a
+  defaults-only **studio** draft resolves `frameKey = frame-6ch` (face 68) and is no longer
+  byte-identical to a bare `solve()`. The golden test in `src/designer/resolve.test.ts` compares
+  against `solve({…, frameKey:"frame-6ch"})` for exactly this reason. `/quote`, the gallery
+  previews and every calibrated validation job are untouched.
+- **The studio runs all four quotable families (2026-08-04)**: `casement-window`,
+  `entrance-door`, `french-door` and `sliding-patio`. Owner report — *"replicate design in studio
+  functionality in all other profiles french door and patio door; some things different but core
+  idea are same"*. What "different" turned out to mean:
+  - **French is seed data only** (`src/catalog/families/french-door.ts` +
+    `src/catalog/options/french.ts`) — a French doorset is an ordinary `CellNode` tree, so it runs
+    on the `cellnode` adapter with no platform change, exactly like `entrance-door` in phase 7.
+  - **Patio needed the second ADAPTER** (`src/designer/adapters/sliding.ts`) the registry has been
+    reserving since phase 2: a patio row is ONE `kind:"sliding"` node with `panels[]`, not a tree
+    of splits, and `cellnode.ts` rejects it outright in three places.
+  - **Patio studio scope is sizes, panel widths and options** — NOT panel count and NOT flipping a
+    panel between fixed and sliding. The design chooses those. Every topology edit is therefore
+    rejected *with its reason* rather than silently ignored; a role flip is a one-`case` change if
+    the scope is ever widened (the cut is identical either way).
+  - Uncalibrated capability stays closed, per family: no frame option for French or patio (each
+    has exactly one calibrated frame), no cill/add-ons for patio (both move the calibrated panel
+    formula), no hardware slot over the approximate patio tally, and no `structure.component-type`
+    for French. Reasons in the seed files; open questions filed as Q28–Q32 in `../questions.md`.
 
 ## Phases & dependency graph
 

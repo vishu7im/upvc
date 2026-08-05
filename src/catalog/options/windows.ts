@@ -65,6 +65,8 @@ export const WINDOW_OPTION_GROUPS: OptionGroup[] = [
 
 /** Casement units never use the sliding or French-specific profiles. */
 const CASEMENT_FRAME_KEYS = ["frame-5ch", "frame-6ch"] as const;
+/** Owner decision 2026-08-04: the studio starts on 6 chamber for windows AND doors. */
+const DEFAULT_FRAME_KEY = "frame-6ch";
 const CASEMENT_BEAD_KEYS = ["bead-28", "bead-32"] as const;
 /** Divider sections a casement/door unit can use (not the French stulp). */
 const CASEMENT_DIVIDER_KEYS = ["transom-t-67", "transom-z-67", "mullion-78", "mullion-75"] as const;
@@ -168,10 +170,21 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
     }
   }
 
-  // Frame chamber — the whole frame at once (the engine's `frameKey`). The
-  // per-EDGE rows below override it one side at a time; both exist because a
-  // saved draft may answer either, and answering all four edges individually to
-  // change one profile would be tedious.
+  // Frame chamber — ONE answer for the WHOLE unit (the engine's `frameKey`).
+  //
+  // OWNER DECISION, 2026-08-04: a unit is fabricated from one chamber, never a
+  // mix. Until then this seeded four additional `Frame (Standard) (Top|Bottom|
+  // Left|Right)` rows mirroring the reference configurator's Job 169 layout,
+  // which let a user build a doorset with a 5-chamber head and a 6-chamber sill.
+  // Those four rows are GONE. The engine keeps its per-edge capability
+  // (`Design.frameKeys` / `QuoteInput.frameKeys`, calibrated on Job 169 — see
+  // Spec/03-doors-module/phase-2-per-edge-profiles.md); it simply has no UI
+  // writer now. Do not re-add the per-edge rows without an owner decision.
+  //
+  // Shared with entrance-door (see options/doors.ts) so both studios show one
+  // Frame row. NOT shared with any family calibrated on a different frame:
+  // OptionChoice carries no familyKeys, so every family on this key sees every
+  // choice, and CASEMENT_FRAME_KEYS is the 5ch/6ch pair only.
   options.push(
     opt({
       key: "profile.frame-chamber",
@@ -183,7 +196,7 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
       scope: { level: "item" },
       pricingMode: "catalog",
       presentation: {
-        helpText: "Unset ⇒ the frame the chosen design was calibrated with.",
+        helpText: "One chamber for the whole unit — head, sill and both jambs are cut from it.",
       },
       familyKeys: [FAMILY],
     }),
@@ -196,52 +209,18 @@ export function buildWindowsOptionSystem(sys: ProfileSystem): OptionSystemSeed {
       optionKey: "profile.frame-chamber",
       label: frame.name,
       order: (i + 1) * 10,
-      isDefault: false, // unset ⇒ the design's baked frame (byte-identical)
+      // OWNER DECISION, 2026-08-04: 6 chamber is the studio default.
+      //
+      // This is NOT byte-identical for casement: the seeded casement designs
+      // bake frame-5ch (face 64), so a defaults-only studio draft now resolves
+      // frameKey = frame-6ch (face 68). That is deliberate — the studio must cut
+      // what it shows. Entrance-door designs already bake frame-6ch, so doors
+      // are unaffected. `/quote`, the gallery previews and every calibrated
+      // validation job call solve() directly and are untouched.
+      isDefault: key === DEFAULT_FRAME_KEY,
       partKey: key,
       engineEffect: { kind: "profile-substitution", params: { slot: "frame" } },
     });
-  }
-
-  // Frame profile PER EDGE — the reference's four `Frame (Standard) (Top|
-  // Bottom|Left|Right)` rows, printed in Main Options on every page of Job 169.
-  // On this system the two frames differ (frame-5ch face 64, frame-6ch face
-  // 68), so a mixed selection really does change the cut: each bar's Int loses
-  // the face of the profile at each of its two ends, which are the
-  // PERPENDICULAR edges. Unanswered ⇒ the frame chamber above ⇒ the design's
-  // own frame, byte-identical.
-  for (const [i, side] of ADDON_SIDES.entries()) {
-    const optionKey = `profile.frame-${side}`;
-    options.push(
-      opt({
-        key: optionKey,
-        groupKey: "profile-ancillary",
-        name: `Frame (Standard) (${side[0].toUpperCase()}${side.slice(1)})`,
-        order: 31 + i,
-        display: "select",
-        required: false,
-        scope: { level: "item" },
-        pricingMode: "catalog",
-        presentation: {
-          helpText:
-            `Overrides the frame chamber on the ${side} edge only. Unset ⇒ whatever the frame ` +
-            "chamber above resolves to.",
-        },
-        familyKeys: [FAMILY],
-      }),
-    );
-    for (const [j, key] of CASEMENT_FRAME_KEYS.entries()) {
-      const frame = sys.frames[key];
-      if (!frame) continue;
-      choices.push({
-        key: `frame-${side}-${key}`,
-        optionKey,
-        label: frame.name,
-        order: (j + 1) * 10,
-        isDefault: false, // unset ⇒ the design's baked frame (byte-identical)
-        partKey: key,
-        engineEffect: { kind: "profile-substitution", params: { slot: "frame", side } },
-      });
-    }
   }
 
   // Divider profile — swap ONE transom/mullion's section (the reference's

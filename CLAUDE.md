@@ -199,10 +199,14 @@ no band, byte-identical to before** (validation doesn't assert doc HTML, so the 
   with different content THROWS, which is what makes `familyKeys` sharing the only way to share.
 - `src/designer/*` — the Designer platform: `option-types.ts` + `line-item-types.ts` (contracts),
   `rules.ts` (JSON rule DSL), `option-integrity.ts` (pure write-time seed validation), and the D2
-  resolver — `resolve.ts` (the pipeline), `select.ts` (selection precedence),
-  `adapters/cellnode.ts` (+ `adapters/index.ts` registry). **Pure, no I/O** — same rule as the
-  engine; the catalog reaches the resolver as a `CatalogSnapshot`. Seed sources are
-  `src/catalog/families/*` + `src/catalog/options/*`.
+  resolver — `resolve.ts` (the pipeline), `select.ts` (selection precedence) and the adapters:
+  `adapters/cellnode.ts` (CellNode trees: casement, entrance-door, french-door),
+  `adapters/sliding.ts` (the `kind:"sliding"` row), `adapters/shared.ts` (frame edges, cill,
+  `toQuoteInput` — the family-agnostic parts), `adapters/errors.ts` (`AdapterError` /
+  `NotImplementedError`) and `adapters/index.ts` (the registry). **Pure, no I/O** — same rule as
+  the engine; the catalog reaches the resolver as a `CatalogSnapshot`. Seed sources are
+  `src/catalog/families/*` + `src/catalog/options/*`. **A family must never be seeded ahead of its
+  adapter** — `resolve.ts` calls `getAdapter` unguarded.
 - `web/app/(app)/designer/` + `web/components/designer/*` — the Designer UI: `workspace.tsx`
   (the draft reducer + debounced resolve + the component selection + the D5 view switch/cache),
   `measurements.tsx`, `options.tsx` (scope-aware), `structure.tsx` (D4 tree/actions/history),
@@ -1688,6 +1692,157 @@ what they weld into (**Q25**).
 divider, sash, both steels, beads, glass, both gaskets, the door set, the cill and its steel, and
 the packer counts — plus the additive check that no cill ⇒ no deduction, no bar, no steel.
 `validateJob169` now also asserts its own gasket figures. **1161 → 1299 passed, 0 failed.**
+
+## Field fixes — 2026-08-04 (rounding, language, chamber, patio K)
+
+Four defects reported from using the app on real jobs. None changes a calibrated cut rule; the
+patio one *corrects* two that were extrapolated. **1299 → 1405 passed, 0 failed.**
+
+**1. Every printed LENGTH is a whole millimetre.** `documents.ts#mm()` and `svg.ts#mmLabel()` apply
+the same `Math.round` (half-up: 30.5 → 31, 30.4 → 30) to every length cell and every drawing
+annotation. This is **presentation only** — the engine keeps its calibrated 0.1 mm precision
+(`bars.ts#round1`), because the fractions are real: an odd profile face halved at a split (67 → 33.5,
+75 → 37.5) and the sliding panel formula both produce them, and the calibrated jobs assert those
+values. Do not push the rounding into the engine. Money keeps `toFixed(2)`; the BOM/DMO `qty` column
+is metres/m²/pieces, not a length, and keeps `round3`. The drawing was rounded too so a schematic
+pane label and the cutting-list row beside it in the same PDF can never differ (asserted both ways
+in `validateViews`). Two adjacent honesty fixes: gasket rows printed a **millimetre** value under
+the header "Metres" (the number is right and deliberate — the reference Quotila docs print mm — so
+only the label changed), and the Work Planner's weld counters matched bar NAMES, tallying every
+square-cut sliding cap as a frame or sash weld; they now filter on `weldedEnds(endPrep) > 0`, the
+same test `bars.ts` uses to apply the allowance.
+
+**2. The patio documents were half in Romanian.** Six sliding `auxiliaries` names in
+`system-sunnyplast.ts` were transcribed verbatim from Jobs 44/48 and printed on **every** patio
+quote — as the Cutting List section title, the Work Order description, Work Planner Station 1 and
+the BOM/DMO description. They are now English (`Aluminium Slide Track`, `Frame Slide Cap`, …) with
+the Romanian kept in the calibration comment as the source citation. The catalog source is the only
+durable fix: `prisma/seed.ts#upsertPart` rewrites `name` on every reseed, so a DB edit would not
+stick. `documents.ts#section()` gained an **Auxiliary** branch, checked first — several of these
+legitimately carry "Frame"/"Sash" in their name and were being filed as frame members.
+
+**3. Chamber is a WHOLE-UNIT choice; the studio defaults to 6 chamber.** Owner decision: a unit is
+fabricated from one profile type. The four seeded per-edge `Frame (Standard) (Top|Bottom|Left|Right)`
+rows are **removed** and `profile.frame-chamber` is now shared by `casement-window` and
+`entrance-door` with `frame-6ch` as `isDefault`. **The engine's per-edge capability is untouched** —
+`Design.frameKeys` / `QuoteInput.frameKeys` / `framesForEdges()` / the per-edge cut math all remain,
+still proven by `validatePerEdgeFrames` (Job 169); they simply have no UI writer. Recorded
+consequence: the casement designs bake `frame-5ch` (face 64), and unlike the `bead`/`sash` branches
+the resolver's frame branch applies a DEFAULT-sourced answer — deliberately, so the studio cuts what
+it shows — so a defaults-only **studio** draft is no longer byte-identical to a bare `solve()`. The
+golden test compares against `solve({…, frameKey:"frame-6ch"})`. `/quote`, the gallery previews and
+every calibrated job are unaffected. Full note in `Spec/01-windows-module/README.md` +
+`Spec/03-doors-module/README.md`. Also: `frame-french` was renamed
+**"Frame 6 Chamber — French 48mm"** — it deliberately shares code `SPQ-6-11252` with `frame-6ch`
+(one physical profile, two calibrated faces) but shared its NAME too, so `/admin/catalog` showed two
+indistinguishable rows.
+
+**4. The patio panel constant K is per configuration** (`topology.ts#PANEL_WIDTH_K`).
+`patio_calibration.pdf` (owner package, 31 Jul 2026 — four items F1–F4, all 2000 high, covering 2-,
+3- and 4-panel layouts) reproduces every frame, sash, bead, steel and glass row from constants
+already in the catalog, and corrects the one value that was extrapolated:
+
+| Config | Document | W | n | Printed panel | K | Was |
+|---|---|---|---|---|---|---|
+| OX | Jobs 44/48 + F1 | 1900/2210/2000 | 2 | 949 / 1104 / 999 | **10** | 10 ✓ |
+| XOO | F2 | 3000 | 3 | 995 | **3** | 10 ✗ |
+| OXO | F4 | 3500 | 3 | 1161.7 | **3** | 10 ✗ |
+| OXXO | F3 | 4000 | 4 | 1017 | **92** | 79 ✗ |
+
+Two independent 3-panel items agree on K = 3; K = 92 replaces 79, which rested on the superseded
+Job 104 alone and was already flagged uncalibrated. `JOB_PATIO_F1..F4` assert the documents;
+`JOB_SL_OXO`/`JOB_SL_OXXO` were re-baselined. **The AUXILIARY profiles were deliberately NOT
+changed** — F1 prints no `AD55142`/`GLIS16` although it has a fixed panel, where Jobs 44/48 print
+both, and the `AD16014`/`GLIS17`/`SPQ-GL-10253`/`GLIS16` lengths fit no rule across four samples.
+That conflict, plus an `AD55144` the catalog does not have, is **Q27** in `Spec/questions.md`; the
+aux rows are asserted on F1 only.
+
+## Studio parity — french-door + sliding-patio (2026-08-04)
+
+Owner report: *"replicate design in studio functionality in all other profiles french door and
+patio door — some things different but core idea are same."* The Designer now runs **all four
+quotable families**. The two halves were not symmetric, and that asymmetry is the whole story.
+
+**The platform widened first, and proved byte-identical before either family landed.**
+`resolve.ts` reached the topology model through the adapter for only 2 of its 6 needs — the other
+4 (`toQuoteInput`, `pinCellField`, `pinAllCells`, `equalSplitRatios`) were imported straight from
+`cellnode.ts`, so a second adapter could not have been reached at all. All six are now on
+`EngineAdapter`; `AdapterError` moved to `src/designer/adapters/errors.ts` (so a sibling adapter is
+never the de-facto base class) and gained `NotImplementedError`, the difference between "this
+family cannot express that" (a `not-implemented` **warning**, the item still solves) and "you
+addressed something that does not exist" (an **error**). The two `pinAllCells` call sites had **no
+try/catch**, so an adapter throw would have 500'd the public `POST /api/line-items/resolve`; both
+are wrapped. The genuinely family-agnostic parts — the four frame-edge components, the cill, and
+`toQuoteInput` — live in `adapters/shared.ts` so the next engine slot is remembered once.
+**1405 assertions unchanged across the refactor.**
+
+**french-door is seed data only** (`src/catalog/families/french-door.ts` +
+`src/catalog/options/french.ts`, 25 options) — an ordinary `CellNode` tree, `cellnode` adapter, zero
+`web/` change, exactly the phase-7 shape. Leaf constraints are generated from
+`limits.ts#SIZE_LIMITS` (one transcription of HAWDIO p70 in the repo, now feeding three families).
+Two traps were designed around rather than discovered:
+
+- **The stulp is a mullion, and Job 00000264 prints it at 2004 mm on a 2100 doorset.** The generic
+  1.8 m divider rule would have raised a HAWDIO-cited warning on *every* French door we can build —
+  the definition of a constraint that teaches users to ignore constraints. The exemption is written
+  into the rule (`any: [ kind == "S", height <= 1800 ]`), not by dropping the mullion check, so a
+  real welded mullion beside a sidelight is still checked.
+- **`cellnode.ts#applyEdit` falls back to `DEFAULT_SASH_KEY = "sash-t"`** (casement, face 79) when a
+  conversion hits a cell with no `sashKey`. `profile.french-leaf` is therefore scoped to `["sash"]`
+  only and `structure.component-type` is not adopted, so every reachable target already carries
+  `sash-door-*-fr`. **This is a LIVE defect for `entrance-door` today** (`profile.door-leaf` is
+  scoped `["sash","glass"]`) — filed as **Q28**, not fixed here.
+
+French is given **no frame option**: `frame-french` (face 48) is the only calibrated French frame,
+and the shared `profile.frame-chamber` row carries an `isDefault` the resolver applies even when
+unanswered — adopting it would silently re-cut all 12 designs to a casement frame. The golden
+byte-identity test is what guards that. `profile.divider` / `profile.joint-method` are not adopted
+either: `OptionChoice` has no `familyKeys`, so a shared key hands this family every one of its
+choices, and both are scoped by component TYPE — a user could replace the calibrated S-joint stulp
+with a welded `mullion-78`. Beyond the handle, no hardware slot is offered, because `hardware.ts`
+gives a French master leaf exactly ONE substitution slot and adds the lock, cylinder and hinges
+unslotted (flagged approximate — Job 00000264's cut tables do not itemise the gear).
+
+**sliding-patio needed the second ADAPTER** (`src/designer/adapters/sliding.ts`) the registry has
+been reserving since D2. A patio row is ONE `kind:"sliding"` node carrying `panels[]`, `meeting?`
+and `boundaries?` — no splits to walk, no path segments, and the glazing keys sit on the NODE, not
+per panel. **Component ids keep the `cell:` prefix** (`cell:root.p1`), because `parseComponentId`,
+`topologyEditFromParams` and `buildSummary` are shared platform code that hard-codes it and the
+engine already names these cells `root.pN`. A panel is typed `sash` — it IS a sash ring — with the
+engine's own `SashKind` as its `kind`.
+
+**Every topology edit is rejected, each with its reason** (no divider has a cut rule inside a patio
+panel; a midrail is calibrated only for a welded sash ring; a boundary is a share fraction, not a
+part; panel count comes from the design). They surface as `topology-edit-failed` issues through the
+existing catch — the resolver never throws. `equalSplitRatios` returns `{}` because **equal panels
+ARE the absence of `boundaries`** (1/n each), the state the calibrated width formula was derived
+in; `splitModes` is `["byDimensions"]` alone rather than offering a mode that would be a no-op with
+a name. A panel-boundary drag still travels the existing route (`root.b{i}` → `applySplitRatios` →
+`panelFractions`), which is what makes the studio's drag reproduce `validateSlidingSpans`' numbers
+exactly (equal 749; b1 = 0.40 → 598/900).
+
+**Patio studio scope is sizes, panel widths and options** (owner decision) — NOT panel count, NOT
+flipping a panel between fixed and sliding. The flip is *available*: the cut is identical either way
+(panels are cut alike; only the hardware tally and aux rows change), so enabling it later is one
+`case` plus one seeded option. **7 options**: two colours, glazing method, drainage, location, plus
+an item-level glass row and the sliding bead. No frame (one calibrated patio frame), no cill (its
+30 mm height deduction feeds `panelExtH = frame.h − 86` directly and no patio document has one), no
+add-ons (calibrated on a door; the inset would flow into the panel-width formula), no hardware slot
+(the patio tally is engine-computed and partly approximate), no structural actions.
+
+**No option key appears anywhere under `web/`** — still true, and `web/` needed no change:
+`window-designer.tsx` already had the sliding branch and the gallery's studio link is
+descriptor-driven.
+
+**Validation.** `resolve.test.ts` gains `validateFrenchFamily` and `validateSlidingFamily` (both
+SKIP on a DB predating the seed): a golden byte-identity test per family, the stulp guard (zero
+`mullion-max-length` issues at 1700×2100 with exactly one `type:"mullion", kind:"S"`), master/slave
+surviving a resize, the French midrail, the leaf-profile swap moving no length, the sliding
+component contract, the boundary drag, and every rejected op yielding one issue without throwing.
+`options.test.ts` grew a `validateEveryFamily` loop over `listFamilies()` — the family-agnostic
+gates (no empty list option, no dangling partKey, ≤1 default, every `pricingMode:"none"` explains
+itself, every component-scoped option targets a producible type, no money in the public payload) now
+apply to a fifth family the day it is registered. New owner questions **Q28–Q32**.
 
 ## Conventions
 

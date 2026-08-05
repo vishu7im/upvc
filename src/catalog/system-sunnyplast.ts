@@ -129,7 +129,11 @@ export const SUNNYPLAST_70: ProfileSystem = {
     // Weld 3 mm/end: printed frame 1706 = 1700 + 2×3 (all 5 docs).
     "frame-french": {
       code: "SPQ-6-11252",
-      name: "Frame 6 Chamber",
+      // Same NAME as frame-6ch until 2026-08-04, which made the two entries
+      // indistinguishable in the admin catalog. The code is deliberately shared
+      // (one physical profile, two calibrated faces — see the comment above);
+      // only the display name is disambiguated.
+      name: "Frame 6 Chamber — French 48mm",
       faceWidth: 48,
       glassRebate: 15,
       weldAllowanceMm: 3,       // Job 00000264: saw sizes print finished + 3/end
@@ -541,37 +545,43 @@ export const SUNNYPLAST_70: ProfileSystem = {
   auxiliaries: {
     "aux-track-alu": {
       code: "AD16014",
-      name: "Sina glisare aluminiu (slide track)",
+      // Doc name (Jobs 44/48, Romanian): "Sina glisare aluminiu".
+      name: "Aluminium Slide Track",
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-frame-alu": {
       code: "AD55142",
-      name: "Capac rama mare aluminiu (big frame cap)",
+      // Doc name (Jobs 44/48, Romanian): "Capac rama mare aluminiu".
+      name: "Aluminium Frame Cap (Large)",
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-fixed-panel": {
       code: "GLIS16",
-      name: "Capac rama canat fix (fixed-panel cap)",
+      // Doc name (Jobs 44/48, Romanian): "Capac rama canat fix".
+      name: "Fixed Panel Cap",
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-frame-channel": {
       code: "GLIS17",
-      name: "Capac canal rama (frame channel cap)",
+      // Doc name (Jobs 44/48, Romanian): "Capac canal rama".
+      name: "Frame Channel Cap",
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-frame-slide": {
       code: "SPQ-GL-10253",
-      name: "Capac rama glisare (frame slide cap)",
+      // Doc name (Jobs 44/48, Romanian): "Capac rama glisare".
+      name: "Frame Slide Cap",
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-sash-pvc": {
       code: "SPQ-GL-20253",
-      name: "Capac PVC cercevea glisare (sash PVC cap)",
+      // Doc name (Jobs 44/48, Romanian): "Capac PVC cercevea glisare".
+      name: "Sash PVC Cap",
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },

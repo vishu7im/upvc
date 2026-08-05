@@ -4,7 +4,12 @@
 // Phase 7 (extensibility proof) turned "the seed knows about casement windows"
 // into "the seed knows about the registry": `prisma/seed.ts` imports FAMILIES
 // and `buildOptionSystem()` from here and names no family at all. Registering
-// a third family is therefore two seed files plus one line in each list below.
+// a family is therefore two seed files plus one line in each list below.
+//
+// Four are registered. Three run on the `cellnode` adapter and one
+// (`sliding-patio`) on its own — see `src/designer/adapters/index.ts`. A
+// family must never be listed here ahead of its adapter: `resolve.ts` calls
+// `getAdapter` unguarded, so the seed would produce a family that throws.
 // =====================================================================
 
 import type { ProductFamilyDescriptor } from "../../designer/option-types.ts";
@@ -12,16 +17,27 @@ import type { OptionSystemSeed } from "../../designer/option-types.ts";
 import type { ProfileSystem } from "../../types.ts";
 import { CASEMENT_WINDOW_FAMILY } from "./casement-window.ts";
 import { ENTRANCE_DOOR_FAMILY } from "./entrance-door.ts";
+import { FRENCH_DOOR_FAMILY } from "./french-door.ts";
+import { SLIDING_PATIO_FAMILY } from "./sliding-patio.ts";
 import { buildWindowsOptionSystem } from "../options/windows.ts";
 import { buildDoorsOptionSystem } from "../options/doors.ts";
+import { buildFrenchOptionSystem } from "../options/french.ts";
+import { buildSlidingOptionSystem } from "../options/sliding.ts";
 
 /** Every family descriptor the seed applies. */
 export const FAMILIES: ProductFamilyDescriptor[] = [
   CASEMENT_WINDOW_FAMILY,
   ENTRANCE_DOOR_FAMILY,
+  FRENCH_DOOR_FAMILY,
+  SLIDING_PATIO_FAMILY,
 ];
 
-export { CASEMENT_WINDOW_FAMILY, ENTRANCE_DOOR_FAMILY };
+export {
+  CASEMENT_WINDOW_FAMILY,
+  ENTRANCE_DOOR_FAMILY,
+  FRENCH_DOOR_FAMILY,
+  SLIDING_PATIO_FAMILY,
+};
 
 /**
  * The whole option system, across every registered family.
@@ -34,7 +50,14 @@ export { CASEMENT_WINDOW_FAMILY, ENTRANCE_DOOR_FAMILY };
 export function buildOptionSystem(sys: ProfileSystem): OptionSystemSeed {
   const windows = buildWindowsOptionSystem(sys);
   const doors = buildDoorsOptionSystem(sys, windows);
-  return mergeOptionSystems([windows, doors]);
+  // French adopts from BOTH earlier seeds (the windows finishes and structural
+  // actions, and the doorset rows doors.ts declares), so it is handed the
+  // merged pool rather than one of them. `adoptShared` mutates `familyKeys` on
+  // the option objects themselves, and the merge stores those same references,
+  // so the final merge below sees the extended lists.
+  const french = buildFrenchOptionSystem(sys, mergeOptionSystems([windows, doors]));
+  const sliding = buildSlidingOptionSystem(sys, mergeOptionSystems([windows, doors, french]));
+  return mergeOptionSystems([windows, doors, french, sliding]);
 }
 
 /**

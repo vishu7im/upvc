@@ -87,6 +87,14 @@ export function validateDesigner(expect: Expect): void {
   const system = getSystem(SYSTEM)!;
 
   // ---- 1. GOLDEN: defaults-only draft == direct solve -----------------
+  //
+  // `frameKey: "frame-6ch"` is part of the baseline since 2026-08-04: the
+  // `profile.frame-chamber` option now defaults to 6 chamber (owner decision),
+  // and unlike the bead/sash slots the resolver's frame branch applies a
+  // DEFAULT-sourced answer — deliberately, so the studio cuts what it shows.
+  // The casement designs still bake frame-5ch, so the direct solve() this is
+  // compared against must be given the same frame. Everything else is unchanged,
+  // which is exactly what this test proves.
   {
     const direct = solve({
       orderNo: "DESIGNER",
@@ -95,6 +103,7 @@ export function validateDesigner(expect: Expect): void {
       widthMm: 1200,
       heightMm: 1200,
       systemId: SYSTEM,
+      frameKey: "frame-6ch",
     });
     const { resolved, output } = resolveLineItem(draft({ designId: "win-th-over-fixed-z" }), snap);
     expect("golden: resolve produced an engine output", Boolean(output), true);
@@ -190,6 +199,7 @@ export function validateDesigner(expect: Expect): void {
       heightMm: 1200,
       systemId: SYSTEM,
       splitRatios: { root: 0.5 },
+      frameKey: "frame-6ch", // the studio's default frame — see the golden test
     });
     expect("split(equal): no error issues",
       edited.resolved.issues.filter((i) => i.severity === "error").length, 0);
@@ -513,6 +523,8 @@ export function validateDesigner(expect: Expect): void {
   }
 
   validateSecondFamily(expect, snap);
+  validateFrenchFamily(expect, snap);
+  validateSlidingFamily(expect, snap);
 }
 
 // ---------------------------------------------------------------------
@@ -735,5 +747,361 @@ function validateSecondFamily(expect: Expect, snap: CatalogSnapshot): void {
       output!.parts.bars.some((b) => b.code === transomCode), true);
     expect("fanlight: a fixed light above, one door leaf below",
       (resolved.components ?? []).filter((c) => c.type === "sash").length, 1);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Third family — french-door (seed data only, cellnode adapter)
+// ---------------------------------------------------------------------
+
+/**
+ * French is the cheap half of the studio-parity work: an ordinary `CellNode`
+ * tree, so it needed no adapter and no `web/` change. What has to be proved is
+ * that the seed did not quietly re-cut a calibrated family — and that the
+ * STULP survives the two rules that would otherwise have broken it (the
+ * generic 1.8 m divider maximum, and the casement `sash-t` conversion
+ * fallback).
+ */
+function validateFrenchFamily(expect: Expect, snap: CatalogSnapshot): void {
+  console.log("\n---------- Third family: french-door ----------");
+
+  const FR_FAMILY = "french-door";
+  const family = getFamily(FR_FAMILY);
+  const optionSystem = getOptionSystem(FR_FAMILY);
+  if (!family || !optionSystem) {
+    console.log(`  (skipped — family "${FR_FAMILY}" not seeded; run npm run db:seed)`);
+    return;
+  }
+  const system = getSystem(SYSTEM)!;
+
+  const frDraft = (partial: Partial<LineItemDraft> = {}): LineItemDraft => ({
+    schemaVersion: 1,
+    familyKey: FR_FAMILY,
+    systemId: SYSTEM,
+    designId: "door-french",
+    quantity: 1,
+    dimensions: { widthMm: 1700, heightMm: 2100 },
+    ...partial,
+  });
+
+  // ---- GOLDEN: a defaults-only French door == a direct solve() --------
+  //
+  // No `frameKey` in the direct solve, unlike the casement golden test: French
+  // does NOT adopt `profile.frame-chamber` (its choices are the casement 5ch/
+  // 6ch pair and it carries a default the resolver applies), so the design's
+  // own `frame-french` face 48 must survive untouched. This assertion IS that
+  // guarantee — if the option were ever adopted, this line fails first.
+  {
+    const direct = solve({
+      orderNo: "DESIGNER",
+      customer: "Designer",
+      designId: "door-french",
+      widthMm: 1700,
+      heightMm: 2100,
+      systemId: SYSTEM,
+    });
+    const { resolved, output } = resolveLineItem(frDraft(), snap);
+    expect("french golden: resolve produced an engine output", Boolean(output), true);
+    expect("french golden: no error issues",
+      resolved.issues.filter((i) => i.severity === "error").length, 0);
+    expect("french golden: fabrication byte-identical to direct solve()",
+      fabricationOf(output!), fabricationOf(direct));
+    expect("french golden: grand total matches",
+      resolved.pricing?.totals.grandTotal, direct.pricing.totals.grandTotal);
+    expect("french golden: two leaves", resolved.summary?.leafCount, 2);
+  }
+
+  // ---- THE STULP GUARD ------------------------------------------------
+  //
+  // The reason `french-door.ts` writes its own `dividerConstraints()` instead
+  // of reusing the door one: the stulp IS a mullion, and Job 00000264 prints it
+  // at 2004 mm on the product's own standard size. The generic rule would have
+  // raised a HAWDIO-cited warning on EVERY French door we can build.
+  {
+    const { resolved, output } = resolveLineItem(frDraft(), snap);
+    const mullions = (resolved.components ?? []).filter((c) => c.type === "mullion");
+    expect("stulp: exactly one mullion in a pure pair", mullions.length, 1);
+    expect("stulp: it is the square-cut S joint", mullions[0]?.kind, "S");
+    expect("stulp: it spans past 1.8 m on the standard size",
+      mullions[0]!.rect.h > 1800, true);
+    expect("stulp: and raises NO mullion-length issue",
+      resolved.issues.filter((i) => i.constraintId === "mullion-max-length").length, 0);
+    // Job 00000264 prints 2004 = 2100 − 96, with no horn and no weld add.
+    const stulp = output!.parts.bars.find((b) => b.code === system.transoms["french-mullion"].code);
+    expect("stulp: cut to the full daylight height", stulp?.extMm, 2004);
+    expect("stulp: square-cut — Ext == Int, no horns", stulp?.intMm, stulp?.extMm);
+    expect("stulp: no welded ends, so no weld allowance", stulp?.weldedEndCount, 0);
+  }
+
+  // A real welded mullion beside a sidelight is still checked — the exemption
+  // is on the JOINT TYPE, not on the rule.
+  {
+    const rule = family.constraints.find((c) => c.id === "mullion-max-length");
+    expect("stulp: the mullion rule still exists", Boolean(rule), true);
+    expect("stulp: it exempts by joint type, not by dropping the check",
+      JSON.stringify(rule?.assert).includes('"component.kind"'), true);
+  }
+
+  // ---- Master/slave survive a resize ----------------------------------
+  {
+    const wide = resolveLineItem(frDraft({ dimensions: { widthMm: 2000, heightMm: 2200 } }), snap);
+    const kinds = (wide.resolved.components ?? [])
+      .filter((c) => c.type === "sash")
+      .map((c) => c.kind)
+      .sort();
+    expect("resize: still a master + slave pair",
+      kinds.join(","), "french-door-master,french-door-slave");
+    expect("resize: componentIds are position-derived and stable",
+      (wide.resolved.components ?? []).some((c) => c.componentId === "cell:root.left"), true);
+  }
+
+  // ---- The midrail this family CALIBRATED ------------------------------
+  {
+    // Job 00000264's own fabrication: the bar welds inside the leaf's ring, so
+    // the opener, its handle and its gear survive and the glazing splits.
+    const { resolved, output } = resolveLineItem(
+      frDraft({
+        topologyEdits: [
+          { id: "m", edit: { op: "split", componentId: "cell:root.left", axis: "horizontal", position: "equal" } },
+        ],
+      }),
+      snap,
+    );
+    expect("french midrail: resolved without errors",
+      resolved.issues.filter((i) => i.severity === "error").length, 0);
+    expect("french midrail: still exactly two leaves",
+      (resolved.components ?? []).filter((c) => c.type === "sash").length, 2);
+    expect("french midrail: the master's glazing splits into two panes",
+      output!.geometry.cells.length, 3);
+    const midrailCode = system.transoms["midrail-67"]?.code;
+    expect("french midrail: cut as the calibrated midrail profile",
+      output!.parts.bars.some((b) => b.code === midrailCode), true);
+  }
+
+  // ---- The leaf profile is a genuine 1:1 swap --------------------------
+  {
+    const base = resolveLineItem(frDraft(), snap).output!;
+    const { resolved, output } = resolveLineItem(
+      frDraft({
+        selections: [
+          { optionKey: "profile.french-sash-profile", choiceKey: "french-sash-profile-sash-door-t-fr" },
+        ],
+      }),
+      snap,
+    );
+    expect("french sash swap: no error issues",
+      resolved.issues.filter((i) => i.severity === "error").length, 0);
+    const tCode = system.sashes["sash-door-t-fr"].code;
+    const zCode = system.sashes["sash-door-z-fr"].code;
+    expect("french sash swap: the T leaf is cut", output!.parts.bars.some((b) => b.code === tCode), true);
+    expect("french sash swap: the Z leaf is gone", output!.parts.bars.some((b) => b.code === zCode), false);
+    // Job 00000264 cuts both leaves identically — face 105, overlap 20, 3 mm
+    // weld — so ONLY the code may move. Compare the lengths, not the codes.
+    const lengths = (o: typeof base) =>
+      JSON.stringify(o.parts.bars.map((b) => [b.extMm, b.intMm, b.orientation]));
+    expect("french sash swap: every bar LENGTH is unchanged",
+      lengths(output!), lengths(base));
+  }
+
+  // ---- What French must NOT be offered --------------------------------
+  {
+    const frKeys = new Set(optionSystem.groups.flatMap((g) => g.options.map((o) => o.key)));
+    expect("french: no frame-chamber option (frame-french is the only calibrated frame)",
+      frKeys.has("profile.frame-chamber"), false);
+    expect("french: no divider-profile option (it would replace the stulp)",
+      frKeys.has("profile.divider"), false);
+    expect("french: no component-type conversion (the sash-t fallback)",
+      frKeys.has("structure.component-type"), false);
+    expect("french: no lock/cylinder/hinge slots (the engine fits them unslotted)",
+      frKeys.has("hardware.door-lock") || frKeys.has("hardware.cylinder") || frKeys.has("hardware.door-hinge"),
+      false);
+    expect("french: the handle IS a real slot", frKeys.has("hardware.door-handle"), true);
+    expect("french: shares the catalog glass option", frKeys.has("glazing.glass-type"), true);
+    expect("french: declares no conversions", family.componentConversions.length, 0);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Fourth family — sliding-patio (the second ADAPTER)
+// ---------------------------------------------------------------------
+
+/**
+ * Sliding is the half that needed platform work: a `kind:"sliding"` node the
+ * cellnode adapter rejects outright. What must be proved is (a) the row still
+ * quotes byte-identically through the resolver, (b) a panel-boundary drag
+ * reproduces the widths `validateSlidingSpans` already asserts against the
+ * calibrated formula, and (c) every rejected edit becomes an ISSUE — the
+ * resolver must never throw, because `POST /api/line-items/resolve` is public.
+ */
+function validateSlidingFamily(expect: Expect, snap: CatalogSnapshot): void {
+  console.log("\n---------- Fourth family: sliding-patio (new adapter) ----------");
+
+  const SL_FAMILY = "sliding-patio";
+  const family = getFamily(SL_FAMILY);
+  const optionSystem = getOptionSystem(SL_FAMILY);
+  if (!family || !optionSystem) {
+    console.log(`  (skipped — family "${SL_FAMILY}" not seeded; run npm run db:seed)`);
+    return;
+  }
+
+  /** The seeded OX design (fixed + slider), default 1500 × 1750. */
+  const OX = "0057bd49-577c-4b61-bf5f-f8d69ca760b3";
+  if (!snap.getDesign(OX)) {
+    console.log("  (skipped — the sliding designs are not seeded)");
+    return;
+  }
+
+  const slDraft = (partial: Partial<LineItemDraft> = {}): LineItemDraft => ({
+    schemaVersion: 1,
+    familyKey: SL_FAMILY,
+    systemId: SYSTEM,
+    designId: OX,
+    quantity: 1,
+    dimensions: { widthMm: 1500, heightMm: 1750 },
+    ...partial,
+  });
+
+  // ---- GOLDEN: a defaults-only patio row == a direct solve() ----------
+  {
+    const direct = solve({
+      orderNo: "DESIGNER",
+      customer: "Designer",
+      designId: OX,
+      widthMm: 1500,
+      heightMm: 1750,
+      systemId: SYSTEM,
+    });
+    const { resolved, output } = resolveLineItem(slDraft(), snap);
+    expect("sliding golden: resolve produced an engine output", Boolean(output), true);
+    expect("sliding golden: no error issues",
+      resolved.issues.filter((i) => i.severity === "error").length, 0);
+    expect("sliding golden: fabrication byte-identical to direct solve()",
+      fabricationOf(output!), fabricationOf(direct));
+    expect("sliding golden: grand total matches",
+      resolved.pricing?.totals.grandTotal, direct.pricing.totals.grandTotal);
+    expect("sliding golden: no constraints exist to fire (HAWDIO p70 has no sliding row)",
+      family.constraints.length, 0);
+  }
+
+  // ---- The adapter's component contract --------------------------------
+  {
+    const { resolved } = resolveLineItem(slDraft(), snap);
+    const comps = resolved.components ?? [];
+    const panels = comps.filter((c) => c.componentId.startsWith("cell:"));
+    expect("sliding components: one per panel", panels.length, 2);
+    expect("sliding components: ids use the platform's cell: prefix",
+      panels.map((p) => p.componentId).join(","), "cell:root.p1,cell:root.p2");
+    expect("sliding components: a panel is typed as a sash ring",
+      panels.every((p) => p.type === "sash"), true);
+    expect("sliding components: the kind is the engine's own SashKind",
+      panels.map((p) => p.kind).join(","), "sliding-fixed,sliding-slide-left");
+    expect("sliding components: the four frame edges are enumerated",
+      comps.filter((c) => c.type === "frame-edge").length, 4);
+    expect("sliding components: NO per-panel glass sub-component is offered",
+      comps.some((c) => c.componentId.endsWith("/glass")), false);
+    expect("sliding components: no dividers — a boundary is a fraction, not a part",
+      comps.some((c) => c.type === "transom" || c.type === "mullion"), false);
+  }
+
+  // ---- A boundary drag reproduces the calibrated widths ----------------
+  {
+    // The same numbers `jobs.ts#validateSlidingSpans` proves against the
+    // formula: equal ⇒ 749 each; b1 = 0.40 ⇒ 598 / 900 summing to 1498.
+    const equal = resolveLineItem(slDraft(), snap).output!;
+    const sashCode = getSystem(SYSTEM)!.sashes["sash-sliding"].code;
+    const equalW = equal.parts.bars
+      .filter((b) => b.code === sashCode && b.orientation === "H")
+      .map((b) => b.extMm);
+    expect("sliding spans: equal panels are 749 wide", equalW[0], 749);
+
+    const dragged = resolveLineItem(
+      slDraft({ splitRatios: { "root.b1": 0.4 } }),
+      snap,
+    );
+    expect("sliding spans: a drag resolves without errors",
+      dragged.resolved.issues.filter((i) => i.severity === "error").length, 0);
+    const draggedW = [
+      ...new Set(
+        dragged
+          .output!.parts.bars.filter((b) => b.code === sashCode && b.orientation === "H")
+          .map((b) => b.extMm),
+      ),
+    ].sort((a, b) => a - b);
+    expect("sliding spans: b1=0.40 gives 598 / 900", draggedW.join(","), "598,900");
+    expect("sliding spans: the two panels still fill the row", draggedW[0] + draggedW[1], 1498);
+  }
+
+  // ---- Every rejected edit is an ISSUE, never a throw -------------------
+  {
+    const ops: { id: string; edit: any }[] = [
+      { id: "split", edit: { op: "split", componentId: "cell:root.p1", axis: "vertical", position: "equal" } },
+      { id: "midrail", edit: { op: "add-midrail", componentId: "cell:root.p1", position: "equal" } },
+      { id: "remove", edit: { op: "remove-divider", componentId: "divider:root" } },
+      { id: "setdiv", edit: { op: "set-divider", componentId: "divider:root", dividerKey: "mullion-78" } },
+      { id: "convert", edit: { op: "convert-component", componentId: "cell:root.p1", to: "glass" } },
+      { id: "kind", edit: { op: "set-sash-kind", componentId: "cell:root.p1", kind: "sliding-slide-right" } },
+    ];
+    for (const o of ops) {
+      let threw = false;
+      let result: ReturnType<typeof resolveLineItem> | undefined;
+      try {
+        result = resolveLineItem(slDraft({ topologyEdits: [o] }), snap);
+      } catch {
+        threw = true;
+      }
+      expect(`sliding reject (${o.id}): resolveLineItem does not throw`, threw, false);
+      const failures = (result?.resolved.issues ?? []).filter(
+        (i) => i.kind === "topology-edit-failed" && i.editId === o.id,
+      );
+      expect(`sliding reject (${o.id}): exactly one topology-edit-failed issue`, failures.length, 1);
+      expect(`sliding reject (${o.id}): the message says WHY`,
+        (failures[0]?.message.length ?? 0) > 80, true);
+      // A rejected edit must not corrupt the quote: the row still solves.
+      expect(`sliding reject (${o.id}): the row still produces an output`,
+        Boolean(result?.output), true);
+    }
+  }
+
+  // ---- Item-level glass and bead reach the NODE's own slots -------------
+  {
+    const base = resolveLineItem(slDraft(), snap).output!;
+    const system = getSystem(SYSTEM)!;
+    const alt = Object.keys(system.glass).find(
+      (k) => k !== "glass-4-20-4-lowe" && system.glass[k].financialCategory !== "Panels",
+    );
+    if (alt) {
+      const { resolved, output } = resolveLineItem(
+        slDraft({ selections: [{ optionKey: "glazing.sliding-glass", choiceKey: `sliding-glass-${alt}` }] }),
+        snap,
+      );
+      expect("sliding glass: no error issues",
+        resolved.issues.filter((i) => i.severity === "error").length, 0);
+      expect("sliding glass: every pane takes the chosen unit",
+        output!.parts.glass.every((g) => g.code === system.glass[alt].code), true);
+      expect("sliding glass: the pane SIZES are unchanged",
+        JSON.stringify(output!.parts.glass.map((g) => [g.widthMm, g.heightMm])),
+        JSON.stringify(base.parts.glass.map((g) => [g.widthMm, g.heightMm])));
+    }
+  }
+
+  // ---- What the patio studio must NOT offer ----------------------------
+  {
+    const slKeys = new Set(optionSystem.groups.flatMap((g) => g.options.map((o) => o.key)));
+    expect("sliding: no frame option (frame-sliding is the only patio frame)",
+      slKeys.has("profile.frame-chamber"), false);
+    expect("sliding: no cill (it would move every panel via the 30 mm deduction)",
+      slKeys.has("profile.cill"), false);
+    expect("sliding: no add-ons (calibrated on a door, not a patio)",
+      slKeys.has("profile.addon-left"), false);
+    expect("sliding: no structural actions — every edit is rejected",
+      [...slKeys].some((k) => k.startsWith("structure.")), false);
+    expect("sliding: no hardware slot over an approximate tally",
+      [...slKeys].some((k) => k.startsWith("hardware.")), false);
+    expect("sliding: it does own an item-level glass row",
+      slKeys.has("glazing.sliding-glass"), true);
+    expect("sliding: and its own bead row", slKeys.has("profile.sliding-bead"), true);
+    expect("sliding: byDimensions is the only split mode",
+      family.splitModes.join(","), "byDimensions");
+    expect("sliding: it names the sliding adapter", family.engine.adapter, "sliding");
   }
 }

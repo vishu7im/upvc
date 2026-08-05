@@ -541,7 +541,7 @@ function round3(n: number): number { return Math.round(n * 1000) / 1000; }
  *   "[Y - /" → 1
  *   "[ - ]"  → 0   (bead, reinforcement)
  */
-function weldedEnds(endPrep: string): number {
+export function weldedEnds(endPrep: string): number {
   let n = 0;
   // A Y-notch is a welded joint too — the jamb piece welds onto the transom
   // that broke it, so it shrinks at that end like any other. Job 173 p4 prints

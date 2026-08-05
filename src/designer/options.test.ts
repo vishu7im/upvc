@@ -218,14 +218,19 @@ export function validateOptionSystem(expect: Expect): void {
       true,
     );
   }
-  // Both families must offer them — the reference shows the same four rows on
-  // windows and on doors ("they will be common for all other profile").
+  // Every CellNode family must offer them — the reference shows the same four
+  // rows on windows and on doors ("they will be common for all other profile"),
+  // and Job 169's inset rule is about a FRAME, not about what opens.
+  //
+  // sliding-patio is deliberately absent: the inset would flow into `frame.w`
+  // and therefore into the calibrated panel-width formula, with no patio
+  // document to check it against (see catalog/options/sliding.ts).
   for (const side of ["top", "bottom", "left", "right"]) {
     const o = options.find((x) => x.key === `profile.addon-${side}`);
     expect(
-      `add-on ${side} is shared by both families`,
+      `add-on ${side} is shared by the three CellNode families`,
       [...(o?.familyKeys ?? [])].sort().join(","),
-      "casement-window,entrance-door",
+      "casement-window,entrance-door,french-door",
     );
   }
 
@@ -309,4 +314,102 @@ export function validateOptionSystem(expect: Expect): void {
     }),
     true,
   );
+
+  // ---- 8. The same gates, over EVERY registered family ---------------
+  validateEveryFamily(expect, catalogKeys);
+}
+
+/**
+ * The family-agnostic half of this suite, run over `listFamilies()`.
+ *
+ * Sections 1–7 above are the casement family's own acceptance criteria and
+ * name its options. THIS section names none: it asserts only what must be true
+ * of any family the seed registers, so registering a fifth one inherits the
+ * checks instead of needing new ones. The one that earns its keep most often is
+ * "no list option is served empty" — a choice generator whose catalog filter
+ * matches nothing (a renamed partKey prefix, a financialCategory that moved)
+ * produces a dropdown with no entries and no error anywhere else.
+ */
+function validateEveryFamily(expect: Expect, catalogKeys: Set<string>): void {
+  const families = listFamilies();
+  expect("every registered family is served", families.length >= 4, true);
+  // Named so a family that silently fails to seed is visible in the log, not
+  // just absent from a count.
+  expect(
+    "the four families are the ones the registry declares",
+    families.map((f) => f.familyKey).sort().join(","),
+    "casement-window,entrance-door,french-door,sliding-patio",
+  );
+
+  const listDisplays = ["select", "select-image", "segmented"];
+
+  for (const fam of families) {
+    const key = fam.familyKey;
+    const optionSystem = getOptionSystem(key);
+    expect(`${key}: option system loads`, optionSystem !== undefined, true);
+    if (!optionSystem) continue;
+
+    // -- descriptor --------------------------------------------------
+    expect(`${key}: names a registered adapter`,
+      ["cellnode", "sliding"].includes(fam.engine.adapter), true);
+    expect(`${key}: declares at least one split mode`, fam.splitModes.length > 0, true);
+    expect(`${key}: width and height are required dimensions`,
+      ["widthMm", "heightMm"].every((d) =>
+        fam.dimensions.some((x) => x.key === d && x.required)), true);
+    expect(`${key}: constraint ids are unique`,
+      new Set(fam.constraints.map((c) => c.id)).size, fam.constraints.length);
+    expect(`${key}: every constraint cites a source`,
+      fam.constraints.filter((c) => !c.source || !c.source.trim()).length, 0);
+    let malformedRules = 0;
+    for (const c of fam.constraints) {
+      try {
+        assertValidRule(c.assert, c.id);
+      } catch {
+        malformedRules++;
+      }
+    }
+    expect(`${key}: every constraint rule is well-formed`, malformedRules, 0);
+
+    // -- served option system ----------------------------------------
+    const gs = optionSystem.groups;
+    const os = gs.flatMap((g) => g.options);
+    const cs = os.flatMap((o) => o.choices);
+    const served = new Set(gs.map((g) => g.key));
+    expect(`${key}: every served group is one the family declares`,
+      gs.every((g) => fam.optionGroupKeys.includes(g.key)), true);
+    expect(`${key}: every option resolves to a served group`,
+      os.every((o) => served.has(o.groupKey)), true);
+    expect(`${key}: every served option is scoped to this family`,
+      os.every((o) => o.familyKeys.includes(key)), true);
+    expect(`${key}: no option has more than one default`,
+      os.every((o) => o.choices.filter((c) => c.isDefault).length <= 1), true);
+    expect(`${key}: every action option carries a template`,
+      os.filter((o) => o.display === "action").every((o) => o.action !== undefined), true);
+    expect(`${key}: an action option offers no choices`,
+      os.filter((o) => o.display === "action").every((o) => o.choices.length === 0), true);
+    expect(`${key}: no list option is served empty`,
+      os.filter((o) => listDisplays.includes(o.display) && o.choices.length === 0)
+        .map((o) => o.key).join(",") || "(none)",
+      "(none)");
+    expect(`${key}: no choice points at a missing catalog part`,
+      cs.filter((c) => c.partKey && !catalogKeys.has(c.partKey))
+        .map((c) => c.key).join(",") || "(none)",
+      "(none)");
+    // Golden rule, checked structurally: an option that fabricates nothing must
+    // say so, and every one of its choices must declare no engine effect.
+    expect(`${key}: a pricingMode:"none" option explains itself`,
+      os.filter((o) => o.pricingMode === "none" && !(o.presentation?.helpText ?? "").trim())
+        .map((o) => o.key).join(",") || "(none)",
+      "(none)");
+    // A component-scoped option must address a component TYPE the family can
+    // actually produce, or it is a control nobody will ever see.
+    const producible = new Set(fam.componentTypes.map((c) => c.type));
+    expect(`${key}: every component-scoped option targets a producible type`,
+      os.filter((o) => o.scope.level === "component" &&
+        !(o.scope.componentTypes ?? []).some((t) => producible.has(t)))
+        .map((o) => o.key).join(",") || "(none)",
+      "(none)");
+    expect(`${key}: served payload contains no cost/price field`,
+      findMoneyKey({ family: fam, optionSystem }) ?? "(none)", "(none)");
+  }
 }

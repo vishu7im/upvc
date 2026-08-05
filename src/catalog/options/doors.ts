@@ -49,26 +49,25 @@ const FAMILY = "entrance-door";
  * Everything here is about the OPENING, the FINISH or the PAPERWORK — none of
  * it is specific to what opens.
  *
- * `profile.frame-chamber`, `profile.sash-type`, `hardware.handle`,
- * `hardware.locking` and `hardware.hinge` are deliberately NOT shared: their
- * choices are casement parts and casement sash kinds. Doors declare their own
- * below, against the door catalog.
+ * `profile.sash-type`, `hardware.handle`, `hardware.locking` and
+ * `hardware.hinge` are deliberately NOT shared: their choices are casement parts
+ * and casement sash kinds. Doors declare their own below, against the door
+ * catalog.
  *
- * The four per-EDGE frame rows, the divider profile and the joint method ARE
- * shared: a doorset's outer frame and its transom/mullion are the same parts a
- * window's are (Job 169 prints `SPQ-6-11252` on all four edges of a doorset and
- * `SPQ-5-30252` as its divider), and the choices are generated from the same
- * catalog list.
+ * `profile.frame-chamber` IS shared (owner decision 2026-08-04): a doorset's
+ * outer frame is the same part a window's is — Job 169 prints `SPQ-6-11252` on
+ * all four of its edges — and both studios must show exactly ONE frame row,
+ * defaulting to 6 chamber. The four per-EDGE rows that used to be shared here
+ * are gone; see the comment on `profile.frame-chamber` in options/windows.ts.
+ * The divider profile and joint method stay shared (Job 169 prints
+ * `SPQ-5-30252` as a doorset's divider), generated from the same catalog list.
  */
 const SHARED_OPTION_KEYS = [
   "profile.colour-outside",
   "profile.colour-inside",
   "profile.cill",
   "profile.bead",
-  "profile.frame-top",
-  "profile.frame-bottom",
-  "profile.frame-left",
-  "profile.frame-right",
+  "profile.frame-chamber",
   "profile.divider",
   "profile.joint-method",
   "profile.addon-top",

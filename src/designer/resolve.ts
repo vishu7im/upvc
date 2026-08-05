@@ -62,13 +62,10 @@ import type {
 } from "./line-item-types.ts";
 import { LINE_ITEM_SCHEMA_VERSION, isBlockingIssue } from "./line-item-types.ts";
 import { getAdapter } from "./adapters/index.ts";
-import {
-  AdapterError,
-  equalSplitRatios,
-  pinAllCells,
-  pinCellField,
-  toQuoteInput,
-} from "./adapters/cellnode.ts";
+// The resolver reaches the family's topology model ONLY through the adapter it
+// registered (`family.engine.adapter`) — never through a specific adapter's
+// module. `AdapterError` is the shared error type all of them throw.
+import { AdapterError, NotImplementedError } from "./adapters/errors.ts";
 import { resolveSelections, type EffectiveSelection } from "./select.ts";
 
 export interface ResolveResult {
@@ -260,7 +257,7 @@ export function resolveLineItem(
       const frameKey = effects.frameKey ?? design.frameKey;
       const frame = system.frames[frameKey];
       if (!frame) throw new AdapterError(`Unknown frame: ${frameKey}`);
-      splitRatios = equalSplitRatios(working, widthMm, heightMm, system, frame.faceWidth);
+      splitRatios = adapter.equalSplitRatios(working, widthMm, heightMm, system, frame.faceWidth);
     } catch (err) {
       issues.push({
         severity: "warning",
@@ -271,7 +268,7 @@ export function resolveLineItem(
   }
 
   // ---- 6. solve --------------------------------------------------------
-  const quoteInput = toQuoteInput({
+  const quoteInput = adapter.toQuoteInput({
     draft,
     design,
     workingTopology: working,
@@ -418,12 +415,15 @@ function applyEngineEffects(args: {
           // Component-scoped glass: pin the cell's own glassKey in the
           // working topology (the same slot fillDefaultGlass fills).
           try {
-            working = pinCellField(working, ev.component.path, { glassKey: partKey });
+            working = adapterImpl.pinCellField(working, ev.component.path, { glassKey: partKey });
             topologyEdited = true;
           } catch (err) {
+            // A family that cannot express per-component glass is a missing
+            // CAPABILITY, not a broken draft: warn and keep the row's glass.
+            const missing = err instanceof NotImplementedError;
             issues.push({
-              severity: "error",
-              kind: "unknown-component",
+              severity: missing ? "warning" : "error",
+              kind: missing ? "not-implemented" : "unknown-component",
               optionKey: ev.option.key,
               ...scopeIssue,
               message: `Cannot pin glass on ${ev.component.componentId}: ${(err as Error).message}`,
@@ -480,20 +480,31 @@ function applyEngineEffects(args: {
           } else {
             effects.frameKey = partKey;
           }
-        } else if (slot === "bead") {
-          // A DEFAULT bead answer is the design's baked state — pinning it
-          // would rewrite the topology for nothing; only explicit answers pin.
+        } else if (slot === "bead" || slot === "sash") {
+          // A DEFAULT answer is the design's baked state — pinning it would
+          // rewrite the topology for nothing; only explicit answers pin.
+          //
+          // sash (Jobs 172/173): the door T and Z leaves cut identically, so
+          // this swaps the profile and moves no dimension. `pinAllCells` drops
+          // the key on cells that have no sash, so it can never invent an opener.
           if (ev.source === "default") break;
-          working = pinAllCells(working, { beadKey: partKey });
-          topologyEdited = true;
-        } else if (slot === "sash") {
-          // Door sash profile (Jobs 172/173): the T and Z leaves cut
-          // identically, so this swaps the profile and moves no dimension.
-          // Same "a default answer is already the baked state" guard as bead;
-          // `pinAllCells` drops the key on cells that have no sash.
-          if (ev.source === "default") break;
-          working = pinAllCells(working, { sashKey: partKey });
-          topologyEdited = true;
+          try {
+            working = adapterImpl.pinAllCells(
+              working,
+              slot === "bead" ? { beadKey: partKey } : { sashKey: partKey },
+            );
+            topologyEdited = true;
+          } catch (err) {
+            // Fail SOFT, never out of the resolve: an adapter whose topology
+            // has no such slot must degrade to a warning, not a 500 on
+            // POST /api/line-items/resolve.
+            issues.push({
+              severity: "warning",
+              kind: "not-implemented",
+              optionKey: ev.option.key,
+              message: `${ev.option.name}: ${(err as Error).message}`,
+            });
+          }
         } else {
           issues.push({
             severity: "warning",

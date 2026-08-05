@@ -242,6 +242,102 @@ steel, but draws a 41.3 × 17.4 box that carries no code and has no catalog entr
 **Owner decision 2026-07-30:** map the documented 35 × 15 to all three sizes, commenting 95/180 as
 extrapolated. Replace with the real sections if the supplier itemises them.
 
+**Q27. Which auxiliary profiles does a sliding patio carry, and how long are they?**
+⚠ OWNER DECISION REQUIRED — *raised 2026-08-04 from `patio_calibration.pdf` (F1–F4)*
+
+The new package's frame, sash, bead, steel and glass rows all reproduce from the calibrated
+constants, and it corrected the panel-width constant K for 3- and 4-panel layouts
+(`src/engine/topology.ts#PANEL_WIDTH_K`). Its **auxiliary** rows do not fit any rule, and on one
+point it flatly contradicts Jobs 44/48. Nothing was changed on this; the engine still emits the
+Jobs 44/48 rules, and the new jobs assert aux rows only on F1.
+
+1. **Presence.** F1 (2000 × 2000, 2 panels, one fixed) prints **no `AD55142` and no `GLIS16`**.
+   Jobs 44 and 48 — also 2-panel with one fixed — print **both**, at `panelExtW − 99`. Which
+   convention is current? Is the cap fitted per fixed panel, per *bypass track*, or on request?
+2. **Lengths.** Across F1/F2/F3/F4 (W = 2000 / 3000 / 4000 / 3500, all H = 2000):
+
+   | Profile | F1 | F2 | F3 | F4 | Our rule |
+   |---|---|---|---|---|---|
+   | `AD16014` track | 1905 | 1920 | 3900 | 2420 | `W − 95` (only F1 fits) |
+   | `GLIS17` channel cap | 1905 | 1920 | 3905 | 1920 | `H − 95` (F1 fits; F3 = `W − 95`) |
+   | `SPQ-GL-10253` | 1904 ×1, 1955 ×2 | 1905 ×1, 1950 ×2 | 1672 ×1, 2150 ×2 | 1905 ×1, 2450 ×2 | `H − 96` ×1 + `W − 45` ×2 (only F1 fits) |
+   | `SPQ-GL-20253` sash cap | 1912 ×2 | 1917 ×2 | 1917 ×4 | 1917 ×2 | `panelExtH − 2` (F1 fits; the rest print 1917) |
+   | `GLIS16` | — | 858.5 ×1 | 927 ×2 | 1061.7 ×1 | `panelExtW − 99` per fixed panel |
+
+   Four samples are not enough to separate "depends on the sliding aperture" from "depends on the
+   panel count" from "depends on which track". A cutting list for one more 3-panel patio at a
+   different width would probably settle it.
+3. **A part we do not have.** F2/F3/F4 print `AD55144` "Piesa inchidere 3/4 canaturi" (1875 / 1895 /
+   1875) — a 3/4-leaf closing piece with no catalog entry and no rule. Not emitted.
+4. **Unequal frame divisions.** F2 and F4 draw unequal frame divisions (F2: 996 / 959.5 / 1044.5)
+   above three **equal** panels. Our model derives the drawn divisions from the panel fractions, so
+   it cannot express that. Cosmetic today — but if those divisions drive anything on the shop floor
+   we need the rule.
+
+## Task 1 addendum — studio parity for French and patio (2026-08-04)
+
+Raised while adding `french-door` and `sliding-patio` to the Designer. None of them blocked the
+work: each is a capability deliberately **not** exposed, with the reason recorded in the seed file
+beside it.
+
+**Q28. A converted cell is handed the CASEMENT sash profile.** ⚠ LIVE DEFECT FOR `entrance-door`
+
+`src/designer/adapters/cellnode.ts#applyEdit` falls back to `DEFAULT_SASH_KEY = "sash-t"` (the
+casement leaf: face 79, 2.5 mm weld) whenever `convert-component → sash` or `set-sash-kind` lands on
+a cell that carries no `sashKey` of its own. That is right for a casement window and wrong for every
+other family:
+
+- **entrance-door, today.** `profile.door-leaf` is scoped `["sash", "glass"]`, so converting a fixed
+  fanlight into `door-left` builds a **casement** sash inside a doorset — face 79 where the
+  calibrated door leaf is 105, and 2.5 mm weld where Job 90 gives 105/28.
+- **french-door.** Avoided rather than fixed: `profile.french-leaf` is scoped to `["sash"]` only and
+  `structure.component-type` is not adopted, so the only reachable targets already carry
+  `sash-door-t-fr` / `sash-door-z-fr`. The cost is that a French sidelight cannot be converted into
+  a leaf at all, and the family therefore declares `componentConversions: []`.
+
+The fix is one field: a family-supplied default sash profile on the descriptor (or on the adapter
+context), so the fallback is the family's leaf rather than the casement's. It is a platform change,
+so it is an owner call whether it lands before the door defect is hit in the field.
+
+**Q29. What pairs a French doorset — can both leaves be `master`?**
+
+Nothing prevents it. `hardware.ts` fits the master-leaf gear on `french-door-master` and the
+shootbolt on `french-door-slave`, both read per cell, so answering `profile.french-leaf` = master on
+both leaves quotes two handle sets and no shootbolt — a unit nobody would build. The rule DSL
+(`src/designer/rules.ts`) evaluates one component at a time and cannot COUNT components, so this
+cannot be expressed as a family constraint today. Options: (a) leave it — the drawing shows two
+handles, so it is visible; (b) add a counting operator to the DSL; (c) make the leaf role a single
+item-level "handle side" answer that writes both cells. (c) is the smallest and matches how the
+reference configurator asks it.
+
+**Q30. Does a sliding patio ever take a cill?**
+
+`profile.cill` is deliberately **not** offered to `sliding-patio`. Fitting a cill costs 30 mm of
+manufacturing height (`solve.ts`), and the patio panel formula reads that height directly —
+`panelExtH = frame.h − 86` — so a cill would move every panel, bead, steel and pane on the row. No
+patio document we hold (Jobs 44/48, `patio_calibration.pdf` F1–F4) carries a cill, so there is
+nothing to verify the shifted numbers against. If patios are sold with cills, we need one cutting
+list for a patio that has one.
+
+**Q31. Per-panel glazing on a sliding row.**
+
+`CellNode` sliding carries ONE `glassKey`/`beadKey` for the whole row
+(`topology.ts#buildSlidingPanels`), so "obscure glass in the fixed panel only" is not expressible.
+The studio is honest about it: the sliding adapter emits no per-panel glass component,
+`pinCellField` throws a `not-implemented` error the resolver downgrades to a warning, and the
+family's glass option is item-level. Adding `CellNode.panels[i].glassKey` is additive and
+byte-identical when absent — but is it a real requirement? Every calibrated patio job glazes the
+whole row identically.
+
+**Q32. French sidelight glass at frame face 48.**
+
+5 of the 12 quotable French designs carry sidelights or fanlights around the leaf pair. Job 00000264
+calibrates the pair only; the sidelight's glass size follows from the frame face, and French uses
+face **48** where the same physical profile (`SPQ-6-11252`) is calibrated at **68** for the Quotila
+casement/door jobs (see `system-sunnyplast.ts`). The pair's cut list is identical under either face,
+so the disagreement has never mattered — for a sidelight it would. One French cutting list WITH a
+sidelight settles it.
+
 ## Resolved during planning
 
 - **Screenshots gap** — `collections/windows/` subfolders were initially empty; owner supplied 13
