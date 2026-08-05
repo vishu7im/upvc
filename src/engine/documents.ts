@@ -196,22 +196,28 @@ function advisoryBand(advisories?: DocAdvisory[]): string {
  */
 function mainOptionsBlock(options?: DocOption[]): string {
   if (!options || options.length === 0) return "";
-  const rows = options
-    .map(
-      (o) =>
-        `<tr><td style="width:38%;">${esc(o.label)}</td><td>${esc(o.value)}</td></tr>`,
-    )
+  // A three-up label/value GRID, not a one-per-row table. The table gave the
+  // label 38% of the sheet and the value the rest, so an 18-option item spent
+  // ~306 px printing two short strings per line — the single biggest reason a
+  // confirmed order's work order ran to a second page. Same rows, a third of
+  // the height. `.mainopts` is styled in WORK_ORDER_COMPACT_CSS; this function
+  // has exactly one caller (renderWorkOrder), so no other document moves.
+  const cells = options
+    .map((o) => `<b>${esc(o.label)}</b><span>${esc(o.value)}</span>`)
     .join("");
   return `<div class="section-title">Main Options</div>
-    <table><tbody>${rows}</tbody></table>`;
+    <div class="mainopts">${cells}</div>`;
 }
 
-function header(input: QuoteInput, title: string, systemName: string, designName: string, branding?: DocBranding, images?: DocImage[], cill?: DocCill, colour?: DocColour): string {
+/**
+ * `sideBySide` (work order only) puts the preview band BESIDE the header grid
+ * instead of under it — the grid is four narrow columns, so the drawing fits in
+ * the room it was already leaving. Default `false` reproduces the stacked
+ * layout byte for byte, which is what keeps the other six documents unchanged.
+ */
+function header(input: QuoteInput, title: string, systemName: string, designName: string, branding?: DocBranding, images?: DocImage[], cill?: DocCill, colour?: DocColour, sideBySide = false): string {
   const today = new Date().toLocaleDateString("en-GB");
-  return `
-    ${brandBar(branding)}
-    <h1>${title}</h1>
-    <div class="header">
+  const grid = `<div class="header">
       <b>Customer:</b><span>${esc(input.customer)}</span>
       <b>Job No:</b><span>${esc(input.orderNo)}</span>
       <b>Reference:</b><span>${esc(input.reference ?? "")}</span>
@@ -220,30 +226,50 @@ function header(input: QuoteInput, title: string, systemName: string, designName
       <b>Design:</b><span>${esc(designName)}</span>
       <b>Width × Height:</b><span>${input.widthMm > 0 && input.heightMm > 0 ? `${mm(input.widthMm)} × ${mm(input.heightMm)} mm` : "—"}</span>
       <b>Quote#:</b><span>${esc(input.orderNo)}</span>${cillRows(cill)}${colourRows(colour)}
-    </div>
-    ${previewBand(images)}
+    </div>`;
+  return `
+    ${brandBar(branding)}
+    <h1>${title}</h1>
+    ${sideBySide ? `<div class="headrow">${grid}${previewBand(images)}</div>` : `${grid}
+    ${previewBand(images)}`}
   `;
 }
 
 /**
  * Work-order-only layout compaction (owner 2026-08-05: "adjust work order in
- * single page instead of 2 pages").
+ * single page instead of 2 pages"; extended 2026-08-05 after the report that
+ * the work order made AT ORDER CONFIRM was still two pages).
  *
- * A single-item work order ran ~1060 px of content against ~968 px of usable A4
- * height (297 mm − Puppeteer's 12 mm top/bottom margins − 64 px of body margin),
- * so it spilled onto a second page by a small margin. This recovers ~280 px:
- * a smaller preview card, a body margin that no longer duplicates the PDF's own,
- * tighter table rows and a slightly smaller row font.
+ * Usable A4 height at pdf.ts's 12 mm top/bottom margins is 1032 px. The first
+ * pass was measured against `solve()`'s work order, which carries no "Main
+ * Options" block — and confirm's does (api/orders.ts). Measured in headless
+ * Chromium on a 1200 × 1200 casement with the seeded branding:
+ *
+ *   solve() work order, no Main Options ................  819 px  (1 page)
+ *   confirm-style, + 18 Main Options rows .............. 1152 px  (2 pages)
+ *
+ * of which: brandbar 62 · h1 18 · header grid 66 · preview band 121 · four
+ * section titles 76 · MAIN OPTIONS 306 · Sections 239 · Accessories 154 ·
+ * Glass 52. So the overflow was one block plus a layout that stacked
+ * full-width containers holding two-to-four narrow columns. An entrance-door
+ * can answer 37 options (~630 px), so tightening padding again would not hold.
+ *
+ * Three layout moves use the horizontal room instead (~330 px recovered):
+ *   1. `.headrow`  — preview band beside the header grid, not under it (−66).
+ *   2. `.mainopts` — Main Options as a three-up grid, not one row each (−196).
+ *   3. `.two-up`   — Accessories and Glass side by side (−71).
  *
  * Applied through `wrap`'s `extraCss` seam so the other six documents keep the
  * shared STYLE byte for byte — they are not part of this request, and the
  * confirmed-order documents already in the database were rendered with it.
  *
- * NOT a guarantee. Confirm aggregates a multi-item order into ONE work order
- * with a preview per line item (api/orders.ts), so a large order still
- * paginates — deliberately, since shrinking it to fit would make it unreadable
- * on the shop floor. The break rules below are what make that spill land
- * between rows, with the table header repeated, instead of through one.
+ * NOT a guarantee on its own. Confirm aggregates a multi-item order into ONE
+ * work order with a preview per line item (api/orders.ts), so a large order
+ * still paginates — deliberately, since shrinking it to fit would make it
+ * unreadable on the shop floor. The break rules below are what make that spill
+ * land between rows, with the table header repeated, instead of through one.
+ * `services/pdf.ts#htmlToPdf({fitToOnePage})` is the bounded safety net for the
+ * single-product case that lands just over.
  */
 const WORK_ORDER_COMPACT_CSS = `
   body { margin: 8px; font-size: 11px; }
@@ -257,8 +283,17 @@ const WORK_ORDER_COMPACT_CSS = `
   .preview .preview-svg { width: 110px; height: 95px; }
   .preview figcaption { margin-top: 3px; font-size: 9.5px; }
   .meta { margin-bottom: 8px; }
+  .headrow { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+  .headrow .header { flex: 1 1 auto; margin-bottom: 0; }
+  .headrow .previews { flex: 0 1 auto; max-width: 55%; margin-bottom: 0; }
+  .headrow .preview { max-width: 150px; }
+  .mainopts { display: grid; grid-template-columns: repeat(3, max-content minmax(0, 1fr)); gap: 1px 8px; padding: 4px 6px; margin-bottom: 8px; font-size: 10.5px; border-bottom: 1px solid #ddd; }
+  .mainopts b { color: #555; font-weight: normal; white-space: nowrap; }
+  .mainopts span { overflow-wrap: anywhere; }
+  .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: start; }
+  .two-up section { min-width: 0; }
   thead { display: table-header-group; }
-  tr, .preview { break-inside: avoid; }
+  tr, .preview, .two-up section { break-inside: avoid; }
 `;
 
 // ---------- WORK ORDER ----------------------------------------------
@@ -331,8 +366,12 @@ export function renderWorkOrder(
     </tr>
   `).join("");
 
+  // Accessories and Glass sit SIDE BY SIDE: three and four narrow columns
+  // respectively, so stacked they spent a full sheet width printing about a
+  // third of one. The row templates above are deliberately left untouched —
+  // validation/jobs.ts asserts the glass row's exact bytes, indentation and all.
   return wrap("Work Order" + variantSuffix(variant), `
-    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill, colour)}${advisoryBand(advisories)}
+    ${header(input, "WORK ORDER" + variantSuffix(variant).toUpperCase(), systemName, designName, branding, images, cill, colour, true)}${advisoryBand(advisories)}
     ${weldNote(variant)}
 ${mainOptionsBlock(mainOptions)}
 
@@ -344,17 +383,22 @@ ${mainOptionsBlock(mainOptions)}
       <tbody>${sectionsRow}${reinfRow}</tbody>
     </table>
 
-    <div class="section-title">Accessories Required</div>
-    <table>
-      <thead><tr><th>Description</th><th class="right">Qty</th><th>Unit Of Measurement</th></tr></thead>
-      <tbody>${hwRow}${gasketRow}</tbody>
-    </table>
-
-    <div class="section-title">Glass Required</div>
-    <table>
-      <thead><tr><th>Description</th><th class="right">Qty</th><th class="right">Width</th><th class="right">Length</th></tr></thead>
-      <tbody>${glassRow}</tbody>
-    </table>
+    <div class="two-up">
+      <section>
+        <div class="section-title">Accessories Required</div>
+        <table>
+          <thead><tr><th>Description</th><th class="right">Qty</th><th>Unit Of Measurement</th></tr></thead>
+          <tbody>${hwRow}${gasketRow}</tbody>
+        </table>
+      </section>
+      <section>
+        <div class="section-title">Glass Required</div>
+        <table>
+          <thead><tr><th>Description</th><th class="right">Qty</th><th class="right">Width</th><th class="right">Length</th></tr></thead>
+          <tbody>${glassRow}</tbody>
+        </table>
+      </section>
+    </div>
   `, branding, WORK_ORDER_COMPACT_CSS);
 }
 

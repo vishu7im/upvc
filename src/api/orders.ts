@@ -1114,13 +1114,19 @@ ordersRouter.get(
         "Document not generated yet (confirm the order first)",
       );
 
-    const key = `orders/${req.params.id}/${type}__${variant}__catalog-preview-v1.pdf`;
+    // The version suffix is the cache buster. Existence IS the cache, so a
+    // rendering change that should reach ALREADY-CONFIRMED orders has to move
+    // the key — v2 is the 2026-08-05 single-page work-order layout.
+    const key = `orders/${req.params.id}/${type}__${variant}__catalog-preview-v2.pdf`;
     let pdf: Buffer;
     if (await objectExists(key)) {
       pdf = (await getObject(key)).body; // cache hit
     } else {
       const html = await hydrateDocumentPreviews(req.params.id, doc.html);
-      pdf = await htmlToPdf(html);
+      // Only the work order shrinks to fit — it is the sheet the shop floor
+      // wants on one page, and pdf.ts bounds the shrink at 0.8 so a genuinely
+      // long (multi-item) order still paginates instead of printing unreadably.
+      pdf = await htmlToPdf(html, { fitToOnePage: type === DocumentType.WORK_ORDER });
       await putObject(key, pdf, "application/pdf"); // cache for next time
     }
 

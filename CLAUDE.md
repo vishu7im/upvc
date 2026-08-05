@@ -1928,6 +1928,45 @@ cutting list and BOM remain 2. **24/24 renders of the other six documents are by
 multi-item order into ONE work order with a preview per item, so a large order still paginates —
 deliberately, since shrinking it to fit would make it unreadable on the shop floor.
 
+### The CONFIRMED order's work order — the same fix, finished (2026-08-05, second report)
+
+*"we create workorder after order creation and that pdf become long and fit on 2 page."* The pass
+above was measured against **`solve()`'s** work order, which carries no **Main Options** block — and
+the one confirm generates does (`api/orders.ts`, from `ResolvedLineItem.summary.mainOptions`).
+Measured in headless Chromium against the **1032 px** usable A4 height (297 mm − pdf.ts's 12 mm
+top/bottom margins): 819 px without the block, **1152 px with 18 option rows** — 2 pages. An
+`entrance-door` can answer **37** (~630 px), so tightening padding a third time would not have held.
+
+The sheet was stacking full-width containers holding two-to-four narrow columns, so the fix uses the
+horizontal room (**~330 px recovered**), all three through the existing work-order-only `extraCss`
+seam:
+
+| Move | CSS | Saved |
+|---|---|---|
+| Preview band **beside** the header grid, not under it | `.headrow` | −66 px |
+| Main Options as a **three-up label/value grid**, not one row each | `.mainopts` | −196 px |
+| **Accessories and Glass side by side** | `.two-up` | −71 px |
+
+`header()` gained an optional trailing `sideBySide` (default `false` ⇒ the other six documents keep
+their bytes; `renderWorkOrder` is the only caller passing `true`), and `mainOptionsBlock()` swapped
+its `<table>` for the grid. The `hwRow`/`gasketRow`/`glassRow` template literals are **deliberately
+untouched** — `validation/jobs.ts:1066` asserts the glass row's exact bytes, indentation and all;
+only the containers around the tables moved. Measured after: 18 options **814 px**, 37 options
+**905 px**, French midrail with 37 **956 px** — all 1 page, confirmed by counting `/Type /Page` in
+the real PDF. **All 30 renders of the other six documents are byte-identical** (7 documents ×
+5 designs, sha256 before/after).
+
+**The bounded safety net.** `services/pdf.ts#htmlToPdf(html, {fitToOnePage})` (omitted ⇒ the exact
+previous call) measures `documentElement.scrollHeight` under **print** media against a usable height
+derived from **the same margin constants** `page.pdf()` uses, and passes Puppeteer's `scale` when the
+overflow needs no more than a **0.8** reduction. Below that it lets the sheet paginate: an unreadable
+one-pager is worse than two readable pages, and that case is a genuinely multi-item order, which
+SHOULD paginate. Verified through the real function: 60 options ⇒ 1 page, 90 options ⇒ 1 page where
+the unfitted render is 2, 200 options ⇒ 2 pages (correctly refused). Wired in `api/orders.ts` for
+`DocumentType.WORK_ORDER` only, and the PDF cache key moved **`catalog-preview-v1` → `v2`** —
+existence IS the cache, so without the bump every already-confirmed order would keep serving its old
+two-page PDF.
+
 ## Conventions
 
 - Comment every fabrication formula with its source (jobnumber / PDF section).
