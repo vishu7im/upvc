@@ -15,7 +15,7 @@
 //     resolver applies even when unanswered. Adopting it would re-cut every
 //     patio quote to a casement frame.
 //   • NO cill — a cill costs 30 mm of manufacturing HEIGHT (`solve.ts`), and
-//     `panelExtH = frame.h − 86` reads that height directly, so fitting one
+//     `panelExtH = frame.h − 83` reads that height directly, so fitting one
 //     would move every panel, bead, steel and pane. No patio document we hold
 //     carries a cill, so there is nothing to verify that against
 //     (Spec/questions.md).

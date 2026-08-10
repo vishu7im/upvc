@@ -243,13 +243,25 @@ steel, but draws a 41.3 × 17.4 box that carries no code and has no catalog entr
 extrapolated. Replace with the real sections if the supplier itemises them.
 
 **Q27. Which auxiliary profiles does a sliding patio carry, and how long are they?**
-⚠ OWNER DECISION REQUIRED — *raised 2026-08-04 from `patio_calibration.pdf` (F1–F4)*
+⚠ OWNER DECISION REQUIRED — *raised 2026-08-04 from `patio_calibration.pdf` (F1–F4);
+re-confirmed 2026-08-10 against `patio.pdf`, the 07 Aug re-issue of the same four items*
 
-The new package's frame, sash, bead, steel and glass rows all reproduce from the calibrated
+The package's frame, sash, bead, steel and glass rows all reproduce from the calibrated
 constants, and it corrected the panel-width constant K for 3- and 4-panel layouts
 (`src/engine/topology.ts#PANEL_WIDTH_K`). Its **auxiliary** rows do not fit any rule, and on one
 point it flatly contradicts Jobs 44/48. Nothing was changed on this; the engine still emits the
 Jobs 44/48 rules, and the new jobs assert aux rows only on F1.
+
+**The 07 Aug re-issue adds NO aux evidence.** Every auxiliary length and quantity in it is
+byte-identical to the 31 Jul package — the only change in the whole document is the panel envelope
+(+3 mm both axes; see CLAUDE.md "The patio panel envelope is CATALOG data"). Two consequences:
+
+* `SPQ-GL-20253` **tracks the panel** — it moved 1912 → 1915 on F1, still `panelExtH − 2`. That is
+  now the one aux rule with two independent confirmations.
+* `AD55142` / `GLIS16` do **not** track the panel: their lengths are unchanged while the panel they
+  are anchored on grew 3 mm. The engine's constant therefore moved `panelExtW − 99` → `− 102`,
+  purely so Jobs 44/48 still print their 850 / 1005. **That is bookkeeping, not a rule** — what
+  these two are really cut to is exactly what this question asks.
 
 1. **Presence.** F1 (2000 × 2000, 2 panels, one fixed) prints **no `AD55142` and no `GLIS16`**.
    Jobs 44 and 48 — also 2-panel with one fixed — print **both**, at `panelExtW − 99`. Which
@@ -261,8 +273,11 @@ Jobs 44/48 rules, and the new jobs assert aux rows only on F1.
    | `AD16014` track | 1905 | 1920 | 3900 | 2420 | `W − 95` (only F1 fits) |
    | `GLIS17` channel cap | 1905 | 1920 | 3905 | 1920 | `H − 95` (F1 fits; F3 = `W − 95`) |
    | `SPQ-GL-10253` | 1904 ×1, 1955 ×2 | 1905 ×1, 1950 ×2 | 1672 ×1, 2150 ×2 | 1905 ×1, 2450 ×2 | `H − 96` ×1 + `W − 45` ×2 (only F1 fits) |
-   | `SPQ-GL-20253` sash cap | 1912 ×2 | 1917 ×2 | 1917 ×4 | 1917 ×2 | `panelExtH − 2` (F1 fits; the rest print 1917) |
-   | `GLIS16` | — | 858.5 ×1 | 927 ×2 | 1061.7 ×1 | `panelExtW − 99` per fixed panel |
+   | `SPQ-GL-20253` sash cap | 1915 ×2 | 1920 ×2 | 1920 ×4 | 1920 ×2 | `panelExtH − 2` (F1 fits; the rest print 1920) |
+   | `GLIS16` | — | 858.5 ×1 | 927 ×2 | 1061.7 ×1 | `panelExtW − 102` per fixed panel |
+
+   (The `SPQ-GL-20253` row is the 07 Aug printing; the 31 Jul package printed 1912 / 1917 — it is
+   the only aux row the re-issue moved, because it is the only one cut to the panel.)
 
    Four samples are not enough to separate "depends on the sliding aperture" from "depends on the
    panel count" from "depends on which track". A cutting list for one more 3-panel patio at a

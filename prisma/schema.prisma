@@ -66,6 +66,17 @@ model ProfilePart {
   partKey String // the in-memory Record key, e.g. "frame-5ch"
   kind    PartKind
 
+  // Sliding panel envelope (SASH kind, sliding profiles only). A sliding patio's
+  // panels are not derived from face widths like a welded sash ring — the
+  // reference software cuts them to
+  //   panelExt = f x (W + K) - panelClearanceMm,  panelExtH = frameH - panelHeightDeductionMm
+  // and those two deductions are a fabricator SETTING, not a profile geometry:
+  // patio.pdf (07 Aug 2026) prints 3/83 where the 31 Jul package and Jobs 44/48
+  // printed 6/86. NULL on both ⇒ the engine's cited default (3/83). See
+  // src/types.ts SashSection.panelClearance and topology.ts#buildSlidingPanels.
+  panelClearanceMm       Decimal? @db.Decimal(10, 4)
+  panelHeightDeductionMm Decimal? @db.Decimal(10, 4)
+
   // ProfileSection base
   code              String
   name              String

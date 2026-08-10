@@ -625,9 +625,11 @@ The third quotable family (after Casement + Single Door). **Re-calibrated 2026-0
 (1900×2100)** and **Job 48 "Andrei Uk nr 2" (2210×2310)**, both 2-panel (slider left + fixed;
 Windowmaker "Dimensiuni de debitare detaliate"). These **SUPERSEDE the original Job 104
 (yogi test) calibration** (owner confirmed): the yogi docs disagreed on panel envelope
-(H−79 vs H−86; (W+3)/n−6 vs (W+10)/n−6) and steel (Int−10 vs Int+30). The engine now
-reproduces **every row of both Andrei docs exactly** (saw + finished sizes, quantities, steel,
-aux profiles, glass). The 7 DB designs (product `73679b0a-…`) are **OX, XO, OXO Slide
+(H−79 vs H−86; (W+3)/n−6 vs (W+10)/n−6) and steel (Int−10 vs Int+30). The engine reproduces
+**every row of both Andrei docs exactly** (saw + finished sizes, quantities, steel, aux profiles,
+glass) **except their panel envelope, superseded 2026-08-10 by `patio.pdf`** — see "The patio panel
+envelope is CATALOG data" below; setting the sliding sash's `panelClearance` back to 6/86
+reproduces the Andrei panels too. The 7 DB designs (product `73679b0a-…`) are **OX, XO, OXO Slide
 Left/Right, OOX, XOO, OXXO** — all `quotable=true`.
 
 **Structure.** A sliding patio is the *simplest* family: an outer frame (4 mitred bars) + **n
@@ -647,10 +649,11 @@ convention as the French docs):**
   face **85**. Bead `SPQ-1-51252` ("Bagheta ptr.24mm", `bead-sl-24`) face 20. Glass rebate **15**
   (glass = beadInt + 30: 809×1874 / 964×2084). All authentic codes (old `SPQ-SL-*` placeholders
   are gone).
-- **Panel width Ext:** bypass (OX/XO/OXO/OOX/XOO) = `(W+10)/n − 6` *(exact for n=2 — 949/1104;
-  n=3 is the same formula EXTENDED, no 3-panel Andrei doc yet)*; centre-meeting (OXXO) =
-  `(W+79)/4 − 6` *(still the old Job 104 single data point — UNCALIBRATED against the new
-  settings; needs an Andrei-era OXXO doc)*. Panel height Ext = **H − 86** (2014/2224).
+- **Panel envelope** (re-baselined 2026-08-10 — see "The panel envelope is catalog data" below):
+  width Ext = `(W+K)/n − 3` with **K per configuration** (`topology.ts#PANEL_WIDTH_K`: n=2 → 10,
+  n=3 → 3, OXXO → 92); height Ext = **H − 83**. The `3` and the `83` are **catalog data** on the
+  sliding sash (`SashSection.panelClearance`), not engine constants — the same profiles printed
+  `− 6` / `H − 86` in the 31 Jul package and Jobs 44/48.
 - Sash Int = Ext − 170; Bead Int = sash Int, Ext = Int+40 (the docs mark beads 45/45 mitre but
   the length carries no weld add; engine prints square `[ - ]`, cosmetic).
 - **Reinforcement = bar Int + 30** (steel runs 15mm past Int per end): catalog
@@ -660,8 +663,10 @@ convention as the French docs):**
 - **Auxiliary profiles** (new `AUXILIARY` PartKind + `ProfileSystem.auxiliaries`; lengths in
   `bars.ts#emitSlidingAuxBars`, all square-cut): track `AD16014` = W−95; channel cap `GLIS17` =
   H−95; slide cap `SPQ-GL-10253` = H−96 ×1 + (W−45) ×2; sash cap `SPQ-GL-20253` = panelExtH−2
-  per panel; `AD55142`/`GLIS16` = panelExtW−99 **per FIXED panel**. Per-fixed-panel counts and
-  the ×2 W−45 pieces are derived from 2-panel docs only — re-verify on a 3/4-panel doc.
+  per panel; `AD55142`/`GLIS16` = panelExtW−**102** **per FIXED panel** (−99 until 2026-08-10:
+  those two rows did NOT move when the panel envelope grew 3 mm, so the constant absorbs it —
+  bookkeeping, not a rule; Q27). Per-fixed-panel counts and the ×2 W−45 pieces are derived from
+  2-panel docs only — re-verify on a 3/4-panel doc.
 - Gasket 02 = Σ glass perimeter (the casement rule; the Andrei docs list no gaskets — rule
   retained from Job 104 where it was exact).
 - Hardware (unchanged from Job 104 — the Andrei docs list no hardware): per **fixed** panel 7×
@@ -1743,12 +1748,15 @@ indistinguishable rows.
 3- and 4-panel layouts) reproduces every frame, sash, bead, steel and glass row from constants
 already in the catalog, and corrects the one value that was extrapolated:
 
-| Config | Document | W | n | Printed panel | K | Was |
+| Config | Document | W | n | Panel Ext | K | Was |
 |---|---|---|---|---|---|---|
 | OX | Jobs 44/48 + F1 | 1900/2210/2000 | 2 | 949 / 1104 / 999 | **10** | 10 ✓ |
 | XOO | F2 | 3000 | 3 | 995 | **3** | 10 ✗ |
 | OXO | F4 | 3500 | 3 | 1161.7 | **3** | 10 ✗ |
 | OXXO | F3 | 4000 | 4 | 1017 | **92** | 79 ✗ |
+
+(The Panel Ext column is the 31 Jul envelope; the 07 Aug re-issue adds 3 mm to every one of them
+— see the next section. **K is unchanged.**)
 
 Two independent 3-panel items agree on K = 3; K = 92 replaces 79, which rested on the superseded
 Job 104 alone and was already flagged uncalibrated. `JOB_PATIO_F1..F4` assert the documents;
@@ -1757,6 +1765,52 @@ changed** — F1 prints no `AD55142`/`GLIS16` although it has a fixed panel, whe
 both, and the `AD16014`/`GLIS17`/`SPQ-GL-10253`/`GLIS16` lengths fit no rule across four samples.
 That conflict, plus an `AD55144` the catalog does not have, is **Q27** in `Spec/questions.md`; the
 aux rows are asserted on F1 only.
+
+## The patio panel envelope is CATALOG data (2026-08-10, `patio.pdf`)
+
+Owner report: *"this patio is with 100% accurate dimensions, our fabrication engine [is] not giving
+proper measurement"* — with `patio.pdf` (repo root, **07 Aug 2026**, "100 SOFT UK", 4 pages), which
+**re-issues the same four items** as `patio_calibration.pdf` (31 Jul, now deleted).
+
+**A line-by-line diff of the two packages shows exactly ONE substantive change.** Every panel is
+**3 mm bigger in BOTH axes**; the frame, the frame steel, **every auxiliary row**, every quantity
+and every position are identical:
+
+| Row | 31 Jul | 07 Aug |
+|---|---|---|
+| Sash `SPQ-GL-20252` (saw) | 1005 / 1920 | **1008 / 1923** |
+| Bead `SPQ-1-51252` | 869 / 1784 | **872 / 1787** |
+| Sash steel `AU26X26` · glass | 859 × 1774 | **862 × 1777** |
+| Sash PVC cap `SPQ-GL-20253` | 1912 | **1915** |
+
+So `panelExt = f×(W+K) − 6` / `panelExtH = H − 86` becomes **`− 3` / `H − 83`**, and with that one
+change **every printed sash, bead, glass, steel and panel-tracking cap row on all four items
+reproduces exactly** (F1 1002 × 1917 ⇒ saw 1008/1923; F2 998; F3 1020; F4 1164.667 ⇒ saw 1170.7 and
+glass 1025 — its own whole-mm rounding). **K (10/3/92) is unchanged and still correct**, which is
+itself the confirmation: only the envelope moved. The cap that is cut to `panelExtH − 2` moved with
+it while the caps that are not did not — a cap cannot move on its own, so the panel really is taller.
+
+**The two deductions are now CATALOG data, not engine constants** (owner decision). The same
+physical profiles printed 6/86 four weeks earlier, so this is a fabricator SETTING:
+`ProfilePart.panelClearanceMm` / `panelHeightDeductionMm` → `SashSection.panelClearance`
+(migration `20260810010000_add_sliding_panel_envelope`, which **backfills `sash-sliding` with 3/83
+so no reseed is needed**). `topology.ts#buildSlidingPanels` reads it, falling back to the cited
+`PANEL_ENVELOPE_DEFAULT` (3/83) so a pre-migration DB still cuts correctly; the seed writes it on
+**CREATE only** (new `ownerOwned` bucket in `upsertPart`) so an Admin › Catalog edit survives a
+reseed, like `weldAllowanceMm`/prices/`texture`; `partSchema` in `src/api/catalog.ts` accepts both.
+`PANEL_WIDTH_K` stays in the engine — it is per-CONFIGURATION, so it has no profile row to live on.
+
+**Consequences, stated plainly.** The PANEL rows of Jobs 44/48 ("Andrei UK") and of the 31 Jul
+package are **superseded** — every sliding job in `jobs.ts` is re-baselined +3. Nothing is lost:
+`validateSlidingPanelEnvelope()` asserts the catalog carries 3/83 **and** that feeding the
+superseded 6/86 back through the pure `solveTopology` reproduces Job 44's printed 949 × 2014
+exactly, so the older paperwork stays reproducible from one value. `AD55142`/`GLIS16` move from
+`panelExtW − 99` to `− 102` because their printed lengths did **not** move — bookkeeping so
+Jobs 44/48 still print 850/1005, not a claim about the rule (**Q27** stays open: `patio.pdf`'s
+auxiliary rows are byte-identical to the 31 Jul package, so it adds no aux evidence).
+
+**Validation: 1568 → 1575 passed, 0 failed** (+7 envelope assertions), plus a direct row-by-row
+replay of all four `patio.pdf` items through `solve()` — every printed length matches.
 
 ## Studio parity — french-door + sliding-patio (2026-08-04)
 

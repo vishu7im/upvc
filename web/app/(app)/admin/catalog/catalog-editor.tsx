@@ -34,7 +34,15 @@ import { Icon } from "@/components/icons";
 
 type SaveFn = (
   partKey: string,
-  patch: { cost: number; price: number; weight: number; weldAllowanceMm?: number },
+  patch: {
+    cost: number;
+    price: number;
+    weight: number;
+    weldAllowanceMm?: number;
+    // Sliding patio panel envelope — sent only by the sliding sash row.
+    panelClearanceMm?: number;
+    panelHeightDeductionMm?: number;
+  },
 ) => Promise<void>;
 
 const PROFILE_GROUPS: { key: keyof CatalogDump; kind: string; label: string }[] = [
@@ -285,19 +293,32 @@ function PriceRow({
   const [price, setPrice] = useState(row.price);
   const [weight, setWeight] = useState(row.weight);
   const [weld, setWeld] = useState(row.weldAllowanceMm ?? 0);
+  // Sliding patio panel envelope — present on the sliding sash only, so the
+  // extra inputs below appear on exactly that row (no option key, no partKey
+  // test: the catalog says which profile has one).
+  const env = row.panelClearance;
+  const [panelW, setPanelW] = useState(env?.widthMm ?? 0);
+  const [panelH, setPanelH] = useState(env?.heightMm ?? 0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(false);
   const dirty =
     cost !== row.cost ||
     price !== row.price ||
     weight !== row.weight ||
-    (showWeld && weld !== (row.weldAllowanceMm ?? 0));
+    (showWeld && weld !== (row.weldAllowanceMm ?? 0)) ||
+    (!!env && (panelW !== env.widthMm || panelH !== env.heightMm));
 
   async function save() {
     setBusy(true);
     setErr(false);
     try {
-      await onSave(partKey, showWeld ? { cost, price, weight, weldAllowanceMm: weld } : { cost, price, weight });
+      await onSave(partKey, {
+        cost,
+        price,
+        weight,
+        ...(showWeld ? { weldAllowanceMm: weld } : {}),
+        ...(env ? { panelClearanceMm: panelW, panelHeightDeductionMm: panelH } : {}),
+      });
       onSaved();
     } catch {
       setErr(true);
@@ -308,7 +329,7 @@ function PriceRow({
 
   const inp = "h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-right text-sm focus:border-[#4442e3] focus:outline-none focus:ring-[3px] focus:ring-[#4442e3]/12";
 
-  return (
+  const mainRow = (
     <tr className={err ? "bg-red-50" : "transition hover:bg-slate-50"}>
       {showImage && (
         <td className={tdClass}>
@@ -349,6 +370,56 @@ function PriceRow({
         </Button>
       </td>
     </tr>
+  );
+
+  if (!env) return mainRow;
+
+  // The sliding patio's panel envelope. It is two cut SETTINGS rather than
+  // profile geometry (the same profiles printed 6/86 before 07 Aug 2026), so it
+  // gets its own labelled sub-row instead of a column no other part would use.
+  return (
+    <>
+      {mainRow}
+      <tr className={err ? "bg-red-50" : ""}>
+        <td colSpan={6 + (showWeld ? 1 : 0) + (showImage ? 1 : 0)} className="px-4 pb-3">
+          <div className="flex flex-wrap items-end gap-4 rounded-lg bg-slate-50 px-3 py-2">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500" htmlFor={`pc-${partKey}`}>
+                Panel width clearance (mm)
+              </label>
+              <input
+                id={`pc-${partKey}`}
+                type="number"
+                step="0.1"
+                min="0"
+                value={panelW}
+                onChange={(e) => setPanelW(+e.target.value)}
+                className={inp + " w-28"}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500" htmlFor={`ph-${partKey}`}>
+                Panel height deduction (mm)
+              </label>
+              <input
+                id={`ph-${partKey}`}
+                type="number"
+                step="0.1"
+                min="0"
+                value={panelH}
+                onChange={(e) => setPanelH(+e.target.value)}
+                className={inp + " w-28"}
+              />
+            </div>
+            <p className="max-w-md text-[11px] leading-snug text-slate-500">
+              Sliding panel envelope: panel width = (unit width + K) ÷ panels − clearance, panel
+              height = frame height − deduction. <strong>3 / 83</strong> is the current production
+              setting (patio.pdf, 07 Aug 2026); the earlier packages cut 6 / 86.
+            </p>
+          </div>
+        </td>
+      </tr>
+    </>
   );
 }
 

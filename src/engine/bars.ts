@@ -146,12 +146,20 @@ export function computeParts(
 //   GLIS17       frame channel cap   = H − 95            ×1  (2005 / 2215)
 //   SPQ-GL-10253 frame slide cap     = H − 96 (=frameInt) ×1 + (W − 45) ×2
 //                                                            (2004+1855×2 / 2214+2165×2)
-//   SPQ-GL-20253 sash PVC cap        = panelExtH − 2     ×1 per panel (2012 / 2222)
-//   AD55142      big frame cap (alu) = panelExtW − 99    ×1 per FIXED panel (850 / 1005)
-//   GLIS16       fixed-panel cap     = panelExtW − 99    ×1 per FIXED panel (850 / 1005)
+//   SPQ-GL-20253 sash PVC cap        = panelExtH − 2     ×1 per panel (2015 / 2225)
+//   AD55142      big frame cap (alu) = panelExtW − 102   ×1 per FIXED panel (850 / 1005)
+//   GLIS16       fixed-panel cap     = panelExtW − 102   ×1 per FIXED panel (850 / 1005)
 // Per-FIXED-panel quantities and the ×2 (W − 45) pieces are derived from
 // 2-panel docs only (1 slider + 1 fixed each) — re-verify against a 3/4-panel
 // doc when one is available. All square-cut, never welded.
+//
+// The AD55142/GLIS16 constant was −99 until patio.pdf (07 Aug 2026) grew the
+// panel envelope by 3 mm in both axes: the sash cap DID move with the panel
+// (F1 prints 1912 → 1915, still panelExtH − 2) while every AD55142/GLIS16 length
+// in that package is UNCHANGED, so the constant absorbs the shift and Jobs 44/48
+// still print their 850 / 1005. That is bookkeeping, not a derived rule — what
+// these two are really cut to is unknown (Spec/questions.md Q27: F1 prints
+// neither although it has a fixed panel, and F2/F3/F4's lengths fit no rule).
 // ---------------------------------------------------------------------
 function emitSlidingAuxBars(
   bars: BarPiece[],
@@ -191,8 +199,8 @@ function emitSlidingAuxBars(
     const p = c.sashOuter!;
     push("aux-cap-sash-pvc", `Sash PVC cap panel ${i + 1}`, "V", p.h - 2);
     if (c.content === "sliding-fixed") {
-      push("aux-cap-frame-alu",   `Big frame cap (fixed panel ${i + 1})`, "H", p.w - 99);
-      push("aux-cap-fixed-panel", `Fixed-panel cap (panel ${i + 1})`,     "H", p.w - 99);
+      push("aux-cap-frame-alu",   `Big frame cap (fixed panel ${i + 1})`, "H", p.w - 102);
+      push("aux-cap-fixed-panel", `Fixed-panel cap (panel ${i + 1})`,     "H", p.w - 102);
     }
   });
 }

@@ -105,12 +105,29 @@ async function seedSystem(
       endClearance?: number;
       minBarLengthMm?: number;
     } = {},
+    /**
+     * Columns the OWNER owns once the row exists: written on CREATE so a fresh
+     * DB is calibrated, never re-applied on UPDATE so an Admin > Catalog edit
+     * survives a reseed (the same rule as cost/price/weight/weldAllowanceMm
+     * above and ColourOption.texture). `extra` above is seed-owned and IS
+     * re-applied.
+     */
+    ownerOwned: {
+      panelClearanceMm?: number;
+      panelHeightDeductionMm?: number;
+    } = {},
   ) => {
     // These values are edited in Admin > Catalog / filled by the price-list
     // import. Do not reset them on every deploy, because docker-compose runs
     // this seed during backend startup. tierPrices is stripped too — it is never
     // set in the catalog source (imported into cost1p/… by import-prices), so it
     // must never reach a Prisma payload (it is not a column) nor clobber imports.
+    // `panelClearance` is stripped for the same reason: it is TWO columns
+    // (panelClearanceMm / panelHeightDeductionMm), passed through ownerOwned.
+    const { panelClearance: _panelClearance, ...createBase } = base as typeof base & {
+      tierPrices?: unknown;
+      panelClearance?: unknown;
+    };
     const {
       cost: _cost,
       price: _price,
@@ -118,14 +135,14 @@ async function seedSystem(
       weldAllowanceMm: _weldAllowanceMm,
       tierPrices: _tierPrices,
       ...catalogFields
-    } = base as typeof base & { tierPrices?: unknown };
+    } = createBase;
 
     return tx.profilePart.upsert({
       where: {
         systemId_kind_partKey: { systemId: sys.systemId, kind, partKey },
       },
       update: { ...catalogFields, ...extra },
-      create: { systemId: sys.systemId, partKey, kind, ...base, ...extra },
+      create: { systemId: sys.systemId, partKey, kind, ...createBase, ...extra, ...ownerOwned },
     });
   };
 
@@ -133,10 +150,19 @@ async function seedSystem(
     await upsertPart(key, PartKind.FRAME, f, { glassRebate: f.glassRebate });
   }
   for (const [key, s] of Object.entries(sys.sashes)) {
-    await upsertPart(key, PartKind.SASH, s, {
-      glassRebate: s.glassRebate,
-      overlap: s.overlap,
-    });
+    await upsertPart(
+      key,
+      PartKind.SASH,
+      s,
+      { glassRebate: s.glassRebate, overlap: s.overlap },
+      // Sliding panel envelope — owner-editable, so create-only.
+      s.panelClearance
+        ? {
+            panelClearanceMm: s.panelClearance.widthMm,
+            panelHeightDeductionMm: s.panelClearance.heightMm,
+          }
+        : {},
+    );
   }
   for (const [key, t] of Object.entries(sys.transoms)) {
     await upsertPart(key, PartKind.TRANSOM, t, { jointType: t.jointType });

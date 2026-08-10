@@ -1,0 +1,51 @@
+{
+  "generatedAt": "2026-08-07T14:49:03.504Z",
+  "results": [
+    {
+      "viewport": {
+        "label": "1280",
+        "width": 1280,
+        "height": 1000
+      },
+      "metrics": {
+        "pageClientWidth": 1280,
+        "pageScrollWidth": 1280,
+        "bodyFontPx": 16,
+        "tableFontPx": 16,
+        "defaultControlHeightPx": 48,
+        "compactControlHeightPx": 44,
+        "minimumTableRowHeightPx": 44,
+        "focusOutlineWidthPx": 3,
+        "tableClientWidth": 1164,
+        "tableScrollWidth": 1164,
+        "tableHasLocalOverflow": false,
+        "tabletNoticeVisible": false,
+        "specimenColumns": 2
+      },
+      "failures": []
+    },
+    {
+      "viewport": {
+        "label": "834",
+        "width": 834,
+        "height": 1112
+      },
+      "metrics": {
+        "pageClientWidth": 834,
+        "pageScrollWidth": 834,
+        "bodyFontPx": 16,
+        "tableFontPx": 16,
+        "defaultControlHeightPx": 48,
+        "compactControlHeightPx": 44,
+        "minimumTableRowHeightPx": 44,
+        "focusOutlineWidthPx": 3,
+        "tableClientWidth": 750,
+        "tableScrollWidth": 760,
+        "tableHasLocalOverflow": true,
+        "tabletNoticeVisible": true,
+        "specimenColumns": 1
+      },
+      "failures": []
+    }
+  ]
+}

@@ -1,0 +1,348 @@
+{
+  "generatedAt": "2026-08-06T20:48:37.657Z",
+  "method": "One instrumented evaluator walkthrough in headless Chromium at 1280x900. Durations include configured-network and render time; they are evidence of this run, not a user-study average. Commit/destructive controls were counted but not submitted against the shared owner database.",
+  "flows": [
+    {
+      "id": "F1-header",
+      "task": "Quote a standard window via the header CTA",
+      "startedAt": "2026-08-06T20:48:41.288Z",
+      "navigationalClicks": 5,
+      "actionClicks": 0,
+      "formInteractions": 4,
+      "steps": [
+        {
+          "from": "/",
+          "to": "/quote",
+          "elapsedMs": 848,
+          "label": "Quick quote"
+        },
+        {
+          "from": "/quote",
+          "to": "/products",
+          "elapsedMs": 792,
+          "label": "Browse products"
+        },
+        {
+          "from": "/products",
+          "to": "/products/1e503ae1-b978-4dc7-8747-935423503cc9",
+          "elapsedMs": 9585,
+          "label": "352 designsSunny Plast 70mm CasementType101Systemsunnyplast-70"
+        },
+        {
+          "from": "/products/1e503ae1-b978-4dc7-8747-935423503cc9",
+          "to": "/quote?systemId=sunnyplast-70&designId=ed5acf4b-c491-48ed-b519-aa16877efbeb&productId=1e503ae1-b978-4dc7-8747-935423503cc9&name=1",
+          "elapsedMs": 804,
+          "label": "Configure"
+        },
+        {
+          "from": "/quote?systemId=sunnyplast-70&designId=ed5acf4b-c491-48ed-b519-aa16877efbeb&productId=1e503ae1-b978-4dc7-8747-935423503cc9&name=1",
+          "to": "/orders/[new-id]",
+          "elapsedMs": null,
+          "label": "Create order (counted, not submitted against shared data)"
+        }
+      ],
+      "notes": [
+        "The first destination was an empty state instructing the evaluator to browse products.",
+        "The terminal Create order control was present and enabled; it was counted but not submitted against the shared owner database."
+      ],
+      "screensVisited": 5,
+      "scrollScreens": 0,
+      "durationMs": 25170,
+      "finalPath": "/quote?systemId=sunnyplast-70&designId=ed5acf4b-c491-48ed-b519-aa16877efbeb&productId=1e503ae1-b978-4dc7-8747-935423503cc9&name=1"
+    },
+    {
+      "id": "F2",
+      "task": "Turn the configured quote into an order",
+      "startedAt": "2026-08-06T20:49:06.459Z",
+      "navigationalClicks": 1,
+      "actionClicks": 0,
+      "formInteractions": 2,
+      "steps": [
+        {
+          "from": "/quote?systemId=sunnyplast-70&designId=ed5acf4b-c491-48ed-b519-aa16877efbeb&productId=1e503ae1-b978-4dc7-8747-935423503cc9&name=1",
+          "to": "/orders/[new-id]",
+          "elapsedMs": null,
+          "label": "Create order (counted, not submitted against shared data)"
+        }
+      ],
+      "notes": [
+        "Measured as the final Customer/Qty + Create order portion of F1."
+      ],
+      "screensVisited": 1,
+      "durationMs": 0,
+      "finalPath": "/quote?systemId=sunnyplast-70&designId=ed5acf4b-c491-48ed-b519-aa16877efbeb&productId=1e503ae1-b978-4dc7-8747-935423503cc9&name=1"
+    },
+    {
+      "id": "F1-sidebar",
+      "task": "Quote a standard window via Products in the sidebar",
+      "startedAt": "2026-08-06T20:49:06.473Z",
+      "navigationalClicks": 4,
+      "actionClicks": 0,
+      "formInteractions": 4,
+      "steps": [
+        {
+          "from": "/",
+          "to": "/products",
+          "elapsedMs": 807,
+          "label": "Products"
+        },
+        {
+          "from": "/products",
+          "to": "/products/1e503ae1-b978-4dc7-8747-935423503cc9",
+          "elapsedMs": 9874,
+          "label": "352 designsSunny Plast 70mm CasementType101Systemsunnyplast-70"
+        },
+        {
+          "from": "/products/1e503ae1-b978-4dc7-8747-935423503cc9",
+          "to": "/quote?systemId=sunnyplast-70&designId=ed5acf4b-c491-48ed-b519-aa16877efbeb&productId=1e503ae1-b978-4dc7-8747-935423503cc9&name=1",
+          "elapsedMs": 795,
+          "label": "Configure"
+        },
+        {
+          "from": "/quote?systemId=sunnyplast-70&designId=ed5acf4b-c491-48ed-b519-aa16877efbeb&productId=1e503ae1-b978-4dc7-8747-935423503cc9&name=1",
+          "to": "/orders/[new-id]",
+          "elapsedMs": null,
+          "label": "Create order (counted, not submitted against shared data)"
+        }
+      ],
+      "notes": [],
+      "screensVisited": 4,
+      "scrollScreens": 0,
+      "durationMs": 23846,
+      "finalPath": "/quote?systemId=sunnyplast-70&designId=ed5acf4b-c491-48ed-b519-aa16877efbeb&productId=1e503ae1-b978-4dc7-8747-935423503cc9&name=1"
+    },
+    {
+      "id": "F3",
+      "task": "Configure a non-standard unit in the studio",
+      "startedAt": "2026-08-06T20:56:00.298Z",
+      "navigationalClicks": 3,
+      "actionClicks": 0,
+      "formInteractions": 1,
+      "steps": [
+        {
+          "from": "/",
+          "to": "/products",
+          "elapsedMs": 840,
+          "label": "Products"
+        },
+        {
+          "from": "/products",
+          "to": "/products/1e503ae1-b978-4dc7-8747-935423503cc9",
+          "elapsedMs": 12246,
+          "label": "352 designsSunny Plast 70mm CasementType101Systemsunnyplast-70"
+        },
+        {
+          "from": "/products/1e503ae1-b978-4dc7-8747-935423503cc9",
+          "to": "/designer?family=casement-window&design=ed5acf4b-c491-48ed-b519-aa16877efbeb&system=sunnyplast-70&name=1",
+          "elapsedMs": 790,
+          "label": "Design in studio"
+        }
+      ],
+      "notes": [
+        "The dashboard also exposes a Designer quick action, contrary to O-5/O-19, but it lands on an empty state because no family/design is supplied."
+      ],
+      "screensVisited": 3,
+      "durationMs": 23273,
+      "finalPath": "/designer?family=casement-window&design=ed5acf4b-c491-48ed-b519-aa16877efbeb&system=sunnyplast-70&name=1"
+    },
+    {
+      "id": "F4",
+      "task": "Add commercial extras and discount",
+      "startedAt": "2026-08-06T20:56:23.574Z",
+      "navigationalClicks": 2,
+      "actionClicks": 1,
+      "formInteractions": 0,
+      "steps": [
+        {
+          "from": "/",
+          "to": "/orders",
+          "elapsedMs": 794,
+          "label": "Orders"
+        },
+        {
+          "from": "/orders",
+          "to": "/orders/14aa4392-6d4a-441e-b718-a9b9894e3f61",
+          "elapsedMs": 5243,
+          "label": "ORD-1786032407204"
+        },
+        {
+          "from": "/orders/14aa4392-6d4a-441e-b718-a9b9894e3f61",
+          "to": "/orders/14aa4392-6d4a-441e-b718-a9b9894e3f61",
+          "elapsedMs": null,
+          "label": "Save pricing (counted, unchanged data not submitted)"
+        }
+      ],
+      "notes": [
+        "Save pricing was visible and enabled; it was counted without writing to the shared order."
+      ],
+      "scrollScreens": 0.6,
+      "decisionsDemanded": 6,
+      "screensVisited": 1,
+      "durationMs": 17993,
+      "finalPath": "/orders/14aa4392-6d4a-441e-b718-a9b9894e3f61"
+    },
+    {
+      "id": "F5",
+      "task": "Confirm an order and open the cutting list",
+      "startedAt": "2026-08-06T20:58:05.976Z",
+      "navigationalClicks": 2,
+      "actionClicks": 2,
+      "formInteractions": 0,
+      "steps": [
+        {
+          "from": "/",
+          "to": "/orders",
+          "elapsedMs": 818,
+          "label": "Orders"
+        },
+        {
+          "from": "/orders",
+          "to": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "elapsedMs": 5187,
+          "label": "ORD-1786031935313"
+        },
+        {
+          "from": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "to": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "elapsedMs": null,
+          "label": "Confirm order (counted from draft state; confirmed state inspected read-only)"
+        },
+        {
+          "from": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "to": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6#cutting-list-dialog",
+          "elapsedMs": 41,
+          "label": "View welded"
+        }
+      ],
+      "notes": [
+        "Seven document types were presented as equal cards; Cutting List was the second card in DOM order."
+      ],
+      "scrollScreens": 1.6,
+      "screensVisited": 2,
+      "durationMs": 14408,
+      "finalPath": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6"
+    },
+    {
+      "id": "F6",
+      "task": "Correct a confirmed order",
+      "startedAt": "2026-08-06T20:58:20.385Z",
+      "navigationalClicks": 4,
+      "actionClicks": 3,
+      "formInteractions": 0,
+      "steps": [
+        {
+          "from": "/",
+          "to": "/orders",
+          "elapsedMs": 798,
+          "label": "Orders"
+        },
+        {
+          "from": "/orders",
+          "to": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "elapsedMs": 5205,
+          "label": "ORD-1786031935313"
+        },
+        {
+          "from": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "to": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "elapsedMs": 715,
+          "label": "Reopen for editing"
+        },
+        {
+          "from": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "to": "/orders/ff1fe42a-759f-4789-9d96-b9e4c483a4d6",
+          "elapsedMs": null,
+          "label": "Reopen order (counted, not submitted because it deletes documents)"
+        },
+        {
+          "from": "/orders/14aa4392-6d4a-441e-b718-a9b9894e3f61",
+          "to": "/designer?family=sliding-patio&design=bd0ad364-3313-442d-871f-db7fab0502c4&system=sunnyplast-70&orderId=14aa4392-6d4a-441e-b718-a9b9894e3f61&itemId=36ccb72c-d92b-4054-b68e-8d5d3ae28252",
+          "elapsedMs": 785,
+          "label": "Edit"
+        },
+        {
+          "from": "/designer?family=sliding-patio&design=bd0ad364-3313-442d-871f-db7fab0502c4&system=sunnyplast-70&orderId=14aa4392-6d4a-441e-b718-a9b9894e3f61&itemId=36ccb72c-d92b-4054-b68e-8d5d3ae28252",
+          "to": "/orders/14aa4392-6d4a-441e-b718-a9b9894e3f61",
+          "elapsedMs": null,
+          "label": "Update item (counted, not submitted)"
+        },
+        {
+          "from": "/orders/14aa4392-6d4a-441e-b718-a9b9894e3f61",
+          "to": "/orders/14aa4392-6d4a-441e-b718-a9b9894e3f61",
+          "elapsedMs": null,
+          "label": "Confirm order (counted, not submitted)"
+        }
+      ],
+      "notes": [
+        "The reopen confirmation clearly disclosed that all seven documents/PDFs are removed and regenerated later. Reopen, update, and re-confirm were counted but not submitted against shared data."
+      ],
+      "screensVisited": 3,
+      "durationMs": 27129,
+      "finalPath": "/designer?family=sliding-patio&design=bd0ad364-3313-442d-871f-db7fab0502c4&system=sunnyplast-70&orderId=14aa4392-6d4a-441e-b718-a9b9894e3f61&itemId=36ccb72c-d92b-4054-b68e-8d5d3ae28252"
+    },
+    {
+      "id": "F7",
+      "task": "Update a supplier price",
+      "startedAt": "2026-08-06T20:58:47.515Z",
+      "navigationalClicks": 1,
+      "actionClicks": 1,
+      "formInteractions": 0,
+      "steps": [
+        {
+          "from": "/",
+          "to": "/admin/catalog",
+          "elapsedMs": 887,
+          "label": "Catalog"
+        },
+        {
+          "from": "/admin/catalog",
+          "to": "/admin/catalog",
+          "elapsedMs": null,
+          "label": "Save first price row (counted, not submitted)"
+        }
+      ],
+      "notes": [
+        "The only seeded profile system was preselected; no system-selection click was required.",
+        "The first row's Save was visible and enabled; no supplier price write was submitted."
+      ],
+      "screensVisited": 1,
+      "scrollScreens": 0.2,
+      "durationMs": 16317,
+      "finalPath": "/admin/catalog"
+    },
+    {
+      "id": "F8",
+      "task": "Add a user and grant access",
+      "startedAt": "2026-08-06T20:59:03.834Z",
+      "navigationalClicks": 1,
+      "actionClicks": 2,
+      "formInteractions": 4,
+      "steps": [
+        {
+          "from": "/",
+          "to": "/admin/users",
+          "elapsedMs": 833,
+          "label": "Users"
+        },
+        {
+          "from": "/admin/users",
+          "to": "/admin/users",
+          "elapsedMs": 751,
+          "label": "Invite user"
+        },
+        {
+          "from": "/admin/users",
+          "to": "/admin/users",
+          "elapsedMs": null,
+          "label": "Create user (counted, not submitted; required audit accounts already exist)"
+        }
+      ],
+      "notes": [
+        "Invite form and role assignment are inline on Users; no role-matrix screen is required when an existing role fits. The form was filled but not submitted because the two required throwaway audit users already existed."
+      ],
+      "screensVisited": 1,
+      "durationMs": 13798,
+      "finalPath": "/admin/users"
+    }
+  ]
+}

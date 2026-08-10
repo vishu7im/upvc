@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FabricatorOS V2 design-system specimen</title>
+    <link rel="stylesheet" href="../../../web/app/v2.css" />
+    <style>
+      [data-v2].specimen {
+        margin: 0;
+      }
+
+      [data-v2] .spec-shell {
+        width: min(100%, var(--v2-content-wide));
+        margin-inline: auto;
+        padding: var(--v2-space-10) var(--v2-page-gutter) var(--v2-space-20);
+      }
+
+      [data-v2] .spec-header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: var(--v2-space-6);
+        margin-bottom: var(--v2-space-10);
+      }
+
+      [data-v2] h1,
+      [data-v2] h2,
+      [data-v2] h3,
+      [data-v2] p {
+        margin: 0;
+      }
+
+      [data-v2] h1 {
+        max-width: 20ch;
+        font-size: var(--v2-font-size-display);
+        line-height: var(--v2-line-height-display);
+      }
+
+      [data-v2] h2 {
+        font-size: var(--v2-font-size-heading);
+        line-height: var(--v2-line-height-heading);
+      }
+
+      [data-v2] h3 {
+        font-size: var(--v2-font-size-body);
+        line-height: var(--v2-line-height-body);
+      }
+
+      [data-v2] .spec-lede {
+        max-width: var(--v2-measure);
+        margin-top: var(--v2-space-3);
+        color: var(--v2-color-text-secondary);
+        font-size: var(--v2-font-size-lead);
+        line-height: var(--v2-line-height-lead);
+      }
+
+      [data-v2] .spec-meta {
+        color: var(--v2-color-text-meta);
+        font-size: var(--v2-font-size-meta);
+        line-height: var(--v2-line-height-meta);
+      }
+
+      [data-v2] .spec-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--v2-grid-gutter);
+      }
+
+      [data-v2] .spec-card {
+        min-width: 0;
+        padding: var(--v2-space-6);
+        border: 1px solid var(--v2-color-border);
+        border-radius: var(--v2-radius);
+        background: var(--v2-color-surface);
+      }
+
+      [data-v2] .spec-card-wide {
+        grid-column: 1 / -1;
+      }
+
+      [data-v2] .spec-card-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--v2-space-4);
+        margin-bottom: var(--v2-space-6);
+      }
+
+      [data-v2] .type-list,
+      [data-v2] .state-list,
+      [data-v2] .control-list,
+      [data-v2] .elevation-list {
+        display: grid;
+        gap: var(--v2-space-4);
+      }
+
+      [data-v2] .type-row {
+        display: grid;
+        grid-template-columns: 7rem minmax(0, 1fr);
+        align-items: baseline;
+        gap: var(--v2-space-4);
+        padding-bottom: var(--v2-space-3);
+        border-bottom: 1px solid var(--v2-color-border);
+      }
+
+      [data-v2] .type-meta {
+        font-size: var(--v2-font-size-meta);
+        line-height: var(--v2-line-height-meta);
+      }
+
+      [data-v2] .type-body {
+        font-size: var(--v2-font-size-body);
+        line-height: var(--v2-line-height-body);
+      }
+
+      [data-v2] .type-lead {
+        font-size: var(--v2-font-size-lead);
+        line-height: var(--v2-line-height-lead);
+      }
+
+      [data-v2] .type-heading {
+        font-size: var(--v2-font-size-heading);
+        line-height: var(--v2-line-height-heading);
+        font-weight: var(--v2-font-weight-semibold);
+      }
+
+      [data-v2] .type-title {
+        font-size: var(--v2-font-size-title);
+        line-height: var(--v2-line-height-title);
+        font-weight: var(--v2-font-weight-bold);
+      }
+
+      [data-v2] .type-display {
+        font-size: var(--v2-font-size-display);
+        line-height: var(--v2-line-height-display);
+        font-weight: var(--v2-font-weight-bold);
+      }
+
+      [data-v2] .swatch-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: var(--v2-space-3);
+      }
+
+      [data-v2] .swatch {
+        min-width: 0;
+      }
+
+      [data-v2] .swatch-chip {
+        height: 3.5rem;
+        border: 1px solid var(--v2-color-border);
+        border-radius: var(--v2-radius);
+      }
+
+      [data-v2] .swatch p {
+        margin-top: var(--v2-space-2);
+        overflow-wrap: anywhere;
+        color: var(--v2-color-text-secondary);
+        font-size: var(--v2-font-size-meta);
+        line-height: var(--v2-line-height-meta);
+      }
+
+      [data-v2] .semantic-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--v2-space-3);
+        margin-top: var(--v2-space-6);
+      }
+
+      [data-v2] .semantic-chip {
+        min-height: 5.5rem;
+        padding: var(--v2-space-4);
+        border: 2px solid currentColor;
+        border-radius: var(--v2-radius);
+        font-weight: var(--v2-font-weight-semibold);
+      }
+
+      [data-v2] .semantic-chip .spec-meta {
+        color: currentColor;
+      }
+
+      [data-v2] .accent-chip {
+        background: var(--v2-color-accent-soft);
+        color: var(--v2-color-accent);
+      }
+
+      [data-v2] .success-chip {
+        background: var(--v2-color-success-soft);
+        color: var(--v2-color-success);
+      }
+
+      [data-v2] .warning-chip {
+        background: var(--v2-color-warning-soft);
+        color: var(--v2-color-warning);
+      }
+
+      [data-v2] .error-chip {
+        background: var(--v2-color-error-soft);
+        color: var(--v2-color-error);
+      }
+
+      [data-v2] .space-row {
+        display: grid;
+        grid-template-columns: 3.5rem 1fr;
+        align-items: center;
+        gap: var(--v2-space-4);
+        min-height: var(--v2-control-size-compact);
+      }
+
+      [data-v2] .space-bar {
+        height: 0.75rem;
+        border-radius: var(--v2-radius-round);
+        background: var(--v2-color-accent);
+      }
+
+      [data-v2] .space-2 { width: var(--v2-space-2); }
+      [data-v2] .space-4 { width: var(--v2-space-4); }
+      [data-v2] .space-6 { width: var(--v2-space-6); }
+      [data-v2] .space-8 { width: var(--v2-space-8); }
+      [data-v2] .space-12 { width: var(--v2-space-12); }
+      [data-v2] .space-16 { width: var(--v2-space-16); }
+
+      [data-v2] .elevation-sample {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 4.5rem;
+        padding-inline: var(--v2-space-5);
+        border: 1px solid var(--v2-color-border);
+        border-radius: var(--v2-radius);
+        background: var(--v2-color-surface);
+      }
+
+      [data-v2] .state-row {
+        display: grid;
+        grid-template-columns: minmax(8.5rem, 0.8fr) minmax(0, 1.6fr) auto;
+        align-items: center;
+        gap: var(--v2-space-4);
+        min-height: var(--v2-row-size);
+        padding: var(--v2-space-3) var(--v2-space-4);
+        border: 2px solid var(--v2-state-border);
+        border-radius: var(--v2-radius);
+      }
+
+      [data-v2] .state-name {
+        color: var(--v2-state-color);
+        font-weight: var(--v2-font-weight-semibold);
+      }
+
+      [data-v2] .state-action {
+        color: var(--v2-state-color);
+        font-size: var(--v2-font-size-meta);
+        line-height: var(--v2-line-height-meta);
+        font-weight: var(--v2-font-weight-semibold);
+      }
+
+      [data-v2] .control-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--v2-space-3);
+      }
+
+      [data-v2] .spec-button,
+      [data-v2] .spec-input {
+        min-height: var(--v2-control-size);
+        padding-inline: var(--v2-control-padding-inline);
+        border: 1px solid var(--v2-color-control-border);
+        border-radius: var(--v2-radius);
+        background: var(--v2-color-surface);
+        color: var(--v2-color-text);
+      }
+
+      [data-v2] .spec-button {
+        cursor: pointer;
+        font-weight: var(--v2-font-weight-semibold);
+      }
+
+      [data-v2] .spec-button-primary {
+        border-color: var(--v2-color-accent);
+        background: var(--v2-color-accent);
+        color: var(--v2-color-neutral-0);
+      }
+
+      [data-v2] .spec-button-compact {
+        min-height: var(--v2-control-size-compact);
+      }
+
+      [data-v2] .focus-sample {
+        outline: var(--v2-focus-width) solid var(--v2-color-focus);
+        outline-offset: var(--v2-focus-offset);
+      }
+
+      [data-v2] .table-frame {
+        border: 1px solid var(--v2-color-border);
+        border-radius: var(--v2-radius);
+        background: var(--v2-color-surface);
+      }
+
+      [data-v2] table {
+        width: 100%;
+        min-width: 47.5rem;
+        border-collapse: collapse;
+        font-size: var(--v2-font-size-body);
+        line-height: var(--v2-line-height-body);
+      }
+
+      [data-v2] th,
+      [data-v2] td {
+        height: var(--v2-row-size-compact);
+        padding: var(--v2-space-2) var(--v2-space-3);
+        border-bottom: 1px solid var(--v2-color-border);
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      [data-v2] th {
+        background: var(--v2-color-surface-subtle);
+        color: var(--v2-color-neutral-700);
+        font-weight: var(--v2-font-weight-semibold);
+      }
+
+      [data-v2] tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      [data-v2] .status-text {
+        font-weight: var(--v2-font-weight-semibold);
+      }
+
+      [data-v2] .status-draft { color: var(--v2-color-warning); }
+      [data-v2] .status-confirmed { color: var(--v2-color-success); }
+
+      [data-v2] .tablet-note {
+        display: none;
+        margin-bottom: var(--v2-space-6);
+        padding: var(--v2-space-4);
+        border: 2px solid var(--v2-color-accent);
+        border-radius: var(--v2-radius);
+        background: var(--v2-color-accent-soft);
+        color: var(--v2-color-accent);
+        font-weight: var(--v2-font-weight-semibold);
+      }
+
+      @media (max-width: 899px) {
+        [data-v2] .spec-shell {
+          padding-top: var(--v2-space-8);
+        }
+
+        [data-v2] .spec-header {
+          align-items: start;
+          flex-direction: column;
+        }
+
+        [data-v2] .spec-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        [data-v2] .spec-card {
+          padding: var(--v2-space-5);
+        }
+
+        [data-v2] .spec-card-wide {
+          grid-column: auto;
+        }
+
+        [data-v2] .swatch-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        [data-v2] .tablet-note {
+          display: block;
+        }
+      }
+
+      @media (max-width: 620px) {
+        [data-v2] .spec-card {
+          padding: var(--v2-space-4);
+        }
+
+        [data-v2] .semantic-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        [data-v2] .state-row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        [data-v2] .type-row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body class="specimen" data-v2>
+    <main class="spec-shell">
+      <header class="spec-header">
+        <div>
+          <p class="spec-meta">FabricatorOS V2 · Phase 3 approval specimen</p>
+          <h1>Readable by design, calm under load.</h1>
+          <p class="spec-lede">
+            One visual language for office, quotation and factory work: 16 px body text, 44–48 px
+            targets, restrained colour and locally contained density.
+          </p>
+        </div>
+        <button class="spec-button spec-button-primary" type="button">Primary action</button>
+      </header>
+
+      <p class="tablet-note">Tablet check active: one-column specimen, full-size type and controls, table overflow contained locally.</p>
+
+      <div class="spec-grid">
+        <section class="spec-card" data-v2-elevation="1">
+          <div class="spec-card-head">
+            <h2>Type scale</h2>
+            <span class="spec-meta">Minor third · 16 px body</span>
+          </div>
+          <div class="type-list">
+            <div class="type-row"><span class="spec-meta">Meta · 14/20</span><span class="type-meta">Created 7 August 2026 · metadata only</span></div>
+            <div class="type-row"><span class="spec-meta">Body · 16/24</span><span class="type-body">Customer, order and fabrication instructions remain easy to scan.</span></div>
+            <div class="type-row"><span class="spec-meta">Lead · 19.2/28</span><span class="type-lead">One sentence of useful page context.</span></div>
+            <div class="type-row"><span class="spec-meta">Heading · 23/30</span><span class="type-heading">Customer price</span></div>
+            <div class="type-row"><span class="spec-meta">Title · 27.6/34</span><span class="type-title">Order 00000482</span></div>
+            <div class="type-row"><span class="spec-meta">Display · 33.2/40</span><span class="type-display">Start a quote</span></div>
+          </div>
+        </section>
+
+        <section class="spec-card" data-v2-elevation="1">
+          <div class="spec-card-head">
+            <h2>Spacing rhythm</h2>
+            <span class="spec-meta">4 px base</span>
+          </div>
+          <div class="type-list">
+            <div class="space-row"><span class="spec-meta">8 px</span><span class="space-bar space-2"></span></div>
+            <div class="space-row"><span class="spec-meta">16 px</span><span class="space-bar space-4"></span></div>
+            <div class="space-row"><span class="spec-meta">24 px</span><span class="space-bar space-6"></span></div>
+            <div class="space-row"><span class="spec-meta">32 px</span><span class="space-bar space-8"></span></div>
+            <div class="space-row"><span class="spec-meta">48 px</span><span class="space-bar space-12"></span></div>
+            <div class="space-row"><span class="spec-meta">64 px</span><span class="space-bar space-16"></span></div>
+          </div>
+        </section>
+
+        <section class="spec-card spec-card-wide" data-v2-elevation="1">
+          <div class="spec-card-head">
+            <h2>Colour system</h2>
+            <span class="spec-meta">One neutral · one accent · three semantic hues</span>
+          </div>
+          <div class="swatch-grid">
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-0)"></div><p>Neutral 0</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-50)"></div><p>Neutral 50</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-100)"></div><p>Neutral 100</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-200)"></div><p>Neutral 200</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-300)"></div><p>Neutral 300</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-400)"></div><p>Neutral 400</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-500)"></div><p>Neutral 500</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-600)"></div><p>Neutral 600</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-700)"></div><p>Neutral 700</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-800)"></div><p>Neutral 800</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-neutral-950)"></div><p>Neutral 950</p></div>
+            <div class="swatch"><div class="swatch-chip" style="background: var(--v2-color-accent)"></div><p>Accent</p></div>
+          </div>
+          <div class="semantic-grid">
+            <div class="semantic-chip accent-chip">Changed / focus<br /><span class="spec-meta">Accent, not a status</span></div>
+            <div class="semantic-chip success-chip">Success<br /><span class="spec-meta">Completed outcome</span></div>
+            <div class="semantic-chip warning-chip">Needs attention<br /><span class="spec-meta">Action may be required</span></div>
+            <div class="semantic-chip error-chip">Error<br /><span class="spec-meta">Task is blocked</span></div>
+          </div>
+        </section>
+
+        <section class="spec-card" data-v2-elevation="1">
+          <div class="spec-card-head">
+            <h2>Four-state grammar</h2>
+            <span class="spec-meta">Text + border + background</span>
+          </div>
+          <div class="state-list">
+            <div class="state-row" data-v2-state="default">
+              <span class="state-name">Default</span><span>White · Design default</span><span class="state-action">No marker</span>
+            </div>
+            <div class="state-row" data-v2-state="changed">
+              <span class="state-name">Changed</span><span>Anthracite outside</span><span class="state-action">Changed · Reset</span>
+            </div>
+            <div class="state-row" data-v2-state="attention">
+              <span class="state-name">Needs attention</span><span>Choose a handle before saving</span><span class="state-action">Required</span>
+            </div>
+            <div class="state-row" data-v2-state="error">
+              <span class="state-name">Error</span><span>Width exceeds the returned limit</span><span class="state-action">Fix width</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="spec-card" data-v2-elevation="1">
+          <div class="spec-card-head">
+            <h2>Controls and focus</h2>
+            <span class="spec-meta">48 px default · 44 px admin</span>
+          </div>
+          <div class="control-list">
+            <label>
+              <span class="type-body">Customer name</span><br />
+              <input class="spec-input" value="Mrs Patel" aria-label="Customer name specimen" />
+            </label>
+            <div class="control-row">
+              <button class="spec-button spec-button-primary" type="button">Review customer price</button>
+              <button class="spec-button" type="button">Secondary action</button>
+              <button class="spec-button spec-button-compact" type="button">44 px admin</button>
+            </div>
+            <div class="control-row">
+              <button class="spec-button focus-sample" type="button">Visible 3 px focus ring</button>
+              <span class="spec-meta">Tab through the real controls to verify `:focus-visible`.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="spec-card spec-card-wide" data-v2-elevation="1">
+          <div class="spec-card-head">
+            <div>
+              <h2>Six-column admin table</h2>
+              <p class="spec-meta">16 px cells · 44 px compact rows · horizontal overflow contained here, never on the page</p>
+            </div>
+            <button class="spec-button spec-button-compact" type="button">Filter orders</button>
+          </div>
+          <div class="table-frame" data-v2-scroll-region="table" data-v2-density="admin" tabindex="0" aria-label="Order table; scroll horizontally if needed">
+            <table>
+              <thead>
+                <tr><th>Order</th><th>Customer</th><th>Status</th><th>Items</th><th>Total</th><th>Created</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>00000482</td><td>Mrs Patel</td><td><span class="status-text status-draft">Draft</span></td><td>4</td><td>£2,846.20</td><td>7 Aug 2026</td></tr>
+                <tr><td>00000481</td><td>Northside Joinery</td><td><span class="status-text status-confirmed">Confirmed</span></td><td>12</td><td>£8,104.00</td><td>7 Aug 2026</td></tr>
+                <tr><td>00000480</td><td>Ali Renovations</td><td><span class="status-text status-confirmed">Confirmed</span></td><td>2</td><td>£1,492.80</td><td>6 Aug 2026</td></tr>
+                <tr><td>00000479</td><td>Green &amp; Co.</td><td><span class="status-text status-draft">Draft</span></td><td>6</td><td>£3,711.55</td><td>6 Aug 2026</td></tr>
+                <tr><td>00000478</td><td>Westfield Homes</td><td><span class="status-text status-confirmed">Confirmed</span></td><td>9</td><td>£6,238.40</td><td>5 Aug 2026</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="spec-card spec-card-wide" data-v2-elevation="0">
+          <div class="spec-card-head">
+            <h2>Elevation scale</h2>
+            <span class="spec-meta">Only token-backed levels 0–3</span>
+          </div>
+          <div class="elevation-list">
+            <div class="elevation-sample" data-v2-elevation="0"><strong>0 · Flat</strong><span class="spec-meta">Tables and nested wells</span></div>
+            <div class="elevation-sample" data-v2-elevation="1"><strong>1 · Surface</strong><span class="spec-meta">Standard cards</span></div>
+            <div class="elevation-sample" data-v2-elevation="2"><strong>2 · Raised</strong><span class="spec-meta">Sticky or floating panels</span></div>
+            <div class="elevation-sample" data-v2-elevation="3"><strong>3 · Overlay</strong><span class="spec-meta">Drawers and blocking overlays only</span></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

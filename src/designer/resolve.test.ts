@@ -1008,13 +1008,13 @@ function validateSlidingFamily(expect: Expect, snap: CatalogSnapshot): void {
   // ---- A boundary drag reproduces the calibrated widths ----------------
   {
     // The same numbers `jobs.ts#validateSlidingSpans` proves against the
-    // formula: equal ⇒ 749 each; b1 = 0.40 ⇒ 598 / 900 summing to 1498.
+    // formula: equal ⇒ 752 each; b1 = 0.40 ⇒ 601 / 903 summing to 1504.
     const equal = resolveLineItem(slDraft(), snap).output!;
     const sashCode = getSystem(SYSTEM)!.sashes["sash-sliding"].code;
     const equalW = equal.parts.bars
       .filter((b) => b.code === sashCode && b.orientation === "H")
       .map((b) => b.extMm);
-    expect("sliding spans: equal panels are 749 wide", equalW[0], 749);
+    expect("sliding spans: equal panels are 752 wide", equalW[0], 752);
 
     const dragged = resolveLineItem(
       slDraft({ splitRatios: { "root.b1": 0.4 } }),
@@ -1029,8 +1029,8 @@ function validateSlidingFamily(expect: Expect, snap: CatalogSnapshot): void {
           .map((b) => b.extMm),
       ),
     ].sort((a, b) => a - b);
-    expect("sliding spans: b1=0.40 gives 598 / 900", draggedW.join(","), "598,900");
-    expect("sliding spans: the two panels still fill the row", draggedW[0] + draggedW[1], 1498);
+    expect("sliding spans: b1=0.40 gives 601 / 903", draggedW.join(","), "601,903");
+    expect("sliding spans: the two panels still fill the row", draggedW[0] + draggedW[1], 1504);
   }
 
   // ---- Every rejected edit is an ISSUE, never a throw -------------------

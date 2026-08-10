@@ -76,6 +76,21 @@ export interface SashSection extends ProfileSection {
   overlap: number;
   /** Sash rebate depth for glass (mm per side). */
   glassRebate: number;
+  /**
+   * SLIDING PATIO ONLY — the panel envelope deductions (absent on every welded
+   * sash, whose ring comes from `faceWidth`/`overlap` instead):
+   *   widthMm  — deducted from each panel's calibrated width share
+   *              `panelExt = f × (W + K) − widthMm`   (K: topology.ts#PANEL_WIDTH_K)
+   *   heightMm — deducted from the FRAME height
+   *              `panelExtH = frameH − heightMm`
+   * Calibrated **3 / 83** from patio.pdf F1–F4 (07 Aug 2026), which reproduces
+   * every printed sash/bead/glass/steel/cap row on all four items. The 31 Jul
+   * package and Jobs 44/48 printed **6 / 86** — superseded, but reproducible by
+   * setting those two values, because this is a fabricator SETTING (the same
+   * physical profiles printed both) rather than profile geometry. Absent ⇒ the
+   * engine's cited default; see topology.ts#PANEL_ENVELOPE_DEFAULT.
+   */
+  panelClearance?: { widthMm: number; heightMm: number };
 }
 
 /** Frame profile (includes its glass rebate for fixed glazing). */

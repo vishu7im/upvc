@@ -270,6 +270,19 @@ function buildProfileSystem(s: DbSystemWithCatalog): ProfileSystem {
           ...base,
           overlap: num(p.overlap),
           glassRebate: num(p.glassRebate),
+          // Sliding panel envelope — attached only when the row carries it (the
+          // sliding sash), so every welded sash keeps its exact previous shape
+          // and the engine falls back to its cited default. Both columns move
+          // together; one alone would be a half-configured envelope.
+          ...(p.panelClearanceMm !== null && p.panelClearanceMm !== undefined
+            && p.panelHeightDeductionMm !== null && p.panelHeightDeductionMm !== undefined
+            ? {
+                panelClearance: {
+                  widthMm: num(p.panelClearanceMm),
+                  heightMm: num(p.panelHeightDeductionMm),
+                },
+              }
+            : {}),
         };
         break;
       case "TRANSOM":

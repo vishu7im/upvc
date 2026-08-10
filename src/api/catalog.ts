@@ -75,6 +75,9 @@ const priceSchema = z
 // shared glass/gasket/hardware updater below.
 // The four cost1p/price1p/cost2p/price2p tier columns (M5.5) are nullable: pass
 // a number to set a tier price, or null to clear it back to the %-uplift fallback.
+// The two panel-envelope columns are the sliding patio's cut settings (3/83 from
+// patio.pdf, 07 Aug 2026 — see src/types.ts SashSection.panelClearance); they are
+// nullable the same way, and clearing them returns the engine's cited default.
 const partSchema = z
   .object({
     cost: z.number().min(0),
@@ -85,6 +88,8 @@ const partSchema = z
     price1p: z.number().min(0).nullable(),
     cost2p: z.number().min(0).nullable(),
     price2p: z.number().min(0).nullable(),
+    panelClearanceMm: z.number().min(0).nullable(),
+    panelHeightDeductionMm: z.number().min(0).nullable(),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, "Provide at least one editable field");

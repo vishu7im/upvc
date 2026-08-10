@@ -1,0 +1,470 @@
+[
+  {
+    "label": "start-standard",
+    "viewport": "834",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=standard",
+      "title": "Start a quote",
+      "pageClientWidth": 834,
+      "pageScrollWidth": 834,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 4,
+      "layoutChoices": 0,
+      "workspaces": 0,
+      "inspectorTabs": [],
+      "previewViews": [],
+      "resolverSettled": false,
+      "previewPresent": false,
+      "engineeringPrice": null,
+      "bomLines": 0,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 48
+    },
+    "failures": []
+  },
+  {
+    "label": "start-standard",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=standard",
+      "title": "Start a quote",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 4,
+      "layoutChoices": 0,
+      "workspaces": 0,
+      "inspectorTabs": [],
+      "previewViews": [],
+      "resolverSettled": false,
+      "previewPresent": false,
+      "engineeringPrice": null,
+      "bomLines": 0,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 48
+    },
+    "failures": []
+  },
+  {
+    "label": "layouts-standard",
+    "viewport": "834",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=standard&family=casement-window&system=sunnyplast-70",
+      "title": "Choose a Casement Window layout",
+      "pageClientWidth": 834,
+      "pageScrollWidth": 834,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 24,
+      "layoutChoices": 24,
+      "workspaces": 0,
+      "inspectorTabs": [],
+      "previewViews": [],
+      "resolverSettled": false,
+      "previewPresent": false,
+      "engineeringPrice": null,
+      "bomLines": 0,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 48
+    },
+    "failures": []
+  },
+  {
+    "label": "layouts-standard",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=standard&family=casement-window&system=sunnyplast-70",
+      "title": "Choose a Casement Window layout",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 24,
+      "layoutChoices": 24,
+      "workspaces": 0,
+      "inspectorTabs": [],
+      "previewViews": [],
+      "resolverSettled": false,
+      "previewPresent": false,
+      "engineeringPrice": null,
+      "bomLines": 0,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 48
+    },
+    "failures": []
+  },
+  {
+    "label": "workspace-standard",
+    "viewport": "834",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=standard&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 834,
+      "pageScrollWidth": 834,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Essentials",
+        "Item options"
+      ],
+      "previewViews": [
+        "2D",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£123.01",
+      "bomLines": 7,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  },
+  {
+    "label": "workspace-standard",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=standard&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Essentials",
+        "Item options"
+      ],
+      "previewViews": [
+        "2D",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£123.01",
+      "bomLines": 7,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  },
+  {
+    "label": "workspace-standard-joints",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=standard&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Essentials",
+        "Item options"
+      ],
+      "previewViews": [
+        "2D",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£123.01",
+      "bomLines": 7,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  },
+  {
+    "label": "workspace-custom",
+    "viewport": "834",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=custom&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 834,
+      "pageScrollWidth": 834,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Measurements",
+        "Product"
+      ],
+      "previewViews": [
+        "External",
+        "Internal",
+        "Schematic",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£123.01",
+      "bomLines": 7,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  },
+  {
+    "label": "workspace-custom",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=custom&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Measurements",
+        "Product"
+      ],
+      "previewViews": [
+        "External",
+        "Internal",
+        "Schematic",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£123.01",
+      "bomLines": 7,
+      "issueDrawerOpen": false,
+      "selectedPart": null,
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  },
+  {
+    "label": "custom-product-options",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=custom&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Measurements",
+        "Product"
+      ],
+      "previewViews": [
+        "External",
+        "Internal",
+        "Schematic",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£123.01",
+      "bomLines": 7,
+      "issueDrawerOpen": false,
+      "selectedPart": "Whole item",
+      "structuralActions": 0,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  },
+  {
+    "label": "custom-part-selected",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=custom&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Measurements",
+        "Product"
+      ],
+      "previewViews": [
+        "External",
+        "Internal",
+        "Schematic",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£123.01",
+      "bomLines": 7,
+      "issueDrawerOpen": false,
+      "selectedPart": "Fixed glass (top)",
+      "structuralActions": 4,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  },
+  {
+    "label": "custom-structure-undo",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=custom&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Measurements",
+        "Product"
+      ],
+      "previewViews": [
+        "External",
+        "Internal",
+        "Schematic",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£133.82",
+      "bomLines": 7,
+      "issueDrawerOpen": false,
+      "selectedPart": "Whole item",
+      "structuralActions": 0,
+      "structuralHistory": 1,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  },
+  {
+    "label": "custom-view-parity",
+    "viewport": "1280",
+    "metrics": {
+      "viewChecks": [
+        {
+          "label": "External",
+          "active": true
+        },
+        {
+          "label": "Internal",
+          "active": true
+        },
+        {
+          "label": "Schematic",
+          "active": true
+        },
+        {
+          "label": "3D",
+          "active": true
+        }
+      ]
+    },
+    "failures": []
+  },
+  {
+    "label": "custom-issues",
+    "viewport": "1280",
+    "metrics": {
+      "path": "/v2/configure",
+      "query": "?mode=custom&family=casement-window&design=1e8a39cc-5594-4f54-a7da-32e71618e249&system=sunnyplast-70&productId=1e503ae1-b978-4dc7-8747-935423503cc9",
+      "title": "14",
+      "pageClientWidth": 1280,
+      "pageScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "bodyFontSize": "16px",
+      "titleAboveFold": true,
+      "familyChoices": 0,
+      "layoutChoices": 0,
+      "workspaces": 1,
+      "inspectorTabs": [
+        "Measurements",
+        "Product"
+      ],
+      "previewViews": [
+        "External",
+        "Internal",
+        "Schematic",
+        "3D"
+      ],
+      "resolverSettled": true,
+      "previewPresent": true,
+      "engineeringPrice": "£123.01",
+      "bomLines": 7,
+      "issueDrawerOpen": true,
+      "selectedPart": "Fixed glass (top)",
+      "structuralActions": 4,
+      "structuralHistory": 0,
+      "minimumTargetHeight": 44
+    },
+    "failures": []
+  }
+]

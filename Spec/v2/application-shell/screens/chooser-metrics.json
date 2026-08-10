@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-08-07T16:17:50.720Z",
+  "results": [
+    {
+      "viewport": {
+        "label": "1280",
+        "width": 1280,
+        "height": 900
+      },
+      "metrics": {
+        "publicPath": "/",
+        "pageClientWidth": 1280,
+        "pageScrollWidth": 1280,
+        "fontPx": 16,
+        "optionCount": 2,
+        "minimumLinkHeightPx": 48,
+        "preferredLabel": "v2",
+        "focusOutlineWidthPx": 3
+      },
+      "failures": []
+    },
+    {
+      "viewport": {
+        "label": "834",
+        "width": 834,
+        "height": 1112
+      },
+      "metrics": {
+        "publicPath": "/",
+        "pageClientWidth": 834,
+        "pageScrollWidth": 834,
+        "fontPx": 16,
+        "optionCount": 2,
+        "minimumLinkHeightPx": 48,
+        "preferredLabel": "v2",
+        "focusOutlineWidthPx": 3
+      },
+      "failures": []
+    }
+  ]
+}

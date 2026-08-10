@@ -523,18 +523,25 @@ function grow(r: Rect, by: number): Rect {
 // ---------------------------------------------------------------------
 // SLIDING PATIO — a single row of `n` equal-width framed panels.
 //
-// Calibrated against Jobs 44 + 48 (patio-docs/, "Andrei UK", 1900×2100 and
-// 2210×2310, both 2-panel) — these SUPERSEDE the earlier Job 104 (yogi test)
-// docs, which disagreed on the panel envelope and steel lengths (owner
-// confirmed the Andrei docs are current production settings):
+// Calibrated against patio.pdf (owner package, 07 Aug 2026, "100 SOFT UK",
+// items F1–F4: 2000×2000 OX, 3000×2000 XOO, 4000×2000 4-panel, 3500×2000 OXO),
+// which SUPERSEDES patio_calibration.pdf (31 Jul, the same four jobs) and the
+// panel rows of Jobs 44 + 48 (patio-docs/, "Andrei UK", 1900×2100 / 2210×2310).
+// A line-by-line diff of the two packages shows exactly ONE substantive change:
+// every panel is 3 mm bigger in BOTH axes (sash 1005/1920 → 1008/1923 saw, bead
+// +3, sash steel +3, glass +3, the panel-tracking SPQ-GL-20253 cap +3), while
+// the frame, the frame steel and EVERY auxiliary row are identical.
 //   • Frame face 48 (handled by the frame profile in emitFrameBars);
-//     frame Ext = W/H exactly on both docs (finished; printed adds 3mm/end weld).
-//   • Panel outer width (Ext, finished): (W + K)/n − 6, where K is calibrated
-//     PER CONFIGURATION — see PANEL_WIDTH_K below. It is NOT one bypass value:
-//     the 2-, 3- and 4-panel documents each print a different constant.
-//   • Panel outer height (Ext, finished): H − 86  (2014 @ H2100, 2224 @ H2310).
+//     frame Ext = W/H exactly on every doc (finished; printed adds 3mm/end weld).
+//   • Panel outer width (Ext, finished): (W + K)/n − clearance.widthMm, where K
+//     is calibrated PER CONFIGURATION — see PANEL_WIDTH_K below. It is NOT one
+//     bypass value: the 2-, 3- and 4-panel documents each print a different one.
+//   • Panel outer height (Ext, finished): frameH − clearance.heightMm.
+//   • The two clearances are CATALOG data (SashSection.panelClearance, 3/83 —
+//     the same physical profiles printed 6/86 four weeks earlier, so they are a
+//     fabricator setting, not profile geometry). See PANEL_ENVELOPE_DEFAULT.
 //   • Sash face 85 ⇒ sash Int = Ext − 170; glass rebate 15 ⇒ glass = beadInt + 30
-//     (both rules unchanged from Job 104 and exact on the Andrei docs).
+//     (both rules unchanged from Job 104 and exact on every later doc).
 // Every panel (fixed or sliding) is cut identically — only hardware (hardware.ts)
 // and the SVG slide arrow (svg.ts) differ, via the cell `content`.
 //
@@ -543,35 +550,55 @@ function grow(r: Rect, by: number): Rect {
 // ---------------------------------------------------------------------
 
 /**
- * The panel-width constant K in `panelExt = (W + K)/n − 6`, TRANSCRIBED per
- * configuration. Each value is read straight off a production document by
+ * The panel-width constant K in `panelExt = (W + K)/n − clearance`, TRANSCRIBED
+ * per configuration. Each value is read straight off a production document by
  * inverting the printed bead (`bead Int + 170 = panel Ext`) — no interpolation.
  *
- * | Config      | Document                          | W    | n | Printed panel | K  |
- * |-------------|-----------------------------------|------|---|---------------|----|
- * | OX (bypass) | Job 44 (patio-docs/), 1900×2100    | 1900 | 2 | 949           | 10 |
- * | OX (bypass) | Job 48 (patio-docs/), 2210×2310    | 2210 | 2 | 1104          | 10 |
- * | OX (bypass) | patio_calibration.pdf F1, 2000×2000| 2000 | 2 | 999           | 10 |
- * | XOO         | patio_calibration.pdf F2, 3000×2000| 3000 | 3 | 995           |  3 |
- * | OXO         | patio_calibration.pdf F4, 3500×2000| 3500 | 3 | 1161.7        |  3 |
- * | OXXO        | patio_calibration.pdf F3, 4000×2000| 4000 | 4 | 1017          | 92 |
+ * | Config      | Document                  | W    | n | Panel Ext | K  |
+ * |-------------|---------------------------|------|---|-----------|----|
+ * | OX (bypass) | patio.pdf F1, 2000×2000   | 2000 | 2 | 1002      | 10 |
+ * | XOO         | patio.pdf F2, 3000×2000   | 3000 | 3 |  998      |  3 |
+ * | OXO         | patio.pdf F4, 3500×2000   | 3500 | 3 | 1164.7    |  3 |
+ * | OXXO        | patio.pdf F3, 4000×2000   | 4000 | 4 | 1020      | 92 |
+ * | OX (bypass) | Job 44, 1900×2100         | 1900 | 2 |  952      | 10 |
+ * | OX (bypass) | Job 48, 2210×2310         | 2210 | 2 | 1107      | 10 |
+ *
+ * The Panel Ext column is the FINISHED size under the current 3 mm clearance
+ * (add 6 for the printed saw size); the same K reproduced the 31 Jul package
+ * and the Andrei jobs under the superseded 6 mm clearance, which is why the
+ * 07 Aug re-issue moved the clearance and not these numbers.
  *
  * Two independent 3-panel items — different widths, different slider position —
  * agree on K = 3, so that row is solid. K = 92 rests on F3 alone, but it
  * REPLACES 79, which rested on the superseded Job 104 alone and was recorded as
- * uncalibrated. n = 2 is unchanged and still reproduces all three of its docs.
+ * uncalibrated. n = 2 reproduces all three of its docs.
  *
  * There is no derived formula behind these numbers and none is invented: an
  * unlisted panel count falls back to the bypass value and is flagged below.
  */
 const PANEL_WIDTH_K = {
-  /** 2 panels, one bypassing the other. Jobs 44/48 + patio_calibration F1. */
+  /** 2 panels, one bypassing the other. Jobs 44/48 + patio.pdf F1. */
   bypass2: 10,
-  /** 3 panels, one slider (XOO / OXO / OOX). patio_calibration F2 + F4. */
+  /** 3 panels, one slider (XOO / OXO / OOX). patio.pdf F2 + F4. */
   bypass3: 3,
-  /** 4 panels, the two centre leaves meeting (OXXO). patio_calibration F3. */
+  /** 4 panels, the two centre leaves meeting (OXXO). patio.pdf F3. */
   meeting4: 92,
 } as const;
+
+/**
+ * The panel envelope deductions used when the sliding sash profile carries none
+ * (a DB that predates the `panelClearanceMm` / `panelHeightDeductionMm` columns,
+ * or a system whose sliding sash was added without them).
+ *
+ * 3 / 83 is patio.pdf (07 Aug 2026), which reproduces every printed sash, bead,
+ * glass, sash-steel and sash-cap row on all four of its items:
+ *   F1 2000×2000 → 1002 × 1917 (saw 1008 / 1923, glass 862 × 1777, bead 872/1787)
+ *   F2 3000×2000 →  998 × 1917 · F3 4000×2000 → 1020 × 1917
+ *   F4 3500×2000 → 1164.7 × 1917 (saw 1170.7, glass 1024.7 → printed 1025)
+ * The superseded 31 Jul package and Jobs 44/48 print 6 / 86; setting those two
+ * values on the catalog row reproduces them exactly (validateSlidingPanelEnvelope).
+ */
+const PANEL_ENVELOPE_DEFAULT = { widthMm: 3, heightMm: 83 } as const;
 
 /**
  * Pick K for a panel row. `meeting` marks the centre-meeting (OXXO) layout.
@@ -606,14 +633,20 @@ function buildSlidingPanels(
   // applySplitRatios), from which fᵢ = bᵢ − bᵢ₋₁ (b₀=0, bₙ=1).
   const fractions = panelFractions(node.boundaries, n);
 
-  // Total panel material span is calibrated: Σ panelExt = (W + K) − 6n, with K
-  // transcribed per configuration (see PANEL_WIDTH_K). Distribute it per
-  // fraction so panelExtᵢ = fᵢ·(W+K) − 6, which reduces to (W+K)/n − 6 when
-  // equal (exact on every calibrated document). For unequal panels this is an
-  // interpolation (no unequal reference job) — flagged; equal panels stay
-  // byte-identical.
+  // Total panel material span is calibrated: Σ panelExt = (W + K) − c·n, with K
+  // transcribed per configuration (see PANEL_WIDTH_K) and c the catalog
+  // clearance. Distribute it per fraction so panelExtᵢ = fᵢ·(W+K) − c, which
+  // reduces to (W+K)/n − c when equal (exact on every calibrated document). For
+  // unequal panels this is an interpolation (no unequal reference job) —
+  // flagged; equal panels stay byte-identical.
   const K = panelWidthK(n, node.meeting);
-  const panelExtH = frame.h - 86; // Jobs 44/48: 2014 = 2100−86, 2224 = 2310−86
+  // The two envelope deductions are catalog data on the sliding sash profile —
+  // a fabricator setting the owner can change without a code change (patio.pdf
+  // 07 Aug prints 3/83 where the 31 Jul package printed 6/86 on the same
+  // profiles). Absent ⇒ the cited default, so a pre-migration DB still cuts the
+  // current sizes.
+  const env = sash.panelClearance ?? PANEL_ENVELOPE_DEFAULT;
+  const panelExtH = frame.h - env.heightMm; // patio.pdf F1–F4: 1917 = 2000 − 83
   const fw = sash.faceWidth;        // 85
   const rebate = sash.glassRebate;  // 15
 
@@ -631,7 +664,7 @@ function buildSlidingPanels(
         : "sliding-fixed";
 
     const colW = fractions[i] * bounds.w;
-    const panelExtW = fractions[i] * (frame.w + K) - 6;
+    const panelExtW = fractions[i] * (frame.w + K) - env.widthMm;
     const sashOuter: Rect = {
       x: colX + (colW - panelExtW) / 2,
       y: bounds.y + (bounds.h - panelExtH) / 2,

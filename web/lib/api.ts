@@ -347,8 +347,16 @@ export function uploadLogo(file: File): Promise<{ ok: boolean; logoUrl: string }
 }
 
 type PricePatch = { cost?: number; price?: number; weight?: number };
-/** Profile parts also accept a welding-shrinkage allowance (mm per welded end). */
-type PartPatch = PricePatch & { weldAllowanceMm?: number };
+/**
+ * Profile parts also accept a welding-shrinkage allowance (mm per welded end)
+ * and — on the sliding sash only — the patio panel envelope (see
+ * src/types.ts SashSection.panelClearance).
+ */
+type PartPatch = PricePatch & {
+  weldAllowanceMm?: number;
+  panelClearanceMm?: number;
+  panelHeightDeductionMm?: number;
+};
 
 export function updateProfilePart(
   systemId: string,

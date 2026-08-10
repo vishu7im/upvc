@@ -250,6 +250,12 @@ export const SUNNYPLAST_70: ProfileSystem = {
       overlap: 0,               // unused by the sliding solver (panel envelope is explicit)
       glassRebate: 15,
       weldAllowanceMm: 3,       // Jobs 44/48: printed = finished + 3/end
+      // Panel envelope (patio.pdf F1-F4, 07 Aug 2026): panelExt = f×(W+K) − 3,
+      // panelExtH = frameH − 83. Reproduces every printed sash/bead/glass/steel
+      // row on all four items (F1 1002×1917 ⇒ saw 1008/1923). The 31 Jul package
+      // and Jobs 44/48 printed 6/86 — superseded. Owner-editable in Admin >
+      // Catalog, so the seed writes it on CREATE only (see prisma/seed.ts).
+      panelClearance: { widthMm: 3, heightMm: 83 },
       cost: 0, price: 0,
       per: "m",
       weight: 0,

@@ -324,6 +324,13 @@ export interface CatalogPart {
   weight: number;
   /** Welding-shrinkage allowance per welded end (mm). Profile parts only. */
   weldAllowanceMm?: number;
+  /**
+   * Sliding patio panel envelope — the SLIDING SASH only (absent everywhere
+   * else, which is what makes the two extra inputs appear on that one row):
+   * `panelExt = f×(W+K) − widthMm`, `panelExtH = frameH − heightMm`.
+   * 3 / 83 from patio.pdf (07 Aug 2026).
+   */
+  panelClearance?: { widthMm: number; heightMm: number };
   [extra: string]: unknown;
 }
 export interface CatalogColour {
