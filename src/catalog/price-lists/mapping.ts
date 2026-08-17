@@ -118,6 +118,12 @@ export const PRICE_MAPPINGS: PriceMapping[] = [
     base: { docKey: D, supplierCode: "SPQ-GL-20253" },
     note: "Doc D 'U-PVC Interlock & Sash Cover' White = aux-cap-sash-pvc (SPQ-GL-20253). 2P variant -20268 recorded-only.",
   },
+  {
+    target: { table: "auxiliary", kind: "AUXILIARY", partKey: "aux-3-4-panel-adapter" },
+    base: { docKey: D, supplierCode: "SPQ-AD55144" },
+    note: "Doc D '3 & 4 Panel Adapter' SPQ-AD55144 ≙ catalog AD55144. The part is INERT (no cut rule — Spec/questions.md Q27); pricing it lets it be quoted and ordered.",
+    flag: "alias",
+  },
 
   // ---------------- CILLS (cost = Doc A £/m, price = Doc B Normal ÷ 6 m) ----------------
   ...([

@@ -282,8 +282,14 @@ byte-identical to the 31 Jul package — the only change in the whole document i
    Four samples are not enough to separate "depends on the sliding aperture" from "depends on the
    panel count" from "depends on which track". A cutting list for one more 3-panel patio at a
    different width would probably settle it.
-3. **A part we do not have.** F2/F3/F4 print `AD55144` "Piesa inchidere 3/4 canaturi" (1875 / 1895 /
-   1875) — a 3/4-leaf closing piece with no catalog entry and no rule. Not emitted.
+3. **A part we do not have.** ~~F2/F3/F4 print `AD55144` "Piesa inchidere 3/4 canaturi" (1875 / 1895 /
+   1875) — a 3/4-leaf closing piece with no catalog entry and no rule. Not emitted.~~
+   **PARTLY CLOSED 2026-08-18** — the part now EXISTS: `aux-3-4-panel-adapter` (code `AD55144`,
+   "3 & 4 Panel Adapter" per the English catalog), priced from Doc D of the supplier price list
+   (£27.00 / 4.2 m) so it can be quoted and ordered. It remains **inert** — referenced by no cut
+   rule, so no cut row is emitted — because the length question is untouched: the printed lengths
+   are **1875 on a 3000 mm item (F2) AND on a 3500 mm one (F4), but 1895 on a 4000 mm one (F3)**,
+   which is neither a width nor a height rule. *Still needed: what is this piece cut to?*
 4. **Unequal frame divisions.** F2 and F4 draw unequal frame divisions (F2: 996 / 959.5 / 1044.5)
    above three **equal** panels. Our model derives the drawn divisions from the panel fractions, so
    it cannot express that. Cosmetic today — but if those divisions drive anything on the shop floor

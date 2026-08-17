@@ -874,6 +874,93 @@ function validateSlidingSpans(): void {
 // value is the whole difference: feeding the superseded 6/86 back through the
 // pure solver reproduces the Andrei documents' printed panels exactly, so the
 // older paperwork stays reproducible instead of merely being remembered.
+// =====================================================================
+// SLIDING PART NAMES — the owner's own English catalog is the source
+//
+// `SUNNY PLAST SLIDING SYSTEM.pdf` names every sliding profile and fitting,
+// and the production documents use the SAME supplier codes, so the code is the
+// join key. The 2026-08-04 field fix removed the Romanian names transcribed
+// from Jobs 44/48 but invented descriptive English ones instead of using the
+// catalog's, so patio paperwork printed "Aluminium Slide Track" where the
+// owner's catalog says "Aluminium sliding rail".
+//
+// These assertions pin the names so a future catalog edit cannot drift back,
+// and they record the three DELIBERATE deviations as intent rather than
+// omission. Names are cosmetic to the cut math — nothing here asserts a
+// length — but they are what the shop floor and the supplier order from.
+// =====================================================================
+function validateSlidingNames(): void {
+  console.log("\n==================================================");
+  console.log("Sliding part names — English catalog (matched by code)");
+  console.log("==================================================");
+
+  const system = getSystem("sunnyplast-70");
+  if (!system) {
+    console.log("  (skipped — sunnyplast-70 not seeded)");
+    return;
+  }
+
+  // partKey -> the name printed in SUNNY PLAST SLIDING SYSTEM.pdf.
+  const profiles: Array<[Record<string, { code: string; name: string }>, string, string, string]> = [
+    [system.auxiliaries ?? {}, "aux-track-alu",         "AD16014",      "Aluminium Sliding Rail"],
+    [system.auxiliaries ?? {}, "aux-cap-frame-alu",     "AD55142",      "Threshold Cover Trim"],
+    [system.auxiliaries ?? {}, "aux-cap-frame-slide",   "SPQ-GL-10253", "Sliding Frame Cover"],
+    [system.auxiliaries ?? {}, "aux-cap-sash-pvc",      "SPQ-GL-20253", "U-PVC Interlock & Sash Cover"],
+    [system.auxiliaries ?? {}, "aux-3-4-panel-adapter", "AD55144",      "3 & 4 Panel Adapter"],
+    [system.reinforcement ?? {}, "reinf-44x12",         "AO44X12",      "Reinforcement 44x12x44x12"],
+  ];
+  for (const [rec, key, code, name] of profiles) {
+    expect(`${key} code ${code}`, rec[key]?.code ?? "(missing)", code);
+    expect(`${key} name = catalog "${name}"`, rec[key]?.name ?? "(missing)", name);
+  }
+
+  const hw: Array<[string, string, string]> = [
+    ["hw-patio-handle-white",  "GLIS-09", "Patio Handle Set"],
+    ["hw-patio-lock-keep",     "GLIS-10", "Patio Door Lock & Keep Set"],
+    ["hw-patio-roller",        "GLIS-13", "Sliding Rolls"],
+    ["hw-panel-stopper",       "GLIS-04", "Bump Stop"],
+    ["hw-fixed-panel-support", "GLIS-03", "Fixed Panel Support Spacer"],
+    ["hw-brush-top",           "GLIS-01", "Top Brush Block"],
+    ["hw-brush-bottom",        "GLIS-02", "Bottom Brush Block"],
+  ];
+  for (const [key, code, name] of hw) {
+    expect(`${key} code ${code}`, system.hardware[key]?.code ?? "(missing)", code);
+    expect(`${key} name = catalog "${name}"`, system.hardware[key]?.name ?? "(missing)", name);
+  }
+
+  // ---- the three deliberate deviations, asserted so they stay deliberate ----
+  // GLIS16/GLIS17 are absent from the English catalog (it lists no GLIS 16/17),
+  // so there is nothing to match them against.
+  expect("GLIS16 keeps its descriptive name (not in the catalog)",
+    system.auxiliaries?.["aux-cap-fixed-panel"]?.name ?? "", "Fixed Panel Cap");
+  expect("GLIS17 keeps its descriptive name (not in the catalog)",
+    system.auxiliaries?.["aux-cap-frame-channel"]?.name ?? "", "Frame Channel Cap");
+  // The catalog's second reinforcement reads "Reinforcement 27x25x27" and
+  // prints NO code, while this code and the calibrated section both say 26x26.
+  expect("AU26X26 keeps its code-accurate name (catalog prints no code)",
+    system.reinforcement?.["reinf-25x27-u"]?.name ?? "", "26 x 26 U Steel Reinforcement");
+  // One supplier code, two catalog rows — the qualifiers keep them apart in
+  // Admin > Catalog (cf. frame-french vs frame-6ch).
+  expect("bead-28 name", system.beads["bead-28"]?.name ?? "", "Bead 28mm");
+  expect("bead-sl-24 name", system.beads["bead-sl-24"]?.name ?? "", "Bead 24mm Glazing");
+  expect("the two beads share one supplier code",
+    system.beads["bead-28"]?.code === system.beads["bead-sl-24"]?.code, true);
+  expect("...but are distinguishable by name",
+    system.beads["bead-28"]?.name !== system.beads["bead-sl-24"]?.name, true);
+
+  // The 3 & 4 panel adapter is INERT: priced and orderable, but no cut rule
+  // emits it, because its printed lengths fit no rule (questions.md Q27).
+  const oxo = getDesign("8a1b8a80-e31a-4f0b-aa62-2771e04ec985"); // OXO Slide Left (3-panel)
+  if (oxo) {
+    const q = solve({
+      orderNo: "AD55144-inert-check", customer: "validation",
+      systemId: "sunnyplast-70", designId: oxo.designId, widthMm: 3000, heightMm: 2000,
+    });
+    expect("AD55144 emits no cut row (inert — Q27)",
+      q.parts.bars.some((b) => b.code === "AD55144"), false);
+  }
+}
+
 function validateSlidingPanelEnvelope(): void {
   console.log("\n==================================================");
   console.log("Sliding patio — panel envelope is catalog data");
@@ -1987,6 +2074,7 @@ function validateAdvisories(): void {
     JOB_264_T, JOB_264_MIDRAIL, JOB_264_UNEQUAL,
   ].forEach(validate);
   validateSlidingSpans();
+  validateSlidingNames();
   validateSlidingPanelEnvelope();
   validateSlidingWeld();
   validateFrenchDoor();

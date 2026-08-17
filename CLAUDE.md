@@ -2021,6 +2021,61 @@ the unfitted render is 2, 200 options ⇒ 2 pages (correctly refused). Wired in 
 existence IS the cache, so without the bump every already-confirmed order would keep serving its old
 two-page PDF.
 
+## Sliding part names come from the English catalog (2026-08-18)
+
+Owner report: the engine printed part names that are not the ones in his own catalog. A patio work
+order said **"Aluminium Slide Track"** where `SUNNY PLAST SLIDING SYSTEM.pdf` says
+**"Aluminium sliding rail"**, and **"Sash PVC Cap"** where it says **"U-PVC interlock & sash
+cover"**. This is the residue of the 2026-08-04 field fix: it correctly removed the Romanian names
+transcribed from Jobs 44/48, but replaced them with *invented English* ones. **No Romanian was
+left** — the names were simply not the supplier's.
+
+They were not a guess either: `price-lists/mapping.ts` had **already cited them** from Doc D of the
+supplier price list ("Aluminium Sliding Rail", "Threshold Cover Trim", "Sliding Frame Cover",
+"U-PVC Interlock & Sash Cover"). They just never reached the `name` column.
+
+**The trap that had to be fixed first.** `documents.ts#section()` decided a cutting-list row's
+section by substring-matching its **name** — the sliding auxiliaries only landed under *Auxiliary*
+because their invented names happened to contain "Cap"/"Track". Renaming them to the catalog's
+wording would have filed "Sliding Frame Cover" under **Frame** and "U-PVC Interlock & Sash Cover"
+under **Sash**. So the classification is now **structural**: the new optional `BarPiece.category`
+is set by the emitter in `bars.ts` (which knows the catalog kind), and `section()` returns
+`b.category ?? <the old name heuristic>`. Unset ⇒ the legacy path, which is how the cill and the
+gasket rows (`section({name})`) are unaffected. Proven byte-identical: **all 24 documents** (7 docs
+× casement / single door / French midrail / sliding 2-, 3- and 4-panel) hash-identical after the
+`category` change alone.
+
+**Renamed** (matched by supplier CODE): `AD16014` → Aluminium Sliding Rail · `AD55142` → Threshold
+Cover Trim · `SPQ-GL-10253` → Sliding Frame Cover · `SPQ-GL-20253` → U-PVC Interlock & Sash Cover ·
+`AO44X12` → Reinforcement 44x12x44x12 · beads → "Bead 28mm" / "Bead 24mm Glazing" · hardware
+`GLIS-09/10/13/04/03` → Patio Handle Set / Patio Door Lock & Keep Set / Sliding Rolls / Bump Stop /
+Fixed Panel Support Spacer. `SPQ-GL-10252`/`SPQ-GL-20252` already carried the catalog wording plus
+their size.
+
+**Three deliberate deviations, asserted so they stay deliberate:** `GLIS16`/`GLIS17` keep
+descriptive names (the catalog lists no GLIS 16/17 — nothing to match); `AU26X26` keeps its
+code-accurate "26 x 26 U" because the catalog's "Reinforcement 27x25x27" prints **no code** and
+contradicts both the code and the calibrated section; and the two beads keep qualifiers because they
+share ONE supplier code and would otherwise be indistinguishable in Admin › Catalog (the
+`frame-french` bug again).
+
+**New inert part.** `aux-3-4-panel-adapter` (`AD55144`, "3 & 4 Panel Adapter") — in the catalog, in
+Doc D (£27.00/4.2 m, now mapped so `import:prices` prices it at £6.40/m) and printed by `patio.pdf`
+on every 3- and 4-panel item. **Referenced by no cut rule, so it emits no cut row**: its printed
+lengths are 1875 on a 3000 mm item *and* on a 3500 mm one but 1895 on a 4000 mm one, which is
+neither a width nor a height rule. Q27 is updated, not closed.
+
+**`name` is seed-owned** (`upsertPart` re-applies it on UPDATE), so the catalog source is the
+durable fix — but `db:seed` takes 15+ min, so migration
+`20260818010000_align_sliding_catalog_names` brings the live DB into line now. Every UPDATE is
+guarded on the OLD value (idempotent, cannot clobber an owner edit); the INSERT is
+`ON CONFLICT DO NOTHING`. Seed and migration agree, so neither reverts the other.
+
+**Validation: 1575 → 1609 passed, 0 failed** (`jobs.ts#validateSlidingNames`, +34). Plus the
+document proof: after the renames all 24 documents differ **only** by the rename table, with **no
+measurement changed** anywhere, and the cutting list's section distribution is unmoved
+(Auxiliary still 7 rows on a 2-panel patio — a naive rename would have collapsed it to 2).
+
 ## Conventions
 
 - Comment every fabrication formula with its source (jobnumber / PDF section).

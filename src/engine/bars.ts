@@ -120,6 +120,7 @@ export function computeParts(
       reinforcement.push(withWeld({
         code: r.code,
         name: r.name,
+        category: "Reinf",
         position: "Reinf for Cill",
         orientation: "H",
         extMm: piece.reinforcementLengthMm,
@@ -181,6 +182,7 @@ function emitSlidingAuxBars(
     bars.push(withWeld({
       code: a.code,
       name: a.name,
+      category: "Auxiliary",
       position,
       orientation,
       extMm: round1(len),
@@ -266,6 +268,7 @@ function emitFrameBars(
       reinf.push(withWeld({
         code: r.code,
         name: r.name,
+        category: "Reinf",
         position: `Reinf for ${b.position}`,
         orientation: b.orientation,
         extMm: b.intMm - 2 * r.endClearance,
@@ -315,6 +318,7 @@ function barFrame(
     {
       code: frame.code,
       name: frame.name,
+      category: "Frame",
       position,
       orientation,
       extMm: round1(ext),
@@ -340,6 +344,7 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
     const piece: BarPiece = withWeld({
       code: profile.code,
       name: profile.name,
+      category: "Frame",
       position: `Transom (${t.parentPathId})`,
       orientation: "H",
       extMm: round1(t.extLengthMm),
@@ -355,6 +360,7 @@ function emitTransomBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       reinf.push(withWeld({
         code: r.code,
         name: r.name,
+        category: "Reinf",
         position: `Reinf for ${piece.position}`,
         orientation: "H",
         extMm: piece.reinforcementLengthMm,
@@ -377,6 +383,7 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
     const piece: BarPiece = withWeld({
       code: profile.code,
       name: profile.name,
+      category: "Frame",
       position: `Mullion (${m.parentPathId})`,
       orientation: "V",
       extMm: round1(m.extLengthMm),
@@ -390,6 +397,7 @@ function emitMullionBars(bars: BarPiece[], reinf: BarPiece[], geom: SolvedGeomet
       reinf.push(withWeld({
         code: r.code,
         name: r.name,
+        category: "Reinf",
         position: `Reinf for ${piece.position}`,
         orientation: "V",
         extMm: piece.reinforcementLengthMm,
@@ -413,10 +421,10 @@ function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, sys
 
   const wa = effectiveWeld(sash, weldDefaultMm);
   const pieces: BarPiece[] = [
-    withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} head`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" }, wa),
-    withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} sill`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" }, wa),
-    withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} left`,  orientation: "V", extMm: round1(so.h), intMm: round1(intH), endPrep: "\\ - /" }, wa),
-    withWeld({ code: sash.code, name: sash.name, position: `Sash ${cell.pathId} right`, orientation: "V", extMm: round1(so.h), intMm: round1(intH), endPrep: "\\ - /" }, wa),
+    withWeld({ code: sash.code, name: sash.name, category: "Sash", position: `Sash ${cell.pathId} head`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" }, wa),
+    withWeld({ code: sash.code, name: sash.name, category: "Sash", position: `Sash ${cell.pathId} sill`,  orientation: "H", extMm: round1(so.w), intMm: round1(intW), endPrep: "\\ - /" }, wa),
+    withWeld({ code: sash.code, name: sash.name, category: "Sash", position: `Sash ${cell.pathId} left`,  orientation: "V", extMm: round1(so.h), intMm: round1(intH), endPrep: "\\ - /" }, wa),
+    withWeld({ code: sash.code, name: sash.name, category: "Sash", position: `Sash ${cell.pathId} right`, orientation: "V", extMm: round1(so.h), intMm: round1(intH), endPrep: "\\ - /" }, wa),
   ];
 
   // Reinforcement for every sash bar — always required in your system.
@@ -429,6 +437,7 @@ function emitSashBars(bars: BarPiece[], reinf: BarPiece[], cell: SolvedCell, sys
       reinf.push(withWeld({
         code: r.code,
         name: r.name,
+        category: "Reinf",
         position: `Reinf for ${p.position}`,
         orientation: p.orientation,
         extMm: round1(reinfLen),
@@ -454,10 +463,10 @@ function emitBeadBars(bars: BarPiece[], cell: SolvedCell, system: ProfileSystem,
   // Beads are square-cut (0 welded ends) so this is multiplied by 0 anyway.
   const wa = effectiveWeld(bead, weldDefaultMm);
   bars.push(
-    withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} top`,    orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" }, wa),
-    withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} bottom`, orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" }, wa),
-    withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} left`,   orientation: "V", extMm: round1(intH + 2 * bf), intMm: round1(intH), endPrep: "[ - ]" }, wa),
-    withWeld({ code: bead.code, name: bead.name, position: `Bead ${cell.pathId} right`,  orientation: "V", extMm: round1(intH + 2 * bf), intMm: round1(intH), endPrep: "[ - ]" }, wa),
+    withWeld({ code: bead.code, name: bead.name, category: "Bead", position: `Bead ${cell.pathId} top`,    orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" }, wa),
+    withWeld({ code: bead.code, name: bead.name, category: "Bead", position: `Bead ${cell.pathId} bottom`, orientation: "H", extMm: round1(intW + 2 * bf), intMm: round1(intW), endPrep: "[ - ]" }, wa),
+    withWeld({ code: bead.code, name: bead.name, category: "Bead", position: `Bead ${cell.pathId} left`,   orientation: "V", extMm: round1(intH + 2 * bf), intMm: round1(intH), endPrep: "[ - ]" }, wa),
+    withWeld({ code: bead.code, name: bead.name, category: "Bead", position: `Bead ${cell.pathId} right`,  orientation: "V", extMm: round1(intH + 2 * bf), intMm: round1(intH), endPrep: "[ - ]" }, wa),
   );
 }
 

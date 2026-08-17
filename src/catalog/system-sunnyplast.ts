@@ -376,7 +376,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
       // back to the colour %-uplift). partKey "bead-28" MUST stay first — this
       // only changes the code string, not the ordering.
       code: "SPQ-1-51252",
-      name: "28mm Bead",
+      name: "Bead 28mm",          // catalog: "Bead 28 mm" (SPQ-1-51252)
       faceWidth: 20,            // bead face contribution per side (Ext-Int = 40 = 2x20)
       stickOut: 28,
       weldAllowanceMm: 0,       // beads are square-cut & snapped in, never welded
@@ -395,7 +395,9 @@ export const SUNNYPLAST_70: ProfileSystem = {
     // NB the key deliberately sorts after "bead-28" (see the note above).
     "bead-sl-24": {
       code: "SPQ-1-51252",
-      name: "24mm Glazing Bead",
+      // Same catalog row as bead-28 ("Bead 28 mm"); the qualifier keeps the two
+      // entries distinguishable in Admin > Catalog (cf. frame-french vs frame-6ch).
+      name: "Bead 24mm Glazing",
       faceWidth: 20,
       stickOut: 24,
       weldAllowanceMm: 0,       // square/mitre-cut & snapped in, never welded
@@ -523,7 +525,7 @@ export const SUNNYPLAST_70: ProfileSystem = {
     // endClearance is per-reinforcement, so casement/door math is untouched.
     "reinf-44x12": {
       code: "AO44X12",
-      name: "44 x 12 Steel Reinforcement",
+      name: "Reinforcement 44x12x44x12",   // catalog: "Reinforcement 44x12x44x12"
       faceWidth: 0,
       endClearance: -15,        // −15mm per end ⇒ length = barInt + 30 (sliding frame)
       weldAllowanceMm: 0,       // internal steel insert, not welded
@@ -534,6 +536,10 @@ export const SUNNYPLAST_70: ProfileSystem = {
     },
     "reinf-25x27-u": {
       code: "AU26X26",
+      // The catalog's other reinforcement reads "Reinforcement 27x25x27" and
+      // prints NO code, while this code and the calibrated section both say
+      // 26x26. The two disagree, so the code-accurate name stands until the
+      // supplier confirms which row AU26X26 is.
       name: "26 x 26 U Steel Reinforcement",
       faceWidth: 0,
       endClearance: -15,        // −15mm per end ⇒ length = barInt + 30 (sliding sash)
@@ -554,45 +560,76 @@ export const SUNNYPLAST_70: ProfileSystem = {
   // NB emitSlidingAuxBars emits by EXPLICIT key — entries it doesn't name
   // (the add-on / bay-pole block below) are never cut into any quote.
   auxiliaries: {
+    // NAMES: the owner's own English catalog, `SUNNY PLAST SLIDING SYSTEM.pdf`
+    // ("Sunny Plast aluminium accessories for sliding systems"), matched by
+    // supplier CODE. The 2026-08-04 field fix correctly replaced the Romanian
+    // names transcribed from Jobs 44/48, but invented descriptive English ones
+    // ("Aluminium Slide Track", "Frame Slide Cap") instead of using the
+    // catalog's. The same names are independently cited from Doc D of the
+    // supplier price list in price-lists/mapping.ts. The Romanian doc name is
+    // kept on each row as the calibration source.
+    //
+    // GLIS16 / GLIS17 are NOT in the English catalog (it lists no GLIS 16/17),
+    // so they keep their descriptive names — nothing to match them against.
     "aux-track-alu": {
       code: "AD16014",
       // Doc name (Jobs 44/48, Romanian): "Sina glisare aluminiu".
-      name: "Aluminium Slide Track",
+      name: "Aluminium Sliding Rail",     // catalog: "Aluminium sliding rail" (Ad16014)
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-frame-alu": {
       code: "AD55142",
       // Doc name (Jobs 44/48, Romanian): "Capac rama mare aluminiu".
-      name: "Aluminium Frame Cap (Large)",
+      // NB the catalog calls it a THRESHOLD trim, but both Jobs 44/48 and
+      // patio.pdf cut it as a vertical member (Left, 1672–1905). Name follows
+      // the catalog; the cut rule follows the production documents.
+      name: "Threshold Cover Trim",       // catalog: "Threshold cover trim" (Ad55142)
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-fixed-panel": {
       code: "GLIS16",
       // Doc name (Jobs 44/48, Romanian): "Capac rama canat fix".
-      name: "Fixed Panel Cap",
+      name: "Fixed Panel Cap",            // not in the English catalog — see note above
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-frame-channel": {
       code: "GLIS17",
       // Doc name (Jobs 44/48, Romanian): "Capac canal rama".
-      name: "Frame Channel Cap",
+      name: "Frame Channel Cap",          // not in the English catalog — see note above
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-frame-slide": {
       code: "SPQ-GL-10253",
       // Doc name (Jobs 44/48, Romanian): "Capac rama glisare".
-      name: "Frame Slide Cap",
+      // The catalog prints this profile as SPQ-5-10253; every production
+      // document uses SPQ-GL-10253. Treated as the same profile.
+      name: "Sliding Frame Cover",        // catalog: "Sliding frame cover"
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
     "aux-cap-sash-pvc": {
       code: "SPQ-GL-20253",
       // Doc name (Jobs 44/48, Romanian): "Capac PVC cercevea glisare".
-      name: "Sash PVC Cap",
+      name: "U-PVC Interlock & Sash Cover",  // catalog: "U-PVC interlock & sash cover"
+      cost: 0, price: 0, per: "m", weight: 0,
+      financialCategory: "Auxiliary Profiles",
+    },
+    // 3 & 4 panel adapter — in the English catalog and in Doc D of the price
+    // list (SPQ-AD55144, £27.00 / 4.2 m), and printed by patio.pdf on every 3-
+    // and 4-panel item ("Piesa inchidere 3/4 canaturi", position 2V, ×1).
+    //
+    // INERT: referenced by no cut rule, so it emits no cut row — exactly like
+    // the bay/bow block below. Its printed lengths fit NO rule across the four
+    // samples (1875 on a 3000 mm item AND on a 3500 mm one, 1895 on a 4000 mm
+    // one), so a length formula would be invented. Spec/questions.md Q27.
+    // It IS priced by `npm run import:prices`, so it can be quoted and ordered.
+    "aux-3-4-panel-adapter": {
+      code: "AD55144",
+      name: "3 & 4 Panel Adapter",        // catalog: "3 & 4 Panel adapter"
       cost: 0, price: 0, per: "m", weight: 0,
       financialCategory: "Auxiliary Profiles",
     },
@@ -883,12 +920,12 @@ export const SUNNYPLAST_70: ProfileSystem = {
     // GLIS 13 rolls 2.14. Lock+keep = GLIS 10 (14.74) + GLIS 11 (7.37) modelled
     // as one set (import sums them). Cylinder = its own GLIS-12 row below (NOT the
     // door brass cylinder — different price).
-    "hw-patio-handle-white":  { code: "GLIS-09",     name: "White Patio Handle",                   cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Handles" },
-    "hw-patio-lock-keep":     { code: "GLIS-10",     name: "Patio Lock & Keep Set",               cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Locking" },
+    "hw-patio-handle-white":  { code: "GLIS-09",     name: "Patio Handle Set",                     cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Handles" },
+    "hw-patio-lock-keep":     { code: "GLIS-10",     name: "Patio Door Lock & Keep Set",          cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Locking" },
     "hw-patio-cylinder":      { code: "GLIS-12",     name: "Patio Cylinder",                       cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Cylinders" },
-    "hw-patio-roller":        { code: "GLIS-13",     name: "Ciilock Patio Roller",                 cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
-    "hw-panel-stopper":       { code: "GLIS-04",     name: "Panel Stopper (Bump Stop)",            cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
-    "hw-fixed-panel-support": { code: "GLIS-03",     name: "Fixed Panel Support",                  cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-patio-roller":        { code: "GLIS-13",     name: "Sliding Rolls",                        cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-panel-stopper":       { code: "GLIS-04",     name: "Bump Stop",                            cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
+    "hw-fixed-panel-support": { code: "GLIS-03",     name: "Fixed Panel Support Spacer",           cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
     "hw-brush-top":           { code: "GLIS-01",     name: "Top Brush Block",                      cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
     "hw-brush-bottom":        { code: "GLIS-02",     name: "Bottom Brush Block",                   cost: 0, price: 0, per: "pc", weight: 0, financialCategory: "Casement Extras" },
     // APPROXIMATE count (like the glazing-bridge-packer rule): Bridge Packer. Job

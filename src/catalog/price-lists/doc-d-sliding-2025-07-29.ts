@@ -54,7 +54,7 @@ export const DOC_D: PriceDoc = {
     { supplierCode: "SPQ-AD55142", description: "Threshold Cover Trim", unit: "m", stockLengthM: 4.2, unitPrice: 6.40, source: "Doc D 'THRESHOLD COVER TRIM' (£27.00/4.2 m)" },
     { supplierCode: "SPQ-AD55143", description: "Low Threshold Cover Trim", unit: "m", stockLengthM: 4.2, unitPrice: 5.20, source: "Doc D 'LOW THRESHOLD COVER TRIM' (£22.00/4.2 m) — UNMAPPED" },
     { supplierCode: "SPQ-AD55145", description: "Aluminium Low Threshold", unit: "m", stockLengthM: 6, unitPrice: 14.20, source: "Doc D 'ALUMINIUM LOW THRESHOLD' (£85.00/6 m) — UNMAPPED" },
-    { supplierCode: "SPQ-AD55144", description: "3 & 4 Panel Adapter", unit: "m", stockLengthM: 4.2, unitPrice: 6.40, source: "Doc D '3 & 4 PANEL ADAPTER' (£27.00/4.2 m) — UNMAPPED" },
+    { supplierCode: "SPQ-AD55144", description: "3 & 4 Panel Adapter", unit: "m", stockLengthM: 4.2, unitPrice: 6.40, source: "Doc D '3 & 4 PANEL ADAPTER' (£27.00/4.2 m) — mapped to aux-3-4-panel-adapter (AD55144)" },
     { supplierCode: "GLIS-15", description: "Frame Mechanical Joint", unit: "m", stockLengthM: 6, unitPrice: 2.70, source: "Doc D 'FRAME MECHANICAL JOINT', Aluminium (£16.00/6 m) — UNMAPPED" },
 
     // ---- Other accessories (per pc unless noted) ----

@@ -763,6 +763,17 @@ function esc(s: string): string {
   return String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as any)[m]);
 }
 function section(b: any): string {
+  // The emitter in bars.ts knows the catalog kind the piece came from, so trust
+  // it. The name heuristic below is the FALLBACK for pieces that carry no
+  // category — the cill, and the gasket rows which call this with `{name}` only.
+  //
+  // Classifying by name made a part's section depend on its DESCRIPTION: the
+  // sliding auxiliaries only landed in "Auxiliary" because their (invented)
+  // names happened to contain "Cap"/"Track". Renaming them to the supplier
+  // catalog's own wording — "Sliding Frame Cover", "U-PVC Interlock & Sash
+  // Cover" — would otherwise have filed them under Frame and Sash.
+  if (b.category) return b.category as string;
+
   const n = b.name as string;
   // Sliding auxiliaries (track + cover caps) are their own section — they are
   // square-cut trim, not frame or sash members. Checked FIRST because several

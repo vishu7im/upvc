@@ -707,7 +707,24 @@ export interface BarPiece {
   /** Optional reinforcement: its own piece records its own length. */
   reinforcementCode?: string;
   reinforcementLengthMm?: number;
+  /**
+   * Which cutting-list section this piece belongs to, recorded by the emitter
+   * that knows the catalog kind it came from.
+   *
+   * `documents.ts#section()` used to derive this by substring-matching `name`
+   * ("cap"/"track" ⇒ Auxiliary, "frame" ⇒ Frame, …), which made a part's
+   * SECTION depend on its DESCRIPTION: renaming the sliding auxiliaries to
+   * their supplier-catalog names ("Sliding Frame Cover", "U-PVC Interlock &
+   * Sash Cover") would have silently filed them under Frame and Sash.
+   *
+   * Optional so a piece that does not set it (e.g. the cill) keeps the legacy
+   * name heuristic and stays byte-identical.
+   */
+  category?: BarCategory;
 }
+
+/** Cutting-list grouping — the strings `documents.ts#section()` returns. */
+export type BarCategory = "Frame" | "Sash" | "Bead" | "Reinf" | "Auxiliary";
 
 export interface GlassPiece {
   /** Glass type code. */
